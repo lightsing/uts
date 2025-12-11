@@ -1,0 +1,38 @@
+[package]
+description = "Core types and traits for OpenTimestamps in Rust"
+documentation = "https://docs.rs/uts-core/"
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-core"
+repository.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "uts-info"
+path = "src/bin/uts_info.rs"
+
+[dependencies]
+auto_impl.workspace = true
+digest.workspace = true
+hex.workspace = true
+paste.workspace = true
+ripemd.workspace = true
+sha1.workspace = true
+sha2.workspace = true
+sha3.workspace = true
+smallvec = { workspace = true, features = ["write"] }
+thiserror.workspace = true
+tracing = { workspace = true, optional = true }
+
+[features]
+nightly = [
+  "smallvec/specialization",
+  "smallvec/may_dangle",
+]
+tracing = ["dep:tracing"]
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+opentimestamps = { git = "https://github.com/opentimestamps/rust-opentimestamps" }
