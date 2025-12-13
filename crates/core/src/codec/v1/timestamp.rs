@@ -9,6 +9,7 @@ type StepPtr = Option<NonZeroU32>;
 mod decode;
 mod encode;
 mod fmt;
+mod builder;
 
 const RECURSION_LIMIT: usize = 256;
 const MAX_OP_LENGTH: usize = 4096;
