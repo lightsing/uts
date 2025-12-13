@@ -1,0 +1,15 @@
+[package]
+name = "uts-bmt"
+description = "Binary Merkle Tree implementation for Universal Timestamps in Rust"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
