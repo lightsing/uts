@@ -121,26 +121,27 @@ pub struct SiblingIter<'a, D: Digest> {
     current: usize,
 }
 
-/// Indicates whether the sibling is a left or right child
+/// Indicates current node position relative to its sibling
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SiblingSide {
-    /// The sibling is a left child, `APPEND` its hash when computing the parent
+pub enum NodePosition {
+    /// The sibling is a right child, `APPEND` its hash when computing the parent
     Left,
-    /// The sibling is a right child, `PREPEND` its hash when computing the parent
+    /// The sibling is a left child, `PREPEND` its hash when computing the parent
     Right,
 }
 
 impl<'a, D: Digest> Iterator for SiblingIter<'a, D> {
-    type Item = (SiblingSide, &'a Output<D>);
+    /// (Yielded Node Position, Sibling Hash)
+    type Item = (NodePosition, &'a Output<D>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current <= 1 {
             return None;
         }
         let side = if (self.current & 1) == 0 {
-            SiblingSide::Left
+            NodePosition::Left
         } else {
-            SiblingSide::Right
+            NodePosition::Right
         };
         let sibling_index = self.current ^ 1;
         let sibling = unsafe { self.nodes.get_unchecked(sibling_index) };
@@ -232,11 +233,11 @@ mod tests {
             while let Some((side, sibling_hash)) = iter.next() {
                 let mut hasher = D::new();
                 match side {
-                    SiblingSide::Left => {
+                    NodePosition::Left => {
                         hasher.update(&current_hash);
                         hasher.update(sibling_hash);
                     }
-                    SiblingSide::Right => {
+                    NodePosition::Right => {
                         hasher.update(sibling_hash);
                         hasher.update(&current_hash);
                     }
