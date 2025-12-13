@@ -7,6 +7,7 @@ use std::num::NonZeroU32;
 
 type StepPtr = Option<NonZeroU32>;
 
+mod builder;
 mod decode;
 mod encode;
 pub(crate) mod fmt;
