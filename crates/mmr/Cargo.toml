@@ -1,0 +1,15 @@
+[package]
+authors.workspace = true
+description = "Merkle Mountain Range implementation for Universal Timestamps in Rust"
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-mmr"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
