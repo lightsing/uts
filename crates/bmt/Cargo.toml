@@ -1,11 +1,11 @@
 [package]
-name = "uts-bmt"
-description = "Binary Merkle Tree implementation for Universal Timestamps in Rust"
 authors.workspace = true
+description = "Binary Merkle Tree implementation for Universal Timestamps in Rust"
 edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
 license.workspace = true
+name = "uts-bmt"
 repository.workspace = true
 version.workspace = true
 
@@ -13,13 +13,15 @@ version.workspace = true
 digest.workspace = true
 
 [dev-dependencies]
+commonware-cryptography = "0.0.63" # for benchmarks
+commonware-storage = "0.0.63" # for benchmarks
+criterion.workspace = true
 sha2.workspace = true
 sha3.workspace = true
-criterion.workspace = true
 
 [[bench]]
-name = "tree_construction"
 harness = false
+name = "tree_construction"
 
 [lints]
 workspace = true

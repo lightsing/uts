@@ -1,35 +1,61 @@
-//! Benchmark for Merkle tree construction using different hash algorithms.
+//! Benchmark for Merkle tree construction.
 use criterion::{
     BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
     measurement::WallTime,
 };
-use digest::{Digest, Output};
+use digest::{Digest, FixedOutputReset, Output};
 use sha2::Sha256;
 use sha3::Keccak256;
 use std::hint::black_box;
 use uts_bmt::FlatMerkleTree;
 
-const INPUT_SIZES: &[usize] = &[1, 8, 64, 512, 4096, 8192, 16384, 32768, 65536];
+const INPUT_SIZES: &[usize] = &[8, 1024, 65536, 1_048_576];
 
 fn benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("tree_construction");
-    bench_digest::<Sha256>(&mut group, "sha2::Sha256");
-    bench_digest::<Keccak256>(&mut group, "sha3::Keccak256");
+    bench_digest::<Sha256>(&mut group, "uts-bmt/Sha256");
+    bench_digest::<Keccak256>(&mut group, "uts-bmt/Keccak256");
+    bench_commonware::<commonware_cryptography::Sha256>(
+        &mut group,
+        "commonware_storage::bmt/Sha256",
+    );
     group.finish();
 }
 
-fn bench_digest<D>(group: &mut BenchmarkGroup<'_, WallTime>, algorithm: &str)
+fn bench_digest<D>(group: &mut BenchmarkGroup<'_, WallTime>, id: &str)
 where
-    D: Digest,
+    D: Digest + FixedOutputReset,
     Output<D>: Copy,
 {
     for &size in INPUT_SIZES {
         let leaves = generate_leaves::<D>(size);
         group.throughput(Throughput::Elements(size as u64));
-        group.bench_function(BenchmarkId::new(algorithm, size), move |b| {
+        group.bench_function(BenchmarkId::new(id, size), move |b| {
             // Tree construction is the operation under test.
             b.iter(|| {
                 let tree = FlatMerkleTree::<D>::new(black_box(leaves.as_slice()));
+                black_box(tree);
+            });
+        });
+    }
+}
+
+fn bench_commonware<H: commonware_cryptography::Hasher>(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    id: &str,
+) {
+    use commonware_storage::bmt::Builder;
+
+    for &size in INPUT_SIZES {
+        let leaves: Vec<H::Digest> = generate_commonware_leaves::<H>(size);
+        group.throughput(Throughput::Elements(size as u64));
+        group.bench_function(BenchmarkId::new(id, size), move |b| {
+            b.iter(|| {
+                let mut builder = Builder::<H>::new(leaves.len());
+                for digest in leaves.iter() {
+                    builder.add(black_box(digest));
+                }
+                let tree = builder.build();
                 black_box(tree);
             });
         });
@@ -46,6 +72,15 @@ where
             let mut hasher = D::new();
             hasher.update(i.to_le_bytes());
             hasher.finalize()
+        })
+        .collect()
+}
+
+fn generate_commonware_leaves<H: commonware_cryptography::Hasher>(count: usize) -> Vec<H::Digest> {
+    (0..count)
+        .map(|i| {
+            let input = i.to_le_bytes();
+            H::hash(&input)
         })
         .collect()
 }

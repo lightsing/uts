@@ -2,7 +2,7 @@
 #![feature(maybe_uninit_fill)]
 //! High performance binary Merkle tree implementation in Rust.
 
-use digest::{Digest, Output};
+use digest::{Digest, FixedOutputReset, Output};
 
 /// Flat, Fixed-Size, Read only Merkle Tree
 ///
@@ -16,7 +16,7 @@ pub struct FlatMerkleTree<D: Digest> {
     len: usize,
 }
 
-impl<D: Digest> FlatMerkleTree<D>
+impl<D: Digest + FixedOutputReset> FlatMerkleTree<D>
 where
     Output<D>: Copy,
 {
@@ -62,15 +62,15 @@ where
                 .sort_unstable();
 
             // Build the tree
+            let mut hasher = D::new();
             for i in (1..len).rev() {
                 // SAFETY: in bounds due to loop range and initialization above
                 let left = maybe_uninit.get_unchecked(2 * i).assume_init_ref();
                 let right = maybe_uninit.get_unchecked(2 * i + 1).assume_init_ref();
 
-                let mut hasher = D::new();
-                hasher.update(left);
-                hasher.update(right);
-                let parent_hash = hasher.finalize();
+                Digest::update(&mut hasher, left);
+                Digest::update(&mut hasher, right);
+                let parent_hash = hasher.finalize_reset();
 
                 maybe_uninit.get_unchecked_mut(i).write(parent_hash);
             }
@@ -94,19 +94,19 @@ where
 
     /// Returns the leaves of the Merkle tree
     #[inline]
-    pub fn leafs(&self) -> &[Output<D>] {
+    pub fn leaves(&self) -> &[Output<D>] {
         unsafe { self.nodes.get_unchecked(self.len..self.len + self.len) }
     }
 
     /// Checks if the given leaf is contained in the Merkle tree
     #[inline]
     pub fn contains(&self, leaf: &Output<D>) -> bool {
-        self.leafs().binary_search(leaf).is_ok()
+        self.leaves().binary_search(leaf).is_ok()
     }
 
     /// Get proof for a given leaf
     pub fn get_proof_iter(&self, leaf: &Output<D>) -> Option<SiblingIter<'_, D>> {
-        let leaf_index_in_slice = self.leafs().binary_search(leaf).ok()?;
+        let leaf_index_in_slice = self.leaves().binary_search(leaf).ok()?;
         Some(SiblingIter {
             nodes: &self.nodes,
             current: self.len + leaf_index_in_slice,
@@ -177,7 +177,7 @@ mod tests {
         test_proof::<sha3::Keccak256>();
     }
 
-    fn test_merkle_tree<D: Digest>()
+    fn test_merkle_tree<D: Digest + FixedOutputReset>()
     where
         Output<D>: Copy,
     {
@@ -193,24 +193,22 @@ mod tests {
 
         // Manually compute the expected root
         let mut hasher = D::new();
-        let mut left = D::new();
-        left.update(&leaves[0]);
-        left.update(&leaves[1]);
-        let left_hash = left.finalize();
+        Digest::update(&mut hasher, &leaves[0]);
+        Digest::update(&mut hasher, &leaves[1]);
+        let left_hash = hasher.finalize_reset();
 
-        let mut right = D::new();
-        right.update(&leaves[2]);
-        right.update(&leaves[3]);
-        let right_hash = right.finalize();
+        Digest::update(&mut hasher, &leaves[2]);
+        Digest::update(&mut hasher, &leaves[3]);
+        let right_hash = hasher.finalize_reset();
 
-        hasher.update(&left_hash);
-        hasher.update(&right_hash);
+        Digest::update(&mut hasher, &left_hash);
+        Digest::update(&mut hasher, &right_hash);
         let expected_root = hasher.finalize();
 
         assert_eq!(tree.root().as_slice(), expected_root.as_slice());
     }
 
-    fn test_proof<D: Digest>()
+    fn test_proof<D: Digest + FixedOutputReset>()
     where
         Output<D>: Copy,
     {
@@ -230,19 +228,19 @@ mod tests {
                 .expect("Leaf should be in the tree");
             let mut current_hash = *leaf;
 
+            let mut hasher = D::new();
             while let Some((side, sibling_hash)) = iter.next() {
-                let mut hasher = D::new();
                 match side {
                     NodePosition::Left => {
-                        hasher.update(&current_hash);
-                        hasher.update(sibling_hash);
+                        Digest::update(&mut hasher, &current_hash);
+                        Digest::update(&mut hasher, sibling_hash);
                     }
                     NodePosition::Right => {
-                        hasher.update(sibling_hash);
-                        hasher.update(&current_hash);
+                        Digest::update(&mut hasher, sibling_hash);
+                        Digest::update(&mut hasher, &current_hash);
                     }
                 }
-                current_hash = hasher.finalize();
+                current_hash = hasher.finalize_reset();
             }
 
             assert_eq!(current_hash.as_slice(), tree.root().as_slice());
