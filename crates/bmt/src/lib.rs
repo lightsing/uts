@@ -1,7 +1,9 @@
 #![feature(maybe_uninit_slice)]
 #![feature(maybe_uninit_fill)]
+#![feature(likely_unlikely)]
 //! High performance binary Merkle tree implementation in Rust.
 
+use std::hint::unlikely;
 use digest::{Digest, FixedOutputReset, Output};
 
 /// Flat, Fixed-Size, Read only Merkle Tree
@@ -23,7 +25,7 @@ where
     /// Constructs a new Merkle tree from the given hash leaves.
     pub fn new(data: &[Output<D>]) -> Self {
         let raw_len = data.len();
-        if raw_len == 0 {
+        if unlikely(raw_len == 0) {
             return Self {
                 nodes: Box::new([Output::<D>::default(); 2]),
                 len: 1,
@@ -135,7 +137,7 @@ impl<'a, D: Digest> Iterator for SiblingIter<'a, D> {
     type Item = (NodePosition, &'a Output<D>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current <= 1 {
+        if unlikely(self.current <= 1) {
             return None;
         }
         let side = if (self.current & 1) == 0 {

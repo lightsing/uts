@@ -1,6 +1,6 @@
 //! Benchmark for Merkle tree construction.
 use criterion::{
-    BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
+    BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
     measurement::WallTime,
 };
 use digest::{Digest, FixedOutputReset, Output};
@@ -50,14 +50,20 @@ fn bench_commonware<H: commonware_cryptography::Hasher>(
         let leaves: Vec<H::Digest> = generate_commonware_leaves::<H>(size);
         group.throughput(Throughput::Elements(size as u64));
         group.bench_function(BenchmarkId::new(id, size), move |b| {
-            b.iter(|| {
-                let mut builder = Builder::<H>::new(leaves.len());
-                for digest in leaves.iter() {
-                    builder.add(black_box(digest));
-                }
-                let tree = builder.build();
-                black_box(tree);
-            });
+            b.iter_batched(
+                || {
+                    let mut builder = Builder::<H>::new(leaves.len());
+                    for digest in leaves.iter() {
+                        builder.add(black_box(digest));
+                    }
+                    builder
+                },
+                |builder| {
+                    let tree = builder.build();
+                    black_box(tree);
+                },
+                BatchSize::SmallInput,
+            );
         });
     }
 }
