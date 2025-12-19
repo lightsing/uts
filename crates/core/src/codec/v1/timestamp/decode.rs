@@ -7,8 +7,6 @@ use std::io::BufRead;
 
 impl Decode for Timestamp {
     fn decode(mut reader: impl Decoder) -> Result<Timestamp, DecodeError> {
-        let header = reader.decode()?;
-
         let mut steps = Vec::new();
         let mut data = Vec::new();
         let mut attestations = Vec::new();
@@ -23,7 +21,6 @@ impl Decode for Timestamp {
         )?;
 
         Ok(Timestamp {
-            header,
             steps,
             data,
             attestations,

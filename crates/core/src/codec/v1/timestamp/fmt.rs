@@ -3,12 +3,26 @@ use crate::{
     codec::v1::opcode::{OpCode, OperationBuffer},
     utils::Hexed,
 };
-use smallvec::ToSmallVec;
 use std::fmt;
+
+pub(crate) fn fmt(
+    timestamp: &Timestamp,
+    input: Option<&OperationBuffer>,
+    f: &mut fmt::Formatter,
+) -> fmt::Result {
+    fmt_recurse(
+        &timestamp,
+        input,
+        &timestamp.steps.last().unwrap(),
+        f,
+        0,
+        true,
+    )
+}
 
 fn fmt_recurse(
     timestamp: &Timestamp,
-    input: &OperationBuffer,
+    input: Option<&OperationBuffer>,
     step: &Step,
     f: &mut fmt::Formatter,
     depth: usize,
@@ -57,13 +71,19 @@ fn fmt_recurse(
                 writeln!(f, "execute {op}")?;
             }
 
-            let result = op.execute(&input, &data);
-            indent(f, depth, false)?;
-            writeln!(f, " result {}", Hexed(&result))?;
+            let result = if let Some(input) = input {
+                let result = op.execute(&input, &data);
+                indent(f, depth, false)?;
+                writeln!(f, " result {}", Hexed(&result))?;
+                Some(result)
+            } else {
+                None
+            };
+           
 
             if let Some(step_idx) = resolve_ptr(step.first_child) {
                 let step = &timestamp.steps[step_idx];
-                fmt_recurse(timestamp, &result, step, f, depth, false)?;
+                fmt_recurse(timestamp, result.as_ref(), step, f, depth, false)?;
             }
             Ok(())
         }
@@ -72,15 +92,9 @@ fn fmt_recurse(
 
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(
-            f,
-            "[total {} steps] digest of {}",
-            self.steps.len(),
-            self.header
-        )?;
         fmt_recurse(
             self,
-            &self.header.digest().to_smallvec(),
+            None,
             &self.steps.last().unwrap(),
             f,
             0,
