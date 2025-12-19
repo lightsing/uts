@@ -1,6 +1,7 @@
+//! ** The implementation here is subject to change as this is a read-only version. **
 use crate::codec::{
     Proof, Version,
-    v1::{Attestation, DigestHeader, opcode::OpCode},
+    v1::{Attestation, opcode::OpCode},
 };
 use std::num::NonZeroU32;
 
@@ -8,15 +9,31 @@ type StepPtr = Option<NonZeroU32>;
 
 mod decode;
 mod encode;
-mod fmt;
+pub(crate) mod fmt;
 
 const RECURSION_LIMIT: usize = 256;
 const MAX_OP_LENGTH: usize = 4096;
 
-/// Fully decoded OpenTimestamps proof for version 1.
+/// Proof that that one or more attestations commit to a message.
+///
+/// This should not be confused with [`DetachedTimestamp`](crate::codec::v1::DetachedTimestamp),
+/// single [`Timestamp`]s **DO NOT** include the digest of the message they commit to.
+///
+/// Sample Timestamp:
+/// ```text
+/// execute APPEND 7d9472db4ae254e8
+/// execute SHA256
+/// execute APPEND 65191d41c625e4505a442928ec4211b3
+/// execute SHA256
+/// execute APPEND 000639ee5837a935dce596c85f1ce323d5219afe84ee0832ee6614924f4c6598
+/// execute SHA256
+/// execute PREPEND 6944db61
+/// execute APPEND 0ef41e45bb5534b3
+/// result attested by Pending: update URI https://alice.btc.calendar.opentimestamps.org
+/// ```
+///
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Timestamp {
-    header: DigestHeader,
     steps: Vec<Step>,
     data: Vec<u8>,
     attestations: Vec<Attestation>,

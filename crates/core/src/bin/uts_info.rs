@@ -7,19 +7,19 @@
 //! Simple application to open an OTS info file and dump its contents
 //! to stdout in a human-readable format
 
-use std::{env, fs, io::BufReader, process};
-use uts_core::codec::{Decode, VersionedProof, v1::Timestamp};
+use std::{env, fs, io, io::BufReader, process};
+use std::io::Seek;
+use uts_core::codec::{Decode, VersionedProof};
+use uts_core::codec::v1::{DetachedTimestamp, Timestamp};
 
 fn main() {
-    // env_logger::init();
-    //
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         println!("Usage: {} <timestamp.ots>", args[0]);
         process::exit(1);
     }
 
-    let fh = match fs::File::open(&args[1]) {
+    let mut fh = match fs::File::open(&args[1]) {
         Ok(fh) => BufReader::new(fh),
         Err(e) => {
             println!("Failed to open {}: {}", args[1], e);
@@ -27,13 +27,26 @@ fn main() {
         }
     };
 
-    let ots = match VersionedProof::<Timestamp>::decode(fh) {
-        Ok(ots) => ots,
+    match VersionedProof::<DetachedTimestamp>::decode(&mut fh) {
+        Ok(ots) => {
+            println!("OTS Detached Timestamp found:");
+            println!("{ots}");
+        }
+        Err(e) => {
+            println!("Not a valid Detached Timestamp OTS file (trying raw timestamp): {}\n", e);
+        }
+    };
+
+    fh.seek(io::SeekFrom::Start(0)).unwrap();
+
+    match Timestamp::decode(fh) {
+        Ok(ots) => {
+            println!("Raw Timestamp found:");
+            println!("{ots}");
+        }
         Err(e) => {
             println!("Failed to parse {}: {}", args[1], e);
             process::exit(1);
         }
-    };
-
-    println!("{}", ots);
+    }
 }

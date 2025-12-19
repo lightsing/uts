@@ -7,7 +7,6 @@ use std::io::Write;
 
 impl Encode for Timestamp {
     fn encode(&self, mut writer: impl Encoder) -> Result<(), EncodeError> {
-        writer.encode(&self.header)?;
         self.encode_step_recurse(&mut writer, &self.steps.last().unwrap())
     }
 }
