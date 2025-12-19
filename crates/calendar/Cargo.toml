@@ -1,0 +1,28 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-calendar"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true }
+alloy-signer = { workspace = true }
+alloy-signer-local = { workspace = true }
+axum = { workspace = true, features = ["macros"] }
+axum-extra = { workspace = true }
+bytes = { workspace = true }
+eyre = { workspace = true }
+sha3 = { workspace = true }
+smallvec = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tower-http = { workspace = true, features = ["limit"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uts-core = { workspace = true }
+
+[lints]
+workspace = true

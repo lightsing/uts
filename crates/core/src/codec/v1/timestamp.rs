@@ -31,7 +31,6 @@ const MAX_OP_LENGTH: usize = 4096;
 /// execute APPEND 0ef41e45bb5534b3
 /// result attested by Pending: update URI https://alice.btc.calendar.opentimestamps.org
 /// ```
-///
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Timestamp {
     steps: Vec<Step>,

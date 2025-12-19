@@ -1,8 +1,9 @@
-use std::fmt;
-use std::fmt::Formatter;
+use crate::codec::{
+    Decode, Encode, Proof, Version,
+    v1::{DigestHeader, Timestamp, timestamp},
+};
 use smallvec::ToSmallVec;
-use crate::codec::{Decode, Encode, Proof, Version};
-use crate::codec::v1::{timestamp, DigestHeader, Timestamp};
+use std::{fmt, fmt::Formatter};
 
 /// A file containing a timestamp for another file
 /// Contains a timestamp, along with a header and the digest of the file.
@@ -29,7 +30,10 @@ impl Decode for DetachedTimestamp {
 }
 
 impl Encode for DetachedTimestamp {
-    fn encode(&self, mut writer: impl crate::codec::Encoder) -> Result<(), crate::error::EncodeError> {
+    fn encode(
+        &self,
+        mut writer: impl crate::codec::Encoder,
+    ) -> Result<(), crate::error::EncodeError> {
         self.header.encode(&mut writer)?;
         self.timestamp.encode(&mut writer)?;
         Ok(())
@@ -38,16 +42,12 @@ impl Encode for DetachedTimestamp {
 
 impl fmt::Display for DetachedTimestamp {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "digest of {}",
-            self.header
-        )?;
+        writeln!(f, "digest of {}", self.header)?;
 
         timestamp::fmt::fmt(
             &self.timestamp,
             Some(&self.header.digest().to_smallvec()),
-            f
+            f,
         )
     }
 }
