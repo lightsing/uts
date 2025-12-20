@@ -111,6 +111,15 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
         self.inner.buffer.len()
     }
 
+    /// Acquires a reader for this journal.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a reader is already taken.
+    pub fn reader(&self) -> JournalReader<ENTRY_SIZE> {
+        self.try_reader().expect("Journal reader already taken")
+    }
+
     /// Try acquires a reader for this journal.
     ///
     /// If a reader is already taken, returns None.
@@ -123,7 +132,19 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
     }
 
     /// Commit a new entry to the journal.
-    pub fn commit(
+    ///
+    /// # Panics
+    ///
+    /// Panics if the journal is full.
+    pub fn commit(&self, data: &[u8; ENTRY_SIZE]) -> CommitFuture<'_, ENTRY_SIZE> {
+        self.try_commit(data).expect("Journal buffer is full")
+    }
+
+    /// Try commit a new entry to the journal.
+    ///
+    /// Returns a future that resolves when the entry has been safely persisted.
+    /// Returns `BufferFull` error if the journal is full.
+    pub fn try_commit(
         &self,
         data: &[u8; ENTRY_SIZE],
     ) -> Result<CommitFuture<'_, ENTRY_SIZE>, BufferFull> {
@@ -259,5 +280,117 @@ impl Deref for WakerEntry {
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    pub const ENTRY_SIZE: usize = 8;
+    pub const TEST_DATA: &[[u8; ENTRY_SIZE]] = &[
+        [0u8; ENTRY_SIZE],
+        [1u8; ENTRY_SIZE],
+        [2u8; ENTRY_SIZE],
+        [3u8; ENTRY_SIZE],
+        [4u8; ENTRY_SIZE],
+        [5u8; ENTRY_SIZE],
+        [6u8; ENTRY_SIZE],
+        [7u8; ENTRY_SIZE],
+        [8u8; ENTRY_SIZE],
+        [9u8; ENTRY_SIZE],
+    ];
+    pub type Journal = crate::Journal<ENTRY_SIZE>;
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn try_reader_is_exclusive() {
+        let journal = Journal::with_capacity(2);
+
+        let reader = journal.try_reader().unwrap();
+
+        assert!(
+            journal.try_reader().is_none(),
+            "second reader acquisition should fail"
+        );
+
+        drop(reader);
+        assert!(
+            journal.try_reader().is_some(),
+            "reader acquisition should succeed after drop"
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn commit_and_read_round_trip() -> eyre::Result<()> {
+        let journal = Journal::with_capacity(4);
+        let mut reader = journal.reader();
+
+        journal.commit(&TEST_DATA[0]).await;
+        journal.commit(&TEST_DATA[1]).await;
+
+        {
+            let entries = reader.read(2);
+            assert_eq!(entries.len(), 2);
+            assert_eq!(entries[0], TEST_DATA[0]);
+            assert_eq!(entries[1], TEST_DATA[1]);
+        }
+
+        reader.commit();
+        assert_eq!(reader.available(), 0);
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn commit_returns_error_when_full() -> eyre::Result<()> {
+        let journal = Journal::with_capacity(2);
+
+        journal.commit(&TEST_DATA[1]).await;
+        journal.commit(&TEST_DATA[2]).await;
+
+        let err = journal
+            .try_commit(&TEST_DATA[3])
+            .expect_err("buffer should report full on third commit");
+        assert!(matches!(err, BufferFull));
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn reader_handles_wrap_around_reads() -> eyre::Result<()> {
+        let journal = Journal::with_capacity(4);
+        let mut reader = journal.reader();
+
+        for entry in TEST_DATA.iter().take(4) {
+            journal.commit(entry).await;
+        }
+
+        {
+            let entries = reader.read(2);
+            assert_eq!(entries.len(), 2);
+            assert_eq!(entries[0], TEST_DATA[0]);
+            assert_eq!(entries[1], TEST_DATA[1]);
+        }
+        reader.commit();
+
+        for entry in TEST_DATA.iter().skip(4).take(2) {
+            journal.commit(entry).await;
+        }
+
+        {
+            let entries = reader.read(4);
+            assert_eq!(entries.len(), 2);
+            assert_eq!(entries[0], TEST_DATA[2]);
+            assert_eq!(entries[1], TEST_DATA[3]);
+        }
+
+        {
+            let entries = reader.read(4);
+            assert_eq!(entries.len(), 2);
+            assert_eq!(entries[0], TEST_DATA[4]);
+            assert_eq!(entries[1], TEST_DATA[5]);
+        }
+
+        reader.commit();
+        assert_eq!(reader.available(), 0);
+        Ok(())
     }
 }

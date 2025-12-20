@@ -12,5 +12,9 @@ version.workspace = true
 [dependencies]
 dyn-clone.workspace = true
 
+[dev-dependencies]
+eyre = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
 [lints]
 workspace = true

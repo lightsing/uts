@@ -7,6 +7,8 @@ use std::{
 };
 
 /// A reader for consuming settled entries from the journal.
+///
+/// Reader **WON'T** advance the shared consumed boundary until `commit()` is called.
 pub struct JournalReader<const ENTRY_SIZE: usize> {
     journal: Arc<JournalInner<ENTRY_SIZE>>,
     consumed: u64,
@@ -119,5 +121,92 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
         self.journal
             .consumed_index
             .store(self.consumed, Ordering::Release);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tests::*;
+    use std::sync::atomic::Ordering;
+    use tokio::time::{Duration, sleep, timeout};
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn available_tracks_persisted_entries() -> eyre::Result<()> {
+        let journal = Journal::with_capacity(4);
+        let mut reader = journal.reader();
+
+        assert_eq!(reader.available(), 0);
+
+        journal.commit(&TEST_DATA[0]).await;
+        assert_eq!(reader.available(), 1);
+
+        journal.commit(&TEST_DATA[1]).await;
+        assert_eq!(reader.available(), 2);
+
+        let slice = reader.read(1);
+        assert_eq!(slice.len(), 1);
+        assert_eq!(reader.available(), 1);
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn commit_updates_shared_consumed_boundary() -> eyre::Result<()> {
+        let journal = Journal::with_capacity(4);
+        let mut reader = journal.reader();
+
+        for entry in TEST_DATA.iter().take(3) {
+            journal.commit(entry).await;
+        }
+
+        let slice = reader.read(2);
+        assert_eq!(slice.len(), 2);
+        assert_eq!(reader.available(), 1);
+        assert_eq!(
+            reader.journal.consumed_index.load(Ordering::Acquire),
+            0,
+            "global consumed boundary should not advance before commit",
+        );
+
+        reader.commit();
+        assert_eq!(reader.journal.consumed_index.load(Ordering::Acquire), 2);
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn wait_at_least_resumes_after_persistence() -> eyre::Result<()> {
+        let journal = Journal::with_capacity(4);
+        let reader = journal.reader();
+
+        let journal_clone = journal.clone();
+        let task = tokio::spawn(async move {
+            sleep(Duration::from_millis(5)).await;
+            journal_clone.commit(&TEST_DATA[0]).await;
+        });
+
+        reader.wait_at_least(1).await;
+        assert_eq!(reader.available(), 1);
+
+        task.await?;
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn wait_at_least_waits_for_correct_count() -> eyre::Result<()> {
+        let journal = Journal::with_capacity(4);
+        let reader = journal.reader();
+
+        let journal_clone = journal.clone();
+        let task = tokio::spawn(async move {
+            for entry in TEST_DATA.iter().take(4) {
+                journal_clone.commit(entry).await;
+                sleep(Duration::from_millis(5)).await;
+            }
+        });
+
+        timeout(Duration::from_secs(1), reader.wait_at_least(3)).await?;
+        assert!(reader.available() >= 3);
+
+        task.await?;
+        Ok(())
     }
 }

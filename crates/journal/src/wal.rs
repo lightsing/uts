@@ -16,6 +16,11 @@ const IO_BATCH_LIMIT: u64 = 128;
 pub trait Wal: DynClone + Send + Sync + 'static {
     /// Unpark the WAL worker thread to notify new data is available.
     fn unpark(&self);
+    /// Shutdown the WAL worker thread.
+    fn shutdown(&self) {
+        // Default implementation does nothing.
+        // Specific implementations can override this method to provide shutdown logic.
+    }
 }
 
 dyn_clone::clone_trait_object!(Wal);
