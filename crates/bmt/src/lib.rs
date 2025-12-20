@@ -3,8 +3,8 @@
 #![feature(likely_unlikely)]
 //! High performance binary Merkle tree implementation in Rust.
 
-use std::hint::unlikely;
 use digest::{Digest, FixedOutputReset, Output};
+use std::hint::unlikely;
 
 /// Flat, Fixed-Size, Read only Merkle Tree
 ///
