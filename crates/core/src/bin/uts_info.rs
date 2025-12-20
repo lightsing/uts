@@ -7,10 +7,15 @@
 //! Simple application to open an OTS info file and dump its contents
 //! to stdout in a human-readable format
 
-use std::{env, fs, io, io::BufReader, process};
-use std::io::Seek;
-use uts_core::codec::{Decode, VersionedProof};
-use uts_core::codec::v1::{DetachedTimestamp, Timestamp};
+use std::{
+    env, fs, io,
+    io::{BufReader, Seek},
+    process,
+};
+use uts_core::codec::{
+    Decode, VersionedProof,
+    v1::{DetachedTimestamp, Timestamp},
+};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -33,7 +38,10 @@ fn main() {
             println!("{ots}");
         }
         Err(e) => {
-            println!("Not a valid Detached Timestamp OTS file (trying raw timestamp): {}\n", e);
+            println!(
+                "Not a valid Detached Timestamp OTS file (trying raw timestamp): {}\n",
+                e
+            );
         }
     };
 

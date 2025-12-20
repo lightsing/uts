@@ -79,7 +79,6 @@ fn fmt_recurse(
             } else {
                 None
             };
-           
 
             if let Some(step_idx) = resolve_ptr(step.first_child) {
                 let step = &timestamp.steps[step_idx];
@@ -92,13 +91,6 @@ fn fmt_recurse(
 
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt_recurse(
-            self,
-            None,
-            &self.steps.last().unwrap(),
-            f,
-            0,
-            true,
-        )
+        fmt_recurse(self, None, &self.steps.last().unwrap(), f, 0, true)
     }
 }
