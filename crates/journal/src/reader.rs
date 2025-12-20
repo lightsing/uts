@@ -34,7 +34,7 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
         Self { journal, consumed }
     }
 
-    /// Returns the number of available entries are settled but not yet consumed by this reader.
+    /// Returns the number of available entries that are settled but not yet consumed by this reader.
     #[inline]
     pub fn available(&self) -> usize {
         let persisted = self.journal.persisted_index.load(Ordering::Acquire);
