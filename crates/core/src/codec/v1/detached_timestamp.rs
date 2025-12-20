@@ -51,3 +51,28 @@ impl fmt::Display for DetachedTimestamp {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        codec::{Decode, Encode, proof::VersionedProof},
+        fixtures,
+    };
+
+    #[test]
+    fn round_trip() {
+        let mut encoded_small = vec![];
+        let mut encoded_large = vec![];
+
+        let ots = VersionedProof::<DetachedTimestamp>::decode(fixtures::SMALL_DETACHED_TIMESTAMP);
+        assert!(ots.is_ok());
+        assert!(ots.unwrap().encode(&mut encoded_small).is_ok());
+        assert_eq!(encoded_small, fixtures::SMALL_DETACHED_TIMESTAMP);
+
+        let ots = VersionedProof::<DetachedTimestamp>::decode(fixtures::LARGE_DETACHED_TIMESTAMP);
+        assert!(ots.is_ok());
+        assert!(ots.unwrap().encode(&mut encoded_large).is_ok());
+        assert_eq!(encoded_large, fixtures::LARGE_DETACHED_TIMESTAMP);
+    }
+}
