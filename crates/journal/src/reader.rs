@@ -42,12 +42,27 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
     }
 
     /// Wait until at least `min` entries are available.
-    pub async fn wait_at_least(&self, min: usize) {
+    pub async fn wait_at_least(&mut self, min: usize) {
         if self.available() >= min {
             return;
         }
 
         let target_index = self.consumed.wrapping_add(min as u64);
+        {
+            // panics if the target_index exceeds buffer size, otherwise we might wait forever
+            // this happens if:
+            // - asks for more entries than the buffer can hold
+            // - didn't commit previously read entries, then asks for more than new entries than the buffer can hold
+            // this is considered a misuse of the API / design flaw in the caller, so we panics
+            let journal_buffer_size = self.journal.buffer.len() as u64;
+            let current_consumed = self.journal.consumed_index.load(Ordering::Acquire);
+            let max_possible_target = current_consumed.wrapping_add(journal_buffer_size);
+            if target_index > max_possible_target {
+                panic!(
+                    "requested ({target_index}) exceeds max possible ({max_possible_target}): journal.buffer.len()={journal_buffer_size}, journal.consumed_index={current_consumed}"
+                );
+            }
+        }
 
         // Slow path
         struct WaitForBatch<'a, const ENTRY_SIZE: usize> {
@@ -117,7 +132,7 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
     }
 
     /// Commit current consumed index.
-    pub fn commit(&self) {
+    pub fn commit(&mut self) {
         self.journal
             .consumed_index
             .store(self.consumed, Ordering::Release);
@@ -175,7 +190,7 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn wait_at_least_resumes_after_persistence() -> eyre::Result<()> {
         let journal = Journal::with_capacity(4);
-        let reader = journal.reader();
+        let mut reader = journal.reader();
 
         let journal_clone = journal.clone();
         let task = tokio::spawn(async move {
@@ -193,7 +208,7 @@ mod tests {
     #[tokio::test(flavor = "current_thread")]
     async fn wait_at_least_waits_for_correct_count() -> eyre::Result<()> {
         let journal = Journal::with_capacity(4);
-        let reader = journal.reader();
+        let mut reader = journal.reader();
 
         let journal_clone = journal.clone();
         let task = tokio::spawn(async move {
@@ -208,5 +223,34 @@ mod tests {
 
         task.await?;
         Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    #[should_panic(
+        expected = "requested (5) exceeds max possible (4): journal.buffer.len()=4, journal.consumed_index=0"
+    )]
+    async fn wait_at_least_exceeds_buffer_size() {
+        let journal = Journal::with_capacity(4);
+        let mut reader = journal.reader();
+
+        timeout(Duration::from_secs(1), reader.wait_at_least(5))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    #[should_panic(
+        expected = "requested (5) exceeds max possible (4): journal.buffer.len()=4, journal.consumed_index=0"
+    )]
+    async fn wait_at_least_dirty_read_exceeds_available() {
+        let journal = Journal::with_capacity(4);
+        journal.commit(&TEST_DATA[0]).await;
+
+        let mut reader = journal.reader();
+        reader.read(1);
+
+        timeout(Duration::from_secs(1), reader.wait_at_least(4))
+            .await
+            .unwrap();
     }
 }
