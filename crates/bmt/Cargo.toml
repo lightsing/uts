@@ -11,6 +11,8 @@ version.workspace = true
 
 [dependencies]
 digest.workspace = true
+hybrid-array = { workspace = true, features = ["bytemuck"] }
+bytemuck = { workspace = true }
 
 [dev-dependencies]
 commonware-cryptography = "0.0.63" # for benchmarks
