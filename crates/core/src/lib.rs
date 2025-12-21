@@ -10,4 +10,4 @@ pub mod fixtures;
 pub mod codec;
 /// Error types raised by codec operations.
 pub mod error;
-mod utils;
+pub mod utils;
