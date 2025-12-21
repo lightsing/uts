@@ -4560,6 +4560,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "uts-journal"
+version = "0.1.0"
+dependencies = [
+ "dyn-clone",
+ "eyre",
+ "tokio",
+]
+
+[[package]]
+name = "uts-stamper"
+version = "0.1.0"
+
+[[package]]
 name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
