@@ -6,7 +6,7 @@ pub struct Reader<R: Read>(pub R);
 
 impl<W: Write> Encoder for Writer<W> {
     fn encode_byte(&mut self, byte: u8) -> Result<(), EncodeError> {
-        self.write_all(&[byte])?;
+        self.write_all([byte])?;
         Ok(())
     }
 

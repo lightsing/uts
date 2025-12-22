@@ -61,19 +61,13 @@ impl OpCode {
     /// Returns `true` when the opcode requires an immediate operand.
     #[inline]
     pub const fn has_immediate(&self) -> bool {
-        match *self {
-            Self::APPEND | Self::PREPEND => true,
-            _ => false,
-        }
+        matches!(*self, Self::APPEND | Self::PREPEND)
     }
 
     /// Returns `true` for control opcodes.
     #[inline]
     pub const fn is_control(&self) -> bool {
-        match *self {
-            Self::ATTESTATION | Self::FORK => true,
-            _ => false,
-        }
+        matches!(*self, Self::APPEND | Self::PREPEND)
     }
 
     /// Returns `true` for digest opcodes.

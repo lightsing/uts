@@ -67,7 +67,7 @@ pub async fn submit_digest(digest: Bytes) -> Bytes {
     trace!(recv_timestamp);
     let recv_timestamp = recv_timestamp.to_le_bytes();
     timestamp.encode(OpCode::PREPEND).unwrap();
-    timestamp.encode_bytes(&recv_timestamp).unwrap();
+    timestamp.encode_bytes(recv_timestamp).unwrap();
     pending_attestation.extend(recv_timestamp);
 
     trace!(digest = ?Hexed(&digest));
@@ -81,7 +81,7 @@ pub async fn submit_digest(digest: Bytes) -> Bytes {
     let undeniable_sig = undeniable_sig.as_erc2098();
     trace!(undeniable_sig = ?Hexed(&undeniable_sig));
     timestamp.encode(OpCode::APPEND).unwrap();
-    timestamp.encode_bytes(&undeniable_sig).unwrap();
+    timestamp.encode_bytes(undeniable_sig).unwrap();
     pending_attestation.extend(undeniable_sig);
 
     trace!(pending_attestation = ?Hexed(&pending_attestation));
@@ -99,7 +99,7 @@ pub async fn submit_digest(digest: Bytes) -> Bytes {
     timestamp.encode(OpCode::KECCAK256).unwrap();
 
     timestamp.encode(OpCode::ATTESTATION).unwrap();
-    timestamp.encode(&attestation.to_raw().unwrap()).unwrap();
+    timestamp.encode(attestation.to_raw().unwrap()).unwrap();
 
     // TODO: store the pending_attestation into journal
     debug_assert_eq!(timestamp.len(), buf_size, "buffer size mismatch");

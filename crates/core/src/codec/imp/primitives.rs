@@ -67,7 +67,7 @@ leb128!(u16, u32, u64, u128);
 impl Encode for u8 {
     #[inline]
     fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
-        encoder.write_all(&[*self])?;
+        encoder.write_all([*self])?;
         Ok(())
     }
 }

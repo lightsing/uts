@@ -58,7 +58,7 @@ impl<A: Allocator> Timestamp<A> {
                 }
 
                 let result = if let Some(input) = input {
-                    let result = op.execute(&input, &step.data);
+                    let result = op.execute(input, &step.data);
                     indent(f, depth, false)?;
                     writeln!(f, " result {}", Hexed(&result))?;
                     Some(result)

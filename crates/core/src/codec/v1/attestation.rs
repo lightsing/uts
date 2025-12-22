@@ -47,7 +47,7 @@ impl<A: Allocator> DecodeIn<A> for RawAttestation<A> {
 impl Encode for RawAttestation {
     #[inline]
     fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
-        encoder.write_all(&self.tag)?;
+        encoder.write_all(self.tag)?;
         encoder.encode_bytes(&self.data)
     }
 }
@@ -143,7 +143,7 @@ impl<'a> Attestation<'a> for PendingAttestation<'a> {
         if length as usize > Self::MAX_URI_LEN {
             return Err(DecodeError::UriTooLong);
         }
-        let uri = core::str::from_utf8(&data).map_err(|_| DecodeError::InvalidUriChar)?;
+        let uri = core::str::from_utf8(data).map_err(|_| DecodeError::InvalidUriChar)?;
         if !Self::validate_uri(uri) {
             return Err(DecodeError::InvalidUriChar);
         }

@@ -43,7 +43,7 @@ impl Encode for DigestHeader {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(writer), err))]
     #[inline]
     fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
-        encoder.encode(&self.kind)?;
+        encoder.encode(self.kind)?;
         encoder.write_all(&self.digest[..self.kind.output_size()])?;
         Ok(())
     }
