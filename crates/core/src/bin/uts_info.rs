@@ -36,6 +36,7 @@ fn main() {
         Ok(ots) => {
             println!("OTS Detached Timestamp found:");
             println!("{ots}");
+            return;
         }
         Err(e) => {
             println!(
