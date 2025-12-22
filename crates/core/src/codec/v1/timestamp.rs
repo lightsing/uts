@@ -11,7 +11,6 @@ mod builder;
 mod decode;
 mod encode;
 mod fmt;
-mod builder;
 
 /// Proof that that one or more attestations commit to a message.
 ///
