@@ -1,7 +1,7 @@
 //! ** The implementation here is subject to change as this is a read-only version. **
 
 use crate::{
-    codec::v1::{Attestation, opcode::OpCode},
+    codec::v1::{attestation::RawAttestation, opcode::OpCode},
     utils::Hexed,
 };
 use alloc::{alloc::Global, vec::Vec};
@@ -32,7 +32,7 @@ mod fmt;
 #[derive(Clone, Debug)]
 pub enum Timestamp<A: Allocator = Global> {
     Step(Step<A>),
-    Attestation(Attestation),
+    Attestation(RawAttestation<A>),
 }
 
 /// An execution Step.

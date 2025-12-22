@@ -9,6 +9,9 @@ pub enum DecodeError {
     /// File has a version we do not understand.
     #[error("bad version")]
     BadVersion,
+    /// Expected an attestation tag but decoded something else.
+    #[error("bad attestation tag")]
+    BadAttestationTag,
     /// Read an LEB128-encoded integer that overflowed the expected size.
     #[error("read a LEB128 value overflows {0} bits")]
     LEB128Overflow(u32),
@@ -24,6 +27,9 @@ pub enum DecodeError {
     /// Encountered an invalid character in a URI.
     #[error("invalid character in URI")]
     InvalidUriChar,
+    /// URI is too long.
+    #[error("URI too long")]
+    UriTooLong,
     /// Recursed deeper than allowed while decoding the proof.
     #[error("recursion limit reached")]
     RecursionLimit,
@@ -42,6 +48,12 @@ pub enum EncodeError {
     /// Tried to encode a `usize` exceeding `u32::MAX`.
     #[error("tried to encode a usize exceeding u32::MAX")]
     UsizeOverflow,
+    /// Encountered an invalid character in a URI.
+    #[error("invalid character in URI")]
+    InvalidUriChar,
+    /// URI is too long.
+    #[error("URI too long")]
+    UriTooLong,
     /// General I/O error
     #[cfg(feature = "std")]
     #[error("I/O error: {0}")]

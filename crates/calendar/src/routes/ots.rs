@@ -9,7 +9,7 @@ use tracing::Level;
 use uts_core::{
     codec::{
         Encoder,
-        v1::{Attestation, opcode::OpCode},
+        v1::{Attestation, PendingAttestation, opcode::OpCode},
     },
     utils::Hexed,
 };
@@ -53,7 +53,7 @@ pub async fn submit_digest(digest: Bytes) -> Bytes {
         + 8 // Pending tag
         + 1 // length of packed ATTESTATION data length in leb128
         + (1 + uri.len()); // length of uri in leb128 + uri bytes
-    let attestation = Attestation::Pending { uri };
+    let attestation = PendingAttestation { uri: uri.into() };
 
     let mut timestamp = BytesMut::with_capacity(buf_size);
 
@@ -99,7 +99,7 @@ pub async fn submit_digest(digest: Bytes) -> Bytes {
     timestamp.encode(OpCode::KECCAK256).unwrap();
 
     timestamp.encode(OpCode::ATTESTATION).unwrap();
-    timestamp.encode(&attestation).unwrap();
+    timestamp.encode(&attestation.to_raw().unwrap()).unwrap();
 
     // TODO: store the pending_attestation into journal
     debug_assert_eq!(timestamp.len(), buf_size, "buffer size mismatch");

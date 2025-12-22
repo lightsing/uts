@@ -34,7 +34,7 @@ impl<A: Allocator + Copy> Timestamp<A> {
     ) -> Result<Timestamp<A>, DecodeError> {
         match op {
             OpCode::ATTESTATION => {
-                let attestation = Attestation::decode(decoder)?;
+                let attestation = RawAttestation::decode_in(decoder, alloc)?;
                 Ok(Timestamp::Attestation(attestation))
             }
             OpCode::FORK => {

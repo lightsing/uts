@@ -4,6 +4,7 @@
 //! # Universal Timestamps Core Library
 
 extern crate alloc;
+extern crate core;
 
 mod tracing;
 
