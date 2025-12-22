@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 /// Zero-allocation wrapper that displays byte slices as lowercase hex.
 pub struct Hexed<'a, T: ?Sized>(pub &'a T);

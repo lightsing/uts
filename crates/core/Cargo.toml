@@ -12,6 +12,7 @@ version.workspace = true
 [[bin]]
 name = "uts-info"
 path = "src/bin/uts_info.rs"
+required-features = ["std"]
 
 [dependencies]
 auto_impl.workspace = true
@@ -22,16 +23,16 @@ ripemd.workspace = true
 sha1.workspace = true
 sha2.workspace = true
 sha3.workspace = true
-smallvec = { workspace = true, features = ["write"] }
+smallvec = { workspace = true, features = ["specialization", "may_dangle"] }
 thiserror.workspace = true
 tracing = { workspace = true, optional = true }
+bytes = { workspace = true, optional = true }
 
 [features]
-nightly = [
-  "smallvec/specialization",
-  "smallvec/may_dangle",
-]
+default = ["std"]
 tracing = ["dep:tracing"]
+std = []
+bytes = ["dep:bytes"]
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

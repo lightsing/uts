@@ -8,15 +8,13 @@
 //! comes from some server or from a blockchain.
 
 use crate::{
-    codec::{Decoder, Encoder},
+    codec::{Decode, Decoder, Encode, Encoder},
     error::{DecodeError, EncodeError},
     utils::Hexed,
 };
+use alloc::{string::String, vec::Vec};
+use core::fmt;
 use smallvec::SmallVec;
-use std::{
-    fmt,
-    io::{BufRead, Write},
-};
 
 /// Size in bytes of the tag identifying the attestation type.
 const TAG_SIZE: usize = 8;
@@ -48,23 +46,22 @@ pub enum Attestation {
     Unknown { tag: AttestationTag, data: Vec<u8> },
 }
 
-impl Attestation {
-    /// Decodes an attestation payload from the reader.
-    pub fn decode<R: BufRead>(mut reader: R) -> Result<Attestation, DecodeError> {
+impl Decode for Attestation {
+    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
         let mut tag = [0u8; TAG_SIZE];
-        reader.read_exact(&mut tag)?;
-        let len = reader.decode()?;
+        decoder.read_exact(&mut tag)?;
+        let len = decoder.decode()?;
 
         if tag == *BITCOIN_TAG {
-            let height = reader.decode()?;
+            let height = decoder.decode()?;
             Ok(Attestation::Bitcoin { height })
         } else if tag == *PENDING_TAG {
             // This validation logic copied from python-opentimestamps. Peter comments
             // that he is deliberately avoiding ?, &, @, etc., to "keep us out of trouble"
-            let length = reader.decode_ranged(0..=MAX_URI_LEN)?;
+            let length = decoder.decode_ranged(0..=MAX_URI_LEN)?;
             let mut uri_bytes = Vec::with_capacity(len);
             uri_bytes.resize(length, 0);
-            reader.read_exact(&mut uri_bytes)?;
+            decoder.read_exact(&mut uri_bytes)?;
             let uri_string =
                 String::from_utf8(uri_bytes).map_err(|_| DecodeError::InvalidUriChar)?;
             if !uri_string.chars().all(
@@ -77,30 +74,32 @@ impl Attestation {
         } else {
             let mut data = Vec::with_capacity(len);
             data.resize(len, 0);
-            reader.read_exact(&mut data)?;
+            decoder.read_exact(&mut data)?;
 
             Ok(Attestation::Unknown { tag, data })
         }
     }
+}
 
-    /// Encodes the attestation to the writer.
-    pub fn encode<W: Write>(&self, mut writer: W) -> Result<(), EncodeError> {
+impl Encode for Attestation {
+    #[inline]
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
         match *self {
             Attestation::Bitcoin { height } => {
-                writer.write_all(BITCOIN_TAG)?;
+                encoder.write_all(BITCOIN_TAG)?;
                 let mut buffer = SmallVec::<[u8; u32::BITS.div_ceil(7) as usize]>::new();
-                buffer.encode(height)?;
-                writer.encode_bytes(&buffer)
+                height.encode(&mut buffer)?;
+                encoder.encode_bytes(&buffer)
             }
             Attestation::Pending { ref uri } => {
-                writer.write_all(PENDING_TAG)?;
+                encoder.write_all(PENDING_TAG)?;
                 let mut buffer = Vec::new();
                 buffer.encode_bytes(uri.as_bytes())?;
-                writer.encode_bytes(&buffer)
+                encoder.encode_bytes(&buffer)
             }
             Attestation::Unknown { ref tag, ref data } => {
-                writer.write_all(tag)?;
-                writer.encode_bytes(data)
+                encoder.write_all(tag)?;
+                encoder.encode_bytes(data)
             }
         }
     }

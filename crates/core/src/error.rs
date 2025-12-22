@@ -27,9 +27,13 @@ pub enum DecodeError {
     /// Recursed deeper than allowed while decoding the proof.
     #[error("recursion limit reached")]
     RecursionLimit,
+    /// Reached end-of-file unexpectedly.
+    #[error("unexpected end of file")]
+    UnexpectedEof,
     /// General I/O error
+    #[cfg(feature = "std")]
     #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(std::io::Error),
 }
 
 /// Errors returned while encoding proofs.
@@ -39,6 +43,17 @@ pub enum EncodeError {
     #[error("tried to encode a usize exceeding u32::MAX")]
     UsizeOverflow,
     /// General I/O error
+    #[cfg(feature = "std")]
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+}
+
+#[cfg(feature = "std")]
+impl From<std::io::Error> for DecodeError {
+    fn from(err: std::io::Error) -> Self {
+        match err.kind() {
+            std::io::ErrorKind::UnexpectedEof => Self::UnexpectedEof,
+            _ => Self::Io(err),
+        }
+    }
 }

@@ -22,7 +22,7 @@ tokio = { workspace = true, features = ["full"] }
 tower-http = { workspace = true, features = ["limit"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-uts-core = { workspace = true }
+uts-core = { workspace = true, features = ["bytes"] }
 
 [lints]
 workspace = true

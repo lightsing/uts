@@ -1,14 +1,11 @@
-use crate::{
-    codec::{Decode, Encode},
-    error::EncodeError,
-};
+use crate::codec::*;
 
 macro_rules! leb128 {
     ($ty:ty) => {
         paste::paste! {
-            impl super::Encode for $ty {
+            impl crate::codec::Encode for $ty {
                 #[inline]
-                fn encode(&self, mut encoder: impl crate::codec::Encoder) -> Result<(), $crate::error::EncodeError> {
+                fn encode(&self, encoder: &mut impl crate::codec::Encoder) -> Result<(), $crate::error::EncodeError> {
                     let mut n = *self;
                     let mut buf = [0u8; <$ty>::BITS.div_ceil(7) as usize];
                     let mut i = 0;
@@ -34,9 +31,9 @@ macro_rules! leb128 {
                 }
             }
 
-            impl super::Decode for $ty {
+            impl crate::codec::Decode for $ty {
                 #[inline]
-                fn decode(mut decoder: impl crate::codec::Decoder) -> Result<Self, $crate::error::DecodeError> {
+                fn decode(decoder: &mut impl crate::codec::Decoder) -> Result<Self, $crate::error::DecodeError> {
                     let mut ret: $ty = 0;
                     let mut shift: u32 = 0;
 
@@ -69,7 +66,7 @@ leb128!(u16, u32, u64, u128);
 
 impl Encode for u8 {
     #[inline]
-    fn encode(&self, mut encoder: impl crate::codec::Encoder) -> Result<(), EncodeError> {
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
         encoder.write_all(&[*self])?;
         Ok(())
     }
@@ -77,7 +74,7 @@ impl Encode for u8 {
 
 impl Decode for u8 {
     #[inline]
-    fn decode(mut decoder: impl crate::codec::Decoder) -> Result<Self, crate::error::DecodeError> {
+    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
         let mut byte = [0u8; 1];
         decoder.read_exact(&mut byte)?;
         Ok(byte[0])
@@ -86,17 +83,17 @@ impl Decode for u8 {
 
 impl Encode for usize {
     #[inline]
-    fn encode(&self, mut encoder: impl crate::codec::Encoder) -> Result<(), EncodeError> {
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
         let val: u32 = (*self).try_into().map_err(|_| EncodeError::UsizeOverflow)?;
-        val.encode(&mut encoder)?;
+        val.encode(encoder)?;
         Ok(())
     }
 }
 
 impl Decode for usize {
     #[inline]
-    fn decode(mut decoder: impl crate::codec::Decoder) -> Result<Self, crate::error::DecodeError> {
-        let val = u32::decode(&mut decoder)?;
+    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
+        let val = u32::decode(decoder)?;
         Ok(val as usize)
     }
 }

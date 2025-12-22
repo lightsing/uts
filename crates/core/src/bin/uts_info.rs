@@ -13,7 +13,7 @@ use std::{
     process,
 };
 use uts_core::codec::{
-    Decode, VersionedProof,
+    Decode, Reader, VersionedProof,
     v1::{DetachedTimestamp, Timestamp},
 };
 
@@ -32,7 +32,7 @@ fn main() {
         }
     };
 
-    match VersionedProof::<DetachedTimestamp>::decode(&mut fh) {
+    match VersionedProof::<DetachedTimestamp>::decode(&mut Reader(&mut fh)) {
         Ok(ots) => {
             println!("OTS Detached Timestamp found:");
             println!("{ots}");
@@ -47,7 +47,7 @@ fn main() {
 
     fh.seek(io::SeekFrom::Start(0)).unwrap();
 
-    match Timestamp::decode(fh) {
+    match Timestamp::decode(&mut Reader(&mut fh)) {
         Ok(ots) => {
             println!("Raw Timestamp found:");
             println!("{ots}");

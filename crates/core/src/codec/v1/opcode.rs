@@ -6,22 +6,28 @@ use crate::{
     codec::{Decode, Decoder, Encode, Encoder},
     error::{DecodeError, EncodeError},
 };
+use core::{fmt, hint::unreachable_unchecked};
 use digest::{Digest, OutputSizeUser, typenum::Unsigned};
 use ripemd::Ripemd160;
 use sha1::Sha1;
 use sha2::Sha256;
 use sha3::Keccak256;
 use smallvec::ToSmallVec;
-use std::{fmt, hint::unreachable_unchecked};
 
 pub(crate) type OperationBuffer = smallvec::SmallVec<[u8; 64]>;
 
 /// An OpenTimestamps opcode.
 ///
 /// This is always a valid opcode.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct OpCode(u8);
+
+impl fmt::Debug for OpCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
 
 impl fmt::Display for OpCode {
     /// Formats the opcode as a string.
@@ -32,15 +38,15 @@ impl fmt::Display for OpCode {
 
 impl Encode for OpCode {
     #[inline]
-    fn encode(&self, mut writer: impl Encoder) -> Result<(), EncodeError> {
-        writer.encode_byte(self.tag())
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
+        encoder.encode_byte(self.tag())
     }
 }
 
 impl Decode for OpCode {
     #[inline]
-    fn decode(mut reader: impl Decoder) -> Result<Self, DecodeError> {
-        let byte = reader.decode_byte()?;
+    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
+        let byte = decoder.decode_byte()?;
         OpCode::new(byte).ok_or(DecodeError::BadOpCode(byte))
     }
 }
@@ -153,9 +159,15 @@ impl PartialEq<u8> for OpCode {
 /// An OpenTimestamps digest opcode.
 ///
 /// This is always a valid opcode.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct DigestOp(OpCode);
+
+impl fmt::Debug for DigestOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.name())
+    }
+}
 
 impl fmt::Display for DigestOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -177,15 +189,15 @@ impl PartialEq<u8> for DigestOp {
 
 impl Encode for DigestOp {
     #[inline]
-    fn encode(&self, writer: impl Encoder) -> Result<(), EncodeError> {
-        self.0.encode(writer)
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
+        self.0.encode(encoder)
     }
 }
 
 impl Decode for DigestOp {
     #[inline]
-    fn decode(mut reader: impl Decoder) -> Result<Self, DecodeError> {
-        let opcode = OpCode::decode(&mut reader)?;
+    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
+        let opcode = OpCode::decode(decoder)?;
         opcode
             .as_digest()
             .ok_or(DecodeError::ExpectedDigestOp(opcode))
