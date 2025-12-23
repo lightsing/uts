@@ -58,7 +58,7 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
         let hash = HASHER.with(|hasher| {
             let mut hasher = hasher.borrow_mut();
             hasher.update(EIP191_PREFIX.as_bytes());
-            hasher.update(&recv_timestamp);
+            hasher.update(recv_timestamp);
             hasher.update(&digest);
             hasher.finalize_reset()
         });
