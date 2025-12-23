@@ -1,8 +1,9 @@
 use crate::{
-    codec::{Decode, Decoder, Encode, Encoder, v1::opcode::DigestOp},
+    codec::{DecodeIn, Decoder, Encode, Encoder, v1::opcode::DigestOp},
     error::{DecodeError, EncodeError},
     utils::Hexed,
 };
+use alloc::alloc::Allocator;
 use core::fmt;
 
 /// Header describing the digest that anchors a timestamp.
@@ -49,10 +50,10 @@ impl Encode for DigestHeader {
     }
 }
 
-impl Decode for DigestHeader {
+impl<A: Allocator> DecodeIn<A> for DigestHeader {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(reader), ret, err))]
     #[inline]
-    fn decode(decoder: &mut impl Decoder) -> Result<DigestHeader, DecodeError> {
+    fn decode_in(decoder: &mut impl Decoder, _alloc: A) -> Result<DigestHeader, DecodeError> {
         let kind = decoder.decode()?;
         let mut digest = [0u8; 32];
         decoder.read_exact(&mut digest)?;

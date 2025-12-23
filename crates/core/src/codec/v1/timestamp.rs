@@ -2,7 +2,7 @@
 
 use crate::{
     codec::v1::{attestation::RawAttestation, opcode::OpCode},
-    utils::Hexed,
+    utils::{Hexed, OnceLock},
 };
 use alloc::{alloc::Global, vec::Vec};
 use core::{alloc::Allocator, fmt::Debug};
@@ -40,6 +40,7 @@ pub enum Timestamp<A: Allocator = Global> {
 pub struct Step<A: Allocator = Global> {
     op: OpCode,
     data: Vec<u8, A>,
+    input: OnceLock<Vec<u8, A>>,
     next: Vec<Timestamp<A>, A>,
 }
 
@@ -71,12 +72,104 @@ impl<A: Allocator + Debug> Debug for Step<A> {
         f.field("next", &self.next).finish()
     }
 }
-impl Timestamp {
+
+impl<A: Allocator> Timestamp<A> {
     /// Returns the opcode of this timestamp node.
     pub fn op(&self) -> OpCode {
         match self {
-            Timestamp::Step(step) => step.op,
+            Timestamp::Step(step) => {
+                debug_assert_ne!(
+                    step.op,
+                    OpCode::ATTESTATION,
+                    "sanity check failed: Step with ATTESTATION opcode"
+                );
+                step.op
+            }
             Timestamp::Attestation(_) => OpCode::ATTESTATION,
         }
+    }
+
+    /// Returns this timestamp as a step, if it is one.
+    #[inline]
+    pub fn as_step(&self) -> Option<&Step<A>> {
+        match self {
+            Timestamp::Step(step) => Some(step),
+            Timestamp::Attestation(_) => None,
+        }
+    }
+
+    /// Returns this timestamp as an attestation, if it is one.
+    #[inline]
+    pub fn as_attestation(&self) -> Option<&RawAttestation<A>> {
+        match self {
+            Timestamp::Attestation(attestation) => Some(attestation),
+            Timestamp::Step(_) => None,
+        }
+    }
+
+    /// Returns the input data for this timestamp node, if finalized.
+    #[inline]
+    pub fn input(&self) -> Option<&[u8]> {
+        match self {
+            Timestamp::Step(step) => step.input.get().map(|v| v.as_slice()),
+            Timestamp::Attestation(attestation) => attestation.value.get().map(|v| v.as_slice()),
+        }
+    }
+
+    /// Returns the allocator used by this timestamp node.
+    #[inline]
+    pub fn allocator(&self) -> &A {
+        match self {
+            Self::Attestation(attestation) => attestation.allocator(),
+            Self::Step(step) => step.allocator(),
+        }
+    }
+}
+
+impl<A: Allocator + Clone> Timestamp<A> {
+    /// Finalizes the timestamp with the given input data.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timestamp is already finalized with different input data.
+    pub fn finalize(&self, input: Vec<u8, A>) {
+        match self {
+            Self::Attestation(attestation) => {
+                if let Some(already) = attestation.value.get() {
+                    assert_eq!(&input, already, "trying to finalize with different input");
+                    return;
+                }
+                let _ = attestation.value.get_or_init(|| input);
+            }
+            Self::Step(step) => {
+                if let Some(already) = step.input.get() {
+                    assert_eq!(&input, already, "trying to finalize with different input");
+                    return;
+                }
+                let input = step.input.get_or_init(|| input);
+
+                match step.op {
+                    OpCode::FORK => {
+                        debug_assert!(step.next.len() >= 2, "FORK must have at least two children");
+                        for child in &step.next {
+                            child.finalize(input.clone());
+                        }
+                    }
+                    OpCode::ATTESTATION => unreachable!("should not happen"),
+                    op => {
+                        let output = op.execute_in(input, &step.data, step.allocator().clone());
+                        debug_assert!(step.next.len() == 1, "non-FORK must have exactly one child");
+                        step.next[0].finalize(output);
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl<A: Allocator> Step<A> {
+    /// Returns the allocator used by this step.
+    pub(crate) fn allocator(&self) -> &A {
+        self.data.allocator()
     }
 }

@@ -3,18 +3,16 @@
 //! It contains opcode information and utilities to work with opcodes.
 
 use crate::{
-    codec::{Decode, Decoder, Encode, Encoder},
+    codec::{Decode, DecodeIn, Decoder, Encode, Encoder},
     error::{DecodeError, EncodeError},
 };
+use alloc::{alloc::Allocator, vec::Vec};
 use core::{fmt, hint::unreachable_unchecked};
 use digest::{Digest, OutputSizeUser, typenum::Unsigned};
 use ripemd::Ripemd160;
 use sha1::Sha1;
 use sha2::Sha256;
 use sha3::Keccak256;
-use smallvec::ToSmallVec;
-
-pub(crate) type OperationBuffer = smallvec::SmallVec<[u8; 64]>;
 
 /// An OpenTimestamps opcode.
 ///
@@ -67,7 +65,7 @@ impl OpCode {
     /// Returns `true` for control opcodes.
     #[inline]
     pub const fn is_control(&self) -> bool {
-        matches!(*self, Self::APPEND | Self::PREPEND)
+        matches!(*self, Self::ATTESTATION | Self::FORK)
     }
 
     /// Returns `true` for digest opcodes.
@@ -91,26 +89,41 @@ impl OpCode {
     ///
     /// Panics if the opcode is a control opcode.
     #[inline]
-    pub fn execute(&self, input: impl AsRef<[u8]>, immediate: impl AsRef<[u8]>) -> OperationBuffer {
+    pub fn execute(&self, input: impl AsRef<[u8]>, immediate: impl AsRef<[u8]>) -> Vec<u8> {
+        self.execute_in(input, immediate, alloc::alloc::Global)
+    }
+
+    /// Executes the opcode on the given input data, with an optional immediate value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the opcode is a control opcode.
+    #[inline]
+    pub fn execute_in<A: Allocator>(
+        &self,
+        input: impl AsRef<[u8]>,
+        immediate: impl AsRef<[u8]>,
+        alloc: A,
+    ) -> Vec<u8, A> {
         if let Some(digest_op) = self.as_digest() {
-            return digest_op.execute(input);
+            return digest_op.execute_in(input, alloc);
         }
 
         let input = input.as_ref();
         match *self {
             Self::APPEND => {
-                let mut out = OperationBuffer::from_slice(input);
+                let mut out = input.to_vec_in(alloc);
                 out.extend_from_slice(immediate.as_ref());
                 out
             }
             Self::PREPEND => {
-                let mut out = OperationBuffer::from_slice(immediate.as_ref());
+                let mut out = input.to_vec_in(alloc);
                 out.extend_from_slice(input);
                 out
             }
             Self::REVERSE => {
                 let len = input.len();
-                let mut out = OperationBuffer::with_capacity(len);
+                let mut out = Vec::<u8, A>::with_capacity_in(len, alloc);
 
                 unsafe {
                     // SAFETY: The vector capacity is set to len, so setting the length to len is valid.
@@ -128,7 +141,7 @@ impl OpCode {
             }
             Self::HEXLIFY => {
                 let hex_len = input.len() * 2;
-                let mut out = OperationBuffer::with_capacity(hex_len);
+                let mut out = Vec::<u8, A>::with_capacity_in(hex_len, alloc);
                 // SAFETY: that the vector is actually the specified size.
                 unsafe {
                     out.set_len(hex_len);
@@ -188,9 +201,9 @@ impl Encode for DigestOp {
     }
 }
 
-impl Decode for DigestOp {
+impl<A: Allocator> DecodeIn<A> for DigestOp {
     #[inline]
-    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
+    fn decode_in(decoder: &mut impl Decoder, _alloc: A) -> Result<Self, DecodeError> {
         let opcode = OpCode::decode(decoder)?;
         opcode
             .as_digest()
@@ -270,13 +283,18 @@ macro_rules! define_digest_opcodes {
             }
 
             /// Executes the digest operation on the input data.
-            pub fn execute(&self, input: impl AsRef<[u8]>) -> OperationBuffer {
+            pub fn execute(&self, input: impl AsRef<[u8]>) -> ::alloc::vec::Vec<u8> {
+                self.execute_in(input, ::alloc::alloc::Global)
+            }
+
+            /// Executes the digest operation on the input data.
+            pub fn execute_in<A: Allocator>(&self, input: impl AsRef<[u8]>, alloc: A) -> ::alloc::vec::Vec<u8, A> {
                 match *self {
                     $( Self::$variant => {
                         paste::paste! {
                             let mut hasher = [<$variant:camel>]::new();
                             hasher.update(input);
-                            hasher.finalize().to_smallvec()
+                            hasher.finalize().to_vec_in(alloc)
                         }
                     }, )*
                     // SAFETY: unreachable as all variants are covered.

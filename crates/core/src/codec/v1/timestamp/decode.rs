@@ -6,13 +6,13 @@ use crate::{
 
 const RECURSION_LIMIT: usize = 256;
 
-impl<A: Allocator + Copy> DecodeIn<A> for Timestamp<A> {
+impl<A: Allocator + Clone> DecodeIn<A> for Timestamp<A> {
     fn decode_in(decoder: &mut impl Decoder, alloc: A) -> Result<Self, DecodeError> {
         Self::decode_recursive(decoder, RECURSION_LIMIT, alloc)
     }
 }
 
-impl<A: Allocator + Copy> Timestamp<A> {
+impl<A: Allocator + Clone> Timestamp<A> {
     fn decode_recursive(
         decoder: &mut impl Decoder,
         recursion_limit: usize,
@@ -38,17 +38,23 @@ impl<A: Allocator + Copy> Timestamp<A> {
                 Ok(Timestamp::Attestation(attestation))
             }
             OpCode::FORK => {
-                let mut children = Vec::new_in(alloc);
+                let mut children = Vec::new_in(alloc.clone());
                 let mut next_op = OpCode::FORK;
                 while next_op == OpCode::FORK {
-                    let child = Self::decode_recursive(&mut *decoder, limit - 1, alloc)?;
+                    let child = Self::decode_recursive(&mut *decoder, limit - 1, alloc.clone())?;
                     children.push(child);
                     next_op = OpCode::decode(&mut *decoder)?;
                 }
-                children.push(Self::decode_from_op(next_op, decoder, limit - 1, alloc)?);
+                children.push(Self::decode_from_op(
+                    next_op,
+                    decoder,
+                    limit - 1,
+                    alloc.clone(),
+                )?);
                 Ok(Timestamp::Step(Step {
                     op: OpCode::FORK,
                     data: Vec::new_in(alloc),
+                    input: OnceLock::new(),
                     next: children,
                 }))
             }
@@ -56,19 +62,24 @@ impl<A: Allocator + Copy> Timestamp<A> {
                 let data = if op.has_immediate() {
                     const MAX_OP_LENGTH: usize = 4096;
                     let length = decoder.decode_ranged(1..MAX_OP_LENGTH)?;
-                    let mut data = Vec::with_capacity_in(length, alloc);
+                    let mut data = Vec::with_capacity_in(length, alloc.clone());
                     data.resize(length, 0);
                     decoder.read_exact(&mut data)?;
 
                     data
                 } else {
-                    Vec::new_in(alloc)
+                    Vec::new_in(alloc.clone())
                 };
 
-                let mut next = Vec::with_capacity_in(1, alloc);
+                let mut next = Vec::with_capacity_in(1, alloc.clone());
                 next.push(Self::decode_recursive(decoder, limit - 1, alloc)?);
 
-                Ok(Timestamp::Step(Step { op, data, next }))
+                Ok(Timestamp::Step(Step {
+                    op,
+                    data,
+                    input: OnceLock::new(),
+                    next,
+                }))
             }
         }
     }

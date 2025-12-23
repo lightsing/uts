@@ -1,25 +1,28 @@
 use super::*;
-use crate::{codec::v1::opcode::OperationBuffer, utils::Hexed};
+use crate::utils::Hexed;
 use core::fmt;
 
-impl<A: Allocator> fmt::Display for Timestamp<A> {
+impl<A: Allocator + Clone> fmt::Display for Timestamp<A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.fmt_recurse(None, f, 0, true)
     }
 }
 
-impl<A: Allocator> Timestamp<A> {
-    pub(crate) fn fmt(
-        &self,
-        input: Option<&OperationBuffer>,
-        f: &mut fmt::Formatter,
-    ) -> fmt::Result {
+impl<A: Allocator + Clone> Timestamp<A> {
+    pub(crate) fn fmt(&self, input: Option<&[u8]>, f: &mut fmt::Formatter) -> fmt::Result {
+        let input = match input {
+            Some(input) => Some(input),
+            None => match self {
+                Self::Step(step) => step.input.get().map(|v| v.as_slice()),
+                Self::Attestation(_) => None,
+            },
+        };
         self.fmt_recurse(input, f, 0, true)
     }
 
     fn fmt_recurse(
         &self,
-        input: Option<&OperationBuffer>,
+        input: Option<&[u8]>,
         f: &mut fmt::Formatter,
         depth: usize,
         first_line: bool,
@@ -57,8 +60,10 @@ impl<A: Allocator> Timestamp<A> {
                     writeln!(f, "execute {op}")?;
                 }
 
-                let result = if let Some(input) = input {
-                    let result = op.execute(input, &step.data);
+                let result = if let Some(value) = step.next.first().and_then(|next| next.input()) {
+                    Some(value.to_vec_in(step.allocator().clone()))
+                } else if let Some(input) = input {
+                    let result = op.execute_in(input, &step.data, step.allocator().clone());
                     indent(f, depth, false)?;
                     writeln!(f, " result {}", Hexed(&result))?;
                     Some(result)
@@ -67,7 +72,7 @@ impl<A: Allocator> Timestamp<A> {
                 };
 
                 for child in &step.next {
-                    child.fmt_recurse(result.as_ref(), f, depth, false)?;
+                    child.fmt_recurse(result.as_deref(), f, depth, false)?;
                 }
                 Ok(())
             }

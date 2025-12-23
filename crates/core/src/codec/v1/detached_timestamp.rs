@@ -1,9 +1,9 @@
 use crate::codec::{
-    Decode, Encode, Encoder, Proof, Version,
+    Decode, DecodeIn, Encode, Encoder, Proof, Version,
     v1::{DigestHeader, Timestamp},
 };
+use alloc::alloc::{Allocator, Global};
 use core::{fmt, fmt::Formatter};
-use smallvec::ToSmallVec;
 
 /// A file containing a timestamp for another file
 /// Contains a timestamp, along with a header and the digest of the file.
@@ -12,24 +12,27 @@ use smallvec::ToSmallVec;
 /// which don't encode/decode the magic and version.
 /// The Python version is equivalent to `VersionedProof<DetachedTimestamp>`.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct DetachedTimestamp {
+pub struct DetachedTimestamp<A: Allocator = Global> {
     header: DigestHeader,
-    timestamp: Timestamp,
+    timestamp: Timestamp<A>,
 }
 
-impl Proof for DetachedTimestamp {
+impl<A: Allocator + Clone> Proof<A> for DetachedTimestamp<A> {
     const VERSION: Version = 1;
 }
 
-impl Decode for DetachedTimestamp {
-    fn decode(decoder: &mut impl crate::codec::Decoder) -> Result<Self, crate::error::DecodeError> {
+impl<A: Allocator + Clone> DecodeIn<A> for DetachedTimestamp<A> {
+    fn decode_in(
+        decoder: &mut impl crate::codec::Decoder,
+        alloc: A,
+    ) -> Result<Self, crate::error::DecodeError> {
         let header = DigestHeader::decode(decoder)?;
-        let timestamp = Timestamp::decode(decoder)?;
+        let timestamp = Timestamp::decode_in(decoder, alloc)?;
         Ok(DetachedTimestamp { header, timestamp })
     }
 }
 
-impl Encode for DetachedTimestamp {
+impl<A: Allocator> Encode for DetachedTimestamp<A> {
     fn encode(&self, encoder: &mut impl Encoder) -> Result<(), crate::error::EncodeError> {
         self.header.encode(encoder)?;
         self.timestamp.encode(encoder)?;
@@ -37,12 +40,29 @@ impl Encode for DetachedTimestamp {
     }
 }
 
-impl fmt::Display for DetachedTimestamp {
+impl<A: Allocator + Clone> fmt::Display for DetachedTimestamp<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "digest of {}", self.header)?;
 
-        self.timestamp
-            .fmt(Some(&self.header.digest().to_smallvec()), f)
+        self.timestamp.fmt(Some(self.header.digest()), f)
+    }
+}
+
+impl<A: Allocator> DetachedTimestamp<A> {
+    /// Returns the digest header.
+    pub fn header(&self) -> &DigestHeader {
+        &self.header
+    }
+
+    /// Returns the timestamp.
+    pub fn timestamp(&self) -> &Timestamp<A> {
+        &self.timestamp
+    }
+
+    /// Returns the allocator used by this detached timestamp.
+    #[inline]
+    pub fn allocator(&self) -> &A {
+        self.timestamp.allocator()
     }
 }
 

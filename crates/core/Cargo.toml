@@ -23,7 +23,7 @@ ripemd.workspace = true
 sha1.workspace = true
 sha2.workspace = true
 sha3.workspace = true
-smallvec = { workspace = true, features = ["specialization", "may_dangle"] }
+once_cell = { workspace = true, features = ["alloc"] }
 thiserror.workspace = true
 tracing = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }

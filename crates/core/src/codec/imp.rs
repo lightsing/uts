@@ -4,7 +4,6 @@ use alloc::vec::Vec;
 #[cfg(feature = "bytes")]
 mod bytes;
 mod primitives;
-mod smallvec;
 #[cfg(feature = "std")]
 mod std_io;
 

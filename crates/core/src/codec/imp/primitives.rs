@@ -31,9 +31,9 @@ macro_rules! leb128 {
                 }
             }
 
-            impl crate::codec::Decode for $ty {
+            impl<A: core::alloc::Allocator> crate::codec::DecodeIn<A> for $ty {
                 #[inline]
-                fn decode(decoder: &mut impl crate::codec::Decoder) -> Result<Self, $crate::error::DecodeError> {
+                fn decode_in(decoder: &mut impl crate::codec::Decoder, _alloc: A) -> Result<Self, $crate::error::DecodeError> {
                     let mut ret: $ty = 0;
                     let mut shift: u32 = 0;
 
@@ -72,9 +72,9 @@ impl Encode for u8 {
     }
 }
 
-impl Decode for u8 {
+impl<A: Allocator> DecodeIn<A> for u8 {
     #[inline]
-    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
+    fn decode_in(decoder: &mut impl Decoder, _alloc: A) -> Result<Self, DecodeError> {
         let mut byte = [0u8; 1];
         decoder.read_exact(&mut byte)?;
         Ok(byte[0])
@@ -90,9 +90,9 @@ impl Encode for usize {
     }
 }
 
-impl Decode for usize {
+impl<A: Allocator> DecodeIn<A> for usize {
     #[inline]
-    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
+    fn decode_in(decoder: &mut impl Decoder, _alloc: A) -> Result<Self, DecodeError> {
         let val = u32::decode(decoder)?;
         Ok(val as usize)
     }

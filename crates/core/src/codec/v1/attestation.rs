@@ -6,11 +6,14 @@
 use crate::{
     codec::{Decode, DecodeIn, Decoder, Encode, Encoder},
     error::{DecodeError, EncodeError},
-    utils::Hexed,
+    utils::{Hexed, OnceLock},
 };
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{
+    alloc::{Allocator, Global},
+    borrow::Cow,
+    vec::Vec,
+};
 use core::fmt;
-use std::alloc::{Allocator, Global};
 
 /// Size in bytes of the tag identifying the attestation type.
 const TAG_SIZE: usize = 8;
@@ -28,6 +31,8 @@ pub type AttestationTag = [u8; TAG_SIZE];
 pub struct RawAttestation<A: Allocator = Global> {
     pub tag: AttestationTag,
     pub data: Vec<u8, A>,
+    /// Cached value for verifying the attestation.
+    pub(crate) value: OnceLock<Vec<u8, A>>,
 }
 
 impl<A: Allocator> DecodeIn<A> for RawAttestation<A> {
@@ -40,11 +45,15 @@ impl<A: Allocator> DecodeIn<A> for RawAttestation<A> {
         data.resize(len, 0);
         decoder.read_exact(&mut data)?;
 
-        Ok(RawAttestation { tag, data })
+        Ok(RawAttestation {
+            tag,
+            data,
+            value: OnceLock::new(),
+        })
     }
 }
 
-impl Encode for RawAttestation {
+impl<A: Allocator> Encode for RawAttestation<A> {
     #[inline]
     fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
         encoder.write_all(self.tag)?;
@@ -59,6 +68,14 @@ impl<A: Allocator> PartialEq for RawAttestation<A> {
 }
 
 impl<A: Allocator> Eq for RawAttestation<A> {}
+
+impl<A: Allocator> RawAttestation<A> {
+    /// Returns the allocator used by this raw attestation.
+    #[inline]
+    pub fn allocator(&self) -> &A {
+        self.data.allocator()
+    }
+}
 
 pub trait Attestation<'a>: Sized {
     const TAG: AttestationTag;
@@ -79,6 +96,7 @@ pub trait Attestation<'a>: Sized {
         Ok(RawAttestation {
             tag: Self::TAG,
             data: self.to_raw_data_in(alloc)?,
+            value: OnceLock::new(),
         })
     }
 

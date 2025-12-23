@@ -4,7 +4,7 @@ use crate::{
     error::EncodeError,
 };
 
-impl Encode for Timestamp {
+impl<A: Allocator> Encode for Timestamp<A> {
     fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
         match self {
             Self::Attestation(attestation) => {
