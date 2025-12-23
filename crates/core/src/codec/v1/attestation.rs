@@ -157,11 +157,14 @@ impl<'a> Attestation<'a> for PendingAttestation<'a> {
 
     fn from_raw_data(data: &'a [u8]) -> Result<Self, DecodeError> {
         let data = &mut &data[..];
-        let length = u32::decode(data)?; // length prefix
-        if length as usize > Self::MAX_URI_LEN {
+        let length = u32::decode(data)? as usize; // length prefix
+        if length > Self::MAX_URI_LEN {
             return Err(DecodeError::UriTooLong);
         }
-        let uri = core::str::from_utf8(data).map_err(|_| DecodeError::InvalidUriChar)?;
+        if data.len() < length {
+            return Err(DecodeError::UnexpectedEof);
+        }
+        let uri = core::str::from_utf8(&data[..length]).map_err(|_| DecodeError::InvalidUriChar)?;
         if !Self::validate_uri(uri) {
             return Err(DecodeError::InvalidUriChar);
         }
@@ -170,7 +173,7 @@ impl<'a> Attestation<'a> for PendingAttestation<'a> {
         })
     }
 
-    fn to_raw_data_in<B: Allocator>(&self, alloc: B) -> Result<Vec<u8, B>, EncodeError> {
+    fn to_raw_data_in<A: Allocator>(&self, alloc: A) -> Result<Vec<u8, A>, EncodeError> {
         if self.uri.len() > Self::MAX_URI_LEN {
             return Err(EncodeError::UriTooLong);
         }
