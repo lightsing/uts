@@ -16,13 +16,13 @@ pub fn current_time_sec() -> u64 {
 
 /// An asynchronous task that updates the current time every second.
 pub async fn updater() {
-    let mut sleep = tokio::time::interval(Duration::from_secs(1));
+    let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
         CURRENT_TIME_SEC.store(now, Ordering::Relaxed);
-        sleep.tick().await;
+        interval.tick().await;
     }
 }

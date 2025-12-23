@@ -52,7 +52,20 @@ impl<A: Allocator + Clone> TimestampBuilder<A> {
         self
     }
 
-    /// Computes the commitment of the timestamp.
+    /// Computes the commitment of the timestamp for the given input.
+    ///
+    /// In this context, the **commitment** is the deterministic result of
+    /// executing the timestamp's linear chain of operations over the input
+    /// bytes. It is computed by:
+    ///
+    /// 1. Taking the provided `input` bytes as the initial value.
+    /// 2. Iterating over all steps in the order they were added to the builder.
+    /// 3. For each step, applying its opcode to the current value together
+    ///    with the step's immediate data via [`OpCode::execute_in`], and using
+    ///    the result as the new current value.
+    ///
+    /// The final value after all steps have been applied is returned as the
+    /// commitment.
     pub fn commitment(&self, input: impl AsRef<[u8]>) -> Vec<u8, A> {
         let alloc = self.allocator().clone();
         let mut commitment = input.as_ref().to_vec_in(alloc.clone());
