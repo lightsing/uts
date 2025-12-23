@@ -7,7 +7,7 @@ use crate::{
 use alloc::{alloc::Global, vec::Vec};
 use core::{alloc::Allocator, fmt::Debug};
 
-mod builder;
+pub(crate) mod builder;
 mod decode;
 mod encode;
 mod fmt;
@@ -73,6 +73,13 @@ impl<A: Allocator + Debug> Debug for Step<A> {
     }
 }
 
+impl Timestamp {
+    /// Creates a new timestamp builder.
+    pub fn builder() -> builder::TimestampBuilder<Global> {
+        builder::TimestampBuilder::new_in(Global)
+    }
+}
+
 impl<A: Allocator> Timestamp<A> {
     /// Returns the opcode of this timestamp node.
     pub fn op(&self) -> OpCode {
@@ -127,6 +134,11 @@ impl<A: Allocator> Timestamp<A> {
 }
 
 impl<A: Allocator + Clone> Timestamp<A> {
+    /// Creates a new timestamp builder with the given allocator.
+    pub fn builder_in(alloc: A) -> builder::TimestampBuilder<A> {
+        builder::TimestampBuilder::new_in(alloc)
+    }
+
     /// Finalizes the timestamp with the given input data.
     ///
     /// # Panics

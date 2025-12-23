@@ -309,6 +309,38 @@ macro_rules! define_digest_opcodes {
     };
 }
 
+macro_rules! impl_simple_step {
+    ($variant:ident) => {paste::paste! {
+        impl<A: Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
+            #[doc = concat!("Push the `", stringify!($variant), "` opcode.")]
+            pub fn [< $variant:lower >](self) -> Self {
+                self.push_step(OpCode::[<$variant>])
+            }
+        }
+    }};
+    ($($variant:ident),* $(,)?) => {
+        $(
+            impl_simple_step! { $variant }
+        )*
+    };
+}
+
+macro_rules! impl_step_with_data {
+    ($variant:ident) => {paste::paste! {
+        impl<A: Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
+            #[doc = concat!("Push the `", stringify!($variant), "` opcode.")]
+            pub fn [< $variant:lower >](self, data: ::alloc::vec::Vec<u8, A>) -> Self {
+                self.push_immediate_step(OpCode::[<$variant>], data)
+            }
+        }
+    }};
+    ($($variant:ident),* $(,)?) => {
+        $(
+            impl_step_with_data! { $variant }
+        )*
+    };
+}
+
 define_opcodes! {
     0x02 => SHA1,
     0x03 => RIPEMD160,
@@ -327,6 +359,20 @@ define_digest_opcodes! {
     0x03 => RIPEMD160,
     0x08 => SHA256,
     0x67 => KECCAK256,
+}
+
+impl_simple_step! {
+    SHA1,
+    RIPEMD160,
+    SHA256,
+    KECCAK256,
+    REVERSE,
+    HEXLIFY,
+}
+
+impl_step_with_data! {
+    APPEND,
+    PREPEND,
 }
 
 #[cfg(test)]
