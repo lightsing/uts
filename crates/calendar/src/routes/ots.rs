@@ -106,7 +106,7 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
 
         // copy data out of bump
         // TODO: eliminate this allocation by reusing from a pool
-        // TODO: warp the buffer with a drop trait to return to pool
+        // TODO: wrap the buffer with a drop trait to return to pool
         let mut buf = BytesMut::with_capacity(128);
         timestamp.encode(&mut buf).unwrap();
 
