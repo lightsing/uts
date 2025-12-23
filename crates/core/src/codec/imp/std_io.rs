@@ -1,12 +1,15 @@
 use crate::codec::*;
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    slice,
+};
 
 pub struct Writer<W: Write>(pub W);
 pub struct Reader<R: Read>(pub R);
 
 impl<W: Write> Encoder for Writer<W> {
     fn encode_byte(&mut self, byte: u8) -> Result<(), EncodeError> {
-        self.write_all([byte])?;
+        self.write_all(slice::from_ref(&byte))?;
         Ok(())
     }
 

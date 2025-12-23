@@ -112,12 +112,16 @@ impl OpCode {
         let input = input.as_ref();
         match *self {
             Self::APPEND => {
-                let mut out = input.to_vec_in(alloc);
-                out.extend_from_slice(immediate.as_ref());
+                let immediate = immediate.as_ref();
+                let mut out = Vec::with_capacity_in(input.len() + immediate.len(), alloc);
+                out.extend_from_slice(input);
+                out.extend_from_slice(immediate);
                 out
             }
             Self::PREPEND => {
-                let mut out = input.to_vec_in(alloc);
+                let immediate = immediate.as_ref();
+                let mut out = Vec::with_capacity_in(input.len() + immediate.len(), alloc);
+                out.extend_from_slice(immediate);
                 out.extend_from_slice(input);
                 out
             }

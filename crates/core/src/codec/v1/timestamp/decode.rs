@@ -61,7 +61,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
             _ => {
                 let data = if op.has_immediate() {
                     const MAX_OP_LENGTH: usize = 4096;
-                    let length = decoder.decode_ranged(1..MAX_OP_LENGTH)?;
+                    let length = decoder.decode_ranged(1..=MAX_OP_LENGTH)?;
                     let mut data = Vec::with_capacity_in(length, alloc.clone());
                     data.resize(length, 0);
                     decoder.read_exact(&mut data)?;

@@ -43,7 +43,7 @@ impl<T: Proof<A>, A: Allocator> Encode for VersionedProof<T, A> {
     }
 }
 
-impl<T: Proof + fmt::Display> fmt::Display for VersionedProof<T> {
+impl<T: Proof<A> + fmt::Display, A: Allocator> fmt::Display for VersionedProof<T, A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Version {} Proof {}", T::VERSION, self.proof)
     }
