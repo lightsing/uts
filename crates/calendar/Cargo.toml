@@ -16,6 +16,7 @@ axum = { workspace = true, features = ["macros"] }
 bump-scope.workspace = true
 bytes = { workspace = true }
 eyre = { workspace = true }
+itoa = { workspace = true }
 sha3 = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }

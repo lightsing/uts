@@ -4538,6 +4538,7 @@ dependencies = [
  "bump-scope",
  "bytes",
  "eyre",
+ "itoa",
  "sha3 0.11.0-rc.3",
  "tokio",
  "tracing",

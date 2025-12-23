@@ -53,11 +53,23 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
     let recv_timestamp = current_time_sec().to_le_bytes();
 
     let undeniable_sig = {
-        // sign_message_sync invoke heap allocation, so manually hash it.
+        // sign_message_sync invokes heap allocation, so manually hash it.
         const EIP191_PREFIX: &str = "\x19Ethereum Signed Message:\n";
         let hash = HASHER.with(|hasher| {
             let mut hasher = hasher.borrow_mut();
             hasher.update(EIP191_PREFIX.as_bytes());
+            match digest.len() {
+                // 32 + 8
+                32 => hasher.update(b"40"),
+                // 64 + 8
+                64 => hasher.update(b"72"),
+                _ => {
+                    let length = digest.len() + size_of::<u64>();
+                    let mut buffer = itoa::Buffer::new();
+                    let printed = buffer.format(length);
+                    hasher.update(printed.as_bytes());
+                }
+            }
             hasher.update(recv_timestamp);
             hasher.update(&digest);
             hasher.finalize_reset()

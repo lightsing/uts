@@ -45,6 +45,7 @@ const_format = "0.2"
 criterion = { version = "0.8", features = ["html_reports"] }
 eyre = "0.6"
 hex = "0.4"
+itoa = "1.0"
 once_cell = { version = "1.21", default-features = false }
 paste = "1.0"
 regex = "1.12"

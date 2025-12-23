@@ -19,7 +19,7 @@ struct LinearStep<A: Allocator> {
 }
 
 impl<A: Allocator + Clone> TimestampBuilder<A> {
-    /// Creates a new `TimestampRootBuilder`.
+    /// Creates a new `TimestampBuilder`.
     pub fn new_in(alloc: A) -> TimestampBuilder<A> {
         TimestampBuilder {
             steps: Vec::new_in(alloc),
