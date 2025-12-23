@@ -2,14 +2,14 @@ use alloy_primitives::{Keccak256, b256};
 use alloy_signer::SignerSync;
 use alloy_signer_local::LocalSigner;
 use axum::body::Bytes;
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 use smallvec::SmallVec;
 use std::time::SystemTime;
 use tracing::Level;
 use uts_core::{
     codec::{
-        Encode, Encoder,
-        v1::{Attestation, opcode::OpCode},
+        Encoder,
+        v1::{Attestation, PendingAttestation, opcode::OpCode},
     },
     utils::Hexed,
 };
@@ -53,9 +53,9 @@ pub async fn submit_digest(digest: Bytes) -> Bytes {
         + 8 // Pending tag
         + 1 // length of packed ATTESTATION data length in leb128
         + (1 + uri.len()); // length of uri in leb128 + uri bytes
-    let attestation = Attestation::Pending { uri };
+    let attestation = PendingAttestation { uri: uri.into() };
 
-    let mut timestamp = BytesMut::with_capacity(buf_size).writer(); // TODO: replace this with a builder
+    let mut timestamp = BytesMut::with_capacity(buf_size);
 
     let mut pending_attestation = SmallVec::<[u8; MAX_MESSAGE_SIZE]>::new();
 
@@ -66,8 +66,8 @@ pub async fn submit_digest(digest: Bytes) -> Bytes {
         .as_secs();
     trace!(recv_timestamp);
     let recv_timestamp = recv_timestamp.to_le_bytes();
-    OpCode::PREPEND.encode(&mut timestamp).unwrap();
-    timestamp.encode_bytes(&recv_timestamp).unwrap();
+    timestamp.encode(OpCode::PREPEND).unwrap();
+    timestamp.encode_bytes(recv_timestamp).unwrap();
     pending_attestation.extend(recv_timestamp);
 
     trace!(digest = ?Hexed(&digest));
@@ -80,8 +80,8 @@ pub async fn submit_digest(digest: Bytes) -> Bytes {
     let undeniable_sig = signer.sign_message_sync(&digest).unwrap();
     let undeniable_sig = undeniable_sig.as_erc2098();
     trace!(undeniable_sig = ?Hexed(&undeniable_sig));
-    OpCode::APPEND.encode(&mut timestamp).unwrap();
-    timestamp.encode_bytes(&undeniable_sig).unwrap();
+    timestamp.encode(OpCode::APPEND).unwrap();
+    timestamp.encode_bytes(undeniable_sig).unwrap();
     pending_attestation.extend(undeniable_sig);
 
     trace!(pending_attestation = ?Hexed(&pending_attestation));
@@ -96,14 +96,12 @@ pub async fn submit_digest(digest: Bytes) -> Bytes {
     let mut hasher = Keccak256::new();
     hasher.update(&pending_attestation);
     hasher.finalize_into(&mut pending_attestation[0..32]);
-    OpCode::KECCAK256.encode(&mut timestamp).unwrap();
+    timestamp.encode(OpCode::KECCAK256).unwrap();
 
-    OpCode::ATTESTATION.encode(&mut timestamp).unwrap();
-    attestation.encode(&mut timestamp).unwrap();
+    timestamp.encode(OpCode::ATTESTATION).unwrap();
+    timestamp.encode(attestation.to_raw().unwrap()).unwrap();
 
     // TODO: store the pending_attestation into journal
-
-    let timestamp = timestamp.into_inner();
     debug_assert_eq!(timestamp.len(), buf_size, "buffer size mismatch");
     timestamp.freeze()
 }

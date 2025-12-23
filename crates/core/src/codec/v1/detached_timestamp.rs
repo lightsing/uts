@@ -1,9 +1,9 @@
 use crate::codec::{
-    Decode, Encode, Proof, Version,
-    v1::{DigestHeader, Timestamp, timestamp},
+    Decode, DecodeIn, Encode, Encoder, Proof, Version,
+    v1::{DigestHeader, Timestamp},
 };
-use smallvec::ToSmallVec;
-use std::{fmt, fmt::Formatter};
+use alloc::alloc::{Allocator, Global};
+use core::{fmt, fmt::Formatter};
 
 /// A file containing a timestamp for another file
 /// Contains a timestamp, along with a header and the digest of the file.
@@ -12,43 +12,57 @@ use std::{fmt, fmt::Formatter};
 /// which don't encode/decode the magic and version.
 /// The Python version is equivalent to `VersionedProof<DetachedTimestamp>`.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct DetachedTimestamp {
+pub struct DetachedTimestamp<A: Allocator = Global> {
     header: DigestHeader,
-    timestamp: Timestamp,
+    timestamp: Timestamp<A>,
 }
 
-impl Proof for DetachedTimestamp {
+impl<A: Allocator + Clone> Proof<A> for DetachedTimestamp<A> {
     const VERSION: Version = 1;
 }
 
-impl Decode for DetachedTimestamp {
-    fn decode(mut reader: impl crate::codec::Decoder) -> Result<Self, crate::error::DecodeError> {
-        let header = DigestHeader::decode(&mut reader)?;
-        let timestamp = Timestamp::decode(&mut reader)?;
+impl<A: Allocator + Clone> DecodeIn<A> for DetachedTimestamp<A> {
+    fn decode_in(
+        decoder: &mut impl crate::codec::Decoder,
+        alloc: A,
+    ) -> Result<Self, crate::error::DecodeError> {
+        let header = DigestHeader::decode(decoder)?;
+        let timestamp = Timestamp::decode_in(decoder, alloc)?;
         Ok(DetachedTimestamp { header, timestamp })
     }
 }
 
-impl Encode for DetachedTimestamp {
-    fn encode(
-        &self,
-        mut writer: impl crate::codec::Encoder,
-    ) -> Result<(), crate::error::EncodeError> {
-        self.header.encode(&mut writer)?;
-        self.timestamp.encode(&mut writer)?;
+impl<A: Allocator> Encode for DetachedTimestamp<A> {
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), crate::error::EncodeError> {
+        self.header.encode(encoder)?;
+        self.timestamp.encode(encoder)?;
         Ok(())
     }
 }
 
-impl fmt::Display for DetachedTimestamp {
+impl<A: Allocator + Clone> fmt::Display for DetachedTimestamp<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "digest of {}", self.header)?;
 
-        timestamp::fmt::fmt(
-            &self.timestamp,
-            Some(&self.header.digest().to_smallvec()),
-            f,
-        )
+        self.timestamp.fmt(Some(self.header.digest()), f)
+    }
+}
+
+impl<A: Allocator> DetachedTimestamp<A> {
+    /// Returns the digest header.
+    pub fn header(&self) -> &DigestHeader {
+        &self.header
+    }
+
+    /// Returns the timestamp.
+    pub fn timestamp(&self) -> &Timestamp<A> {
+        &self.timestamp
+    }
+
+    /// Returns the allocator used by this detached timestamp.
+    #[inline]
+    pub fn allocator(&self) -> &A {
+        self.timestamp.allocator()
     }
 }
 
@@ -56,7 +70,7 @@ impl fmt::Display for DetachedTimestamp {
 mod tests {
     use super::*;
     use crate::{
-        codec::{Decode, Encode, proof::VersionedProof},
+        codec::{Decode, Encoder, proof::VersionedProof},
         fixtures,
     };
 
@@ -65,14 +79,18 @@ mod tests {
         let mut encoded_small = vec![];
         let mut encoded_large = vec![];
 
-        let ots = VersionedProof::<DetachedTimestamp>::decode(fixtures::SMALL_DETACHED_TIMESTAMP);
-        assert!(ots.is_ok());
-        assert!(ots.unwrap().encode(&mut encoded_small).is_ok());
+        let ots =
+            VersionedProof::<DetachedTimestamp>::decode(&mut &*fixtures::SMALL_DETACHED_TIMESTAMP)
+                .unwrap();
+        println!("{:#?}", ots);
+        println!("{}", ots);
+        assert!(encoded_small.encode(&ots).is_ok());
         assert_eq!(encoded_small, fixtures::SMALL_DETACHED_TIMESTAMP);
 
-        let ots = VersionedProof::<DetachedTimestamp>::decode(fixtures::LARGE_DETACHED_TIMESTAMP);
-        assert!(ots.is_ok());
-        assert!(ots.unwrap().encode(&mut encoded_large).is_ok());
+        let ots =
+            VersionedProof::<DetachedTimestamp>::decode(&mut &*fixtures::LARGE_DETACHED_TIMESTAMP)
+                .unwrap();
+        assert!(encoded_large.encode(&ots).is_ok());
         assert_eq!(encoded_large, fixtures::LARGE_DETACHED_TIMESTAMP);
     }
 }

@@ -6,7 +6,9 @@ mod digest;
 pub mod opcode;
 mod timestamp;
 
-pub use attestation::{Attestation, AttestationTag};
+pub use attestation::{
+    Attestation, AttestationTag, BitcoinAttestation, PendingAttestation, RawAttestation,
+};
 pub use detached_timestamp::DetachedTimestamp;
 pub use digest::DigestHeader;
 pub use timestamp::Timestamp;

@@ -1,14 +1,14 @@
 use crate::error::{DecodeError, EncodeError};
+use alloc::alloc::Global;
 use auto_impl::auto_impl;
-use std::{
-    io::{BufRead, Write},
-    ops::RangeBounds,
-};
+use core::{alloc::Allocator, ops::RangeBounds};
 
 mod proof;
 pub use proof::{Proof, Version, VersionedProof};
 
-mod primitives;
+mod imp;
+#[cfg(feature = "std")]
+pub use imp::{Reader, Writer};
 
 /// Types and helpers for the version 1 serialization format.
 pub mod v1;
@@ -17,15 +17,13 @@ pub mod v1;
 pub const MAGIC: &[u8; 31] = b"\x00OpenTimestamps\x00\x00Proof\x00\xbf\x89\xe2\xe8\x84\xe8\x92\x94";
 
 /// Helper trait for writing OpenTimestamps primitives to a byte stream.
-pub trait Encoder: Write {
+pub trait Encoder: Sized {
     /// Encodes a single byte to the writer.
-    fn encode_byte(&mut self, byte: u8) -> Result<(), EncodeError> {
-        self.write_all(&[byte])?;
-        Ok(())
-    }
+    fn encode_byte(&mut self, byte: u8) -> Result<(), EncodeError>;
 
     /// Encodes a byte slice prefixed with its length.
-    fn encode_bytes(&mut self, bytes: &[u8]) -> Result<(), EncodeError> {
+    fn encode_bytes(&mut self, bytes: impl AsRef<[u8]>) -> Result<(), EncodeError> {
+        let bytes = bytes.as_ref();
         self.encode(bytes.len())?;
         self.write_all(bytes)?;
         Ok(())
@@ -33,27 +31,22 @@ pub trait Encoder: Write {
 
     /// Writes the OpenTimestamps magic sequence to the stream.
     fn encode_magic(&mut self) -> Result<(), EncodeError> {
-        self.write_all(MAGIC)?;
-        Ok(())
+        self.write_all(&MAGIC[..])
     }
 
     /// Encodes a value implementing the [`Encode`] trait.
-    #[inline]
     fn encode(&mut self, value: impl Encode) -> Result<(), EncodeError> {
         value.encode(self)
     }
+
+    // --- no_std feature compatibility ---
+    fn write_all(&mut self, buf: impl AsRef<[u8]>) -> Result<(), EncodeError>;
 }
 
-impl<W: Write> Encoder for W {}
-
 /// Helper trait for reading OpenTimestamps primitives from a byte stream.
-pub trait Decoder: BufRead {
+pub trait Decoder: Sized {
     /// Decodes a single byte from the reader.
-    fn decode_byte(&mut self) -> Result<u8, DecodeError> {
-        let mut byte = [0];
-        self.read_exact(&mut byte)?;
-        Ok(byte[0])
-    }
+    fn decode_byte(&mut self) -> Result<u8, DecodeError>;
 
     /// Decodes a value and ensures it falls within the supplied range.
     fn decode_ranged<T: Decode + PartialOrd>(
@@ -80,26 +73,37 @@ pub trait Decoder: BufRead {
     }
 
     /// Decodes a value implementing the [`Decode`] trait.
-    #[inline]
     fn decode<T: Decode>(&mut self) -> Result<T, DecodeError> {
         T::decode(self)
     }
+
+    /// Decodes a value implementing the [`Decode`] trait.
+    fn decode_in<T: DecodeIn<A>, A: Allocator>(&mut self, alloc: A) -> Result<T, DecodeError> {
+        T::decode_in(self, alloc)
+    }
+
+    // --- no_std feature compatibility ---
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), DecodeError>;
 }
-
-impl<R: BufRead> Decoder for R {}
-
-/// Marker trait for types supporting both [`Encode`] and [`Decode`].
-pub trait Codec: Encode + Decode {}
-
-impl<T: Encode + Decode> Codec for T {}
 
 /// Serializes a value into an OpenTimestamps-compatible byte stream.
 #[auto_impl(&, &mut, Box, Rc, Arc)]
 pub trait Encode {
-    fn encode(&self, writer: impl Encoder) -> Result<(), EncodeError>;
+    fn encode(&self, writer: &mut impl Encoder) -> Result<(), EncodeError>;
 }
 
 /// Deserializes a value from an OpenTimestamps-compatible byte stream.
 pub trait Decode: Sized {
-    fn decode(reader: impl Decoder) -> Result<Self, DecodeError>;
+    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError>;
+}
+
+/// Deserializes a value from an OpenTimestamps-compatible byte stream.
+pub trait DecodeIn<A: Allocator>: Sized {
+    fn decode_in(decoder: &mut impl Decoder, alloc: A) -> Result<Self, DecodeError>;
+}
+
+impl<T: DecodeIn<Global>> Decode for T {
+    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
+        T::decode_in(decoder, Global)
+    }
 }

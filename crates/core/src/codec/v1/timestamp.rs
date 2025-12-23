@@ -1,18 +1,16 @@
 //! ** The implementation here is subject to change as this is a read-only version. **
-use crate::codec::{
-    Proof, Version,
-    v1::{Attestation, opcode::OpCode},
+
+use crate::{
+    codec::v1::{attestation::RawAttestation, opcode::OpCode},
+    utils::{Hexed, OnceLock},
 };
-use std::num::NonZeroU32;
+use alloc::{alloc::Global, vec::Vec};
+use core::{alloc::Allocator, fmt::Debug};
 
-type StepPtr = Option<NonZeroU32>;
-
+mod builder;
 mod decode;
 mod encode;
-pub(crate) mod fmt;
-
-const RECURSION_LIMIT: usize = 256;
-const MAX_OP_LENGTH: usize = 4096;
+mod fmt;
 
 /// Proof that that one or more attestations commit to a message.
 ///
@@ -31,125 +29,147 @@ const MAX_OP_LENGTH: usize = 4096;
 /// execute APPEND 0ef41e45bb5534b3
 /// result attested by Pending: update URI https://alice.btc.calendar.opentimestamps.org
 /// ```
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Timestamp {
-    steps: Vec<Step>,
-    data: Vec<u8>,
-    attestations: Vec<Attestation>,
+#[derive(Clone, Debug)]
+pub enum Timestamp<A: Allocator = Global> {
+    Step(Step<A>),
+    Attestation(RawAttestation<A>),
 }
 
-/// An OpenTimestamps step.
-#[derive(Clone, PartialEq, Eq, Debug)]
-#[repr(C)]
-struct Step {
-    opcode: OpCode,
-    _padding: u8,
-    data_len: u16,
-    data_offset: u32,
-    // LCRS tree structure
-    first_child: StepPtr,
-    next_sibling: StepPtr,
+/// An execution Step.
+#[derive(Clone)]
+pub struct Step<A: Allocator = Global> {
+    op: OpCode,
+    data: Vec<u8, A>,
+    input: OnceLock<Vec<u8, A>>,
+    next: Vec<Timestamp<A>, A>,
 }
-// cache line aligned
-const _: () = assert!(size_of::<Step>() == 16);
 
-impl Default for Step {
-    fn default() -> Self {
-        Step {
-            opcode: OpCode::ATTESTATION,
-            _padding: 0,
-            data_len: 0,
-            data_offset: 0,
-            first_child: None,
-            next_sibling: None,
+impl<A: Allocator> PartialEq for Timestamp<A> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Timestamp::Step(s1), Timestamp::Step(s2)) => s1 == s2,
+            (Timestamp::Attestation(a1), Timestamp::Attestation(a2)) => a1 == a2,
+            _ => false,
+        }
+    }
+}
+impl<A: Allocator> Eq for Timestamp<A> {}
+
+impl<A: Allocator> PartialEq for Step<A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.op == other.op && self.data == other.data && self.next == other.next
+    }
+}
+impl<A: Allocator> Eq for Step<A> {}
+
+impl<A: Allocator + Debug> Debug for Step<A> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut f = f.debug_struct("Step");
+        f.field("op", &self.op);
+        if self.op.has_immediate() {
+            f.field("data", &Hexed(&self.data));
+        }
+        f.field("next", &self.next).finish()
+    }
+}
+
+impl<A: Allocator> Timestamp<A> {
+    /// Returns the opcode of this timestamp node.
+    pub fn op(&self) -> OpCode {
+        match self {
+            Timestamp::Step(step) => {
+                debug_assert_ne!(
+                    step.op,
+                    OpCode::ATTESTATION,
+                    "sanity check failed: Step with ATTESTATION opcode"
+                );
+                step.op
+            }
+            Timestamp::Attestation(_) => OpCode::ATTESTATION,
+        }
+    }
+
+    /// Returns this timestamp as a step, if it is one.
+    #[inline]
+    pub fn as_step(&self) -> Option<&Step<A>> {
+        match self {
+            Timestamp::Step(step) => Some(step),
+            Timestamp::Attestation(_) => None,
+        }
+    }
+
+    /// Returns this timestamp as an attestation, if it is one.
+    #[inline]
+    pub fn as_attestation(&self) -> Option<&RawAttestation<A>> {
+        match self {
+            Timestamp::Attestation(attestation) => Some(attestation),
+            Timestamp::Step(_) => None,
+        }
+    }
+
+    /// Returns the input data for this timestamp node, if finalized.
+    #[inline]
+    pub fn input(&self) -> Option<&[u8]> {
+        match self {
+            Timestamp::Step(step) => step.input.get().map(|v| v.as_slice()),
+            Timestamp::Attestation(attestation) => attestation.value.get().map(|v| v.as_slice()),
+        }
+    }
+
+    /// Returns the allocator used by this timestamp node.
+    #[inline]
+    pub fn allocator(&self) -> &A {
+        match self {
+            Self::Attestation(attestation) => attestation.allocator(),
+            Self::Step(step) => step.allocator(),
         }
     }
 }
 
-impl Proof for Timestamp {
-    const VERSION: Version = 1;
-}
+impl<A: Allocator + Clone> Timestamp<A> {
+    /// Finalizes the timestamp with the given input data.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timestamp is already finalized with different input data.
+    pub fn finalize(&self, input: Vec<u8, A>) {
+        match self {
+            Self::Attestation(attestation) => {
+                if let Some(already) = attestation.value.get() {
+                    assert_eq!(&input, already, "trying to finalize with different input");
+                    return;
+                }
+                let _ = attestation.value.get_or_init(|| input);
+            }
+            Self::Step(step) => {
+                if let Some(already) = step.input.get() {
+                    assert_eq!(&input, already, "trying to finalize with different input");
+                    return;
+                }
+                let input = step.input.get_or_init(|| input);
 
-impl Timestamp {
-    /// Returns the data slice associated with a step.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the step was constructed from this timestamp's data buffer.
-    #[inline]
-    unsafe fn get_step_data(&self, step: &Step) -> &[u8] {
-        if step.data_len == 0 {
-            return &[];
+                match step.op {
+                    OpCode::FORK => {
+                        debug_assert!(step.next.len() >= 2, "FORK must have at least two children");
+                        for child in &step.next {
+                            child.finalize(input.clone());
+                        }
+                    }
+                    OpCode::ATTESTATION => unreachable!("should not happen"),
+                    op => {
+                        let output = op.execute_in(input, &step.data, step.allocator().clone());
+                        debug_assert!(step.next.len() == 1, "non-FORK must have exactly one child");
+                        step.next[0].finalize(output);
+                    }
+                }
+            }
         }
-        let start = step.data_offset as usize;
-        debug_assert!(start < self.data.len());
-        let end = start + step.data_len as usize;
-        debug_assert!(end <= self.data.len());
-        // SAFETY: bounds checked above
-        unsafe { self.data.get_unchecked(start..end) }
-    }
-
-    /// Returns the attestation index encoded by an attestation step.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the step is an attestation step and that the
-    /// safety requirements of [`Self::get_step_data`] also hold.
-    #[inline]
-    unsafe fn get_attest_idx(&self, step: &Step) -> u32 {
-        debug_assert!(step.opcode == OpCode::ATTESTATION);
-        debug_assert_eq!(step.data_len as usize, size_of::<u32>());
-        let data = unsafe { self.get_step_data(step) };
-        u32::from_le_bytes(data.try_into().unwrap())
-    }
-
-    #[inline]
-    fn push_to_heap(heap: &mut Vec<u8>, data: &[u8]) -> (u32, u16) {
-        if data.is_empty() {
-            return (0, 0);
-        }
-
-        let offset = heap.len();
-        let len = data.len();
-
-        assert!(offset <= u32::MAX as usize, "Data heap overflow (max 4GB)");
-        assert!(len <= u16::MAX as usize, "Ref data too large (max 65KB)");
-
-        heap.extend_from_slice(data);
-
-        (offset as u32, len as u16)
-    }
-
-    /// Returns a mutable buffer from the heap.
-    ///
-    /// # Safety
-    ///
-    /// The caller must write exactly `len` bytes into the returned buffer.
-    #[inline]
-    unsafe fn get_buffer_from_heap(heap: &mut Vec<u8>, len: usize) -> (u32, u16, &mut [u8]) {
-        let offset = heap.len();
-        assert!(offset <= u32::MAX as usize, "Data heap overflow (max 4GB)");
-        assert!(len <= u16::MAX as usize, "Ref data too large (max 65KB)");
-
-        heap.reserve(len);
-
-        // SAFETY: we just reserved enough space
-        let buffer = unsafe {
-            heap.set_len(offset + len);
-            heap.get_unchecked_mut(offset..offset + len)
-        };
-
-        (offset as u32, len as u16, buffer)
     }
 }
 
-#[inline]
-fn make_ptr(idx: usize) -> StepPtr {
-    assert!(idx < u32::MAX as usize);
-    NonZeroU32::new((idx + 1) as u32)
-}
-
-#[inline]
-fn resolve_ptr(ptr: StepPtr) -> Option<usize> {
-    ptr.map(|nz| (nz.get() - 1) as usize)
+impl<A: Allocator> Step<A> {
+    /// Returns the allocator used by this step.
+    pub(crate) fn allocator(&self) -> &A {
+        self.data.allocator()
+    }
 }
