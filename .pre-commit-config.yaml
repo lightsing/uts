@@ -1,0 +1,16 @@
+repos:
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo-fmt
+        entry: cargo +nightly fmt --
+        language: system
+        types: [rust]
+        pass_filenames: true
+      - id: taplo-fmt
+        name: taplo-fmt
+        entry: taplo fmt
+        language: system
+        types: [toml]
+        pass_filenames: true
+
