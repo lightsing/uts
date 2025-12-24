@@ -4703,12 +4703,14 @@ dependencies = [
  "digest 0.11.0-rc.4",
  "eyre",
  "itoa",
+ "rocksdb",
  "sha3 0.11.0-rc.3",
  "tokio",
  "tracing",
  "tracing-subscriber",
  "uts-core",
  "uts-journal",
+ "uts-stamper",
 ]
 
 [[package]]

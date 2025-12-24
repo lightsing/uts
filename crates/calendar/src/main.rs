@@ -7,9 +7,13 @@ use axum::{
     extract::DefaultBodyLimit,
     routing::{get, post},
 };
+use digest::{OutputSizeUser, typenum::Unsigned};
+use rocksdb::DB;
+use sha3::Keccak256;
 use std::sync::Arc;
 use uts_calendar::{AppState, routes, shutdown_signal, time};
 use uts_journal::Journal;
+use uts_stamper::{Stamper, StamperConfig};
 
 const RING_BUFFER_CAPACITY: usize = 1 << 20; // 1 million entries
 
@@ -22,10 +26,33 @@ async fn main() -> eyre::Result<()> {
     let signer = LocalSigner::from_bytes(&b256!(
         "9ba9926331eb5f4995f1e358f57ba1faab8b005b51928d2fdaea16e69a6ad225"
     ))?;
+
+    // journal
+    // TODO: graceful shutdown
     let journal = Journal::with_capacity(RING_BUFFER_CAPACITY);
 
-    let _reader = journal.reader();
-    // TODO: spawn stamper task
+    // stamper
+    let reader = journal.reader();
+    let db = DB::open_default("./.db/tries")?;
+    let mut stamper =
+        Stamper::<Keccak256, { <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>::new(
+            reader,
+            Arc::new(db),
+            // TODO: tune configuration
+            StamperConfig {
+                max_interval_seconds: 10,
+                max_entries_per_timestamp: 1 << 10, // 1024 entries
+                min_leaves: 1 << 4,
+                max_cache_size: 256,
+            },
+        );
+    // TODO: graceful shutdown
+    tokio::spawn(async move {
+        stamper.run().await;
+    });
+
+    // TODO: maybe we can separate "/timestamp/{hex_commitment}" into another service with DB::open_as_secondary()
+    // TODO: write/read separate, reader can scale horizontally? would this be better?
 
     let app = Router::new()
         .route(

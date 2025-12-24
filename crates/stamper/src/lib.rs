@@ -26,13 +26,9 @@ use uts_journal::reader::JournalReader;
 /// - if available entries size is not power of two, it will take:
 ///  - the largest power of two less than available entries, if that is >= `min_leaves`
 ///  - else, it will take all available entries
-pub struct Stamper<D>
-where
-    D: Digest + FixedOutputReset,
-    [u8; D::OutputSize::USIZE]:,
-{
+pub struct Stamper<D: Digest, const ENTRY_SIZE: usize> {
     /// Journal reader to read entries from
-    reader: JournalReader<{ D::OutputSize::USIZE }>,
+    reader: JournalReader<ENTRY_SIZE>,
     /// Storage for merkle trees and leaf->root mappings
     storage: Arc<DB>,
     /// FIFO cache of recent merkle trees
@@ -45,33 +41,44 @@ where
 #[derive(Debug, Clone)]
 pub struct StamperConfig {
     /// The maximum interval (in seconds) between create new timestamps
-    max_interval_seconds: u64,
+    pub max_interval_seconds: u64,
     /// The maximum number of entries per timestamp.
     /// It should be a power of two.
-    max_entries_per_timestamp: usize,
+    pub max_entries_per_timestamp: usize,
     /// The minimum size of the Merkle tree leaves.
     /// It should be a power of two.
-    min_leaves: usize,
+    pub min_leaves: usize,
     /// The maximum number of recent Merkle trees to keep in cache.
-    max_cache_size: usize,
+    pub max_cache_size: usize,
 }
 
-impl<D> fmt::Debug for Stamper<D>
-where
-    D: Digest + FixedOutputReset,
-    [u8; D::OutputSize::USIZE]:,
-{
+impl<D: Digest, const ENTRY_SIZE: usize> fmt::Debug for Stamper<D, ENTRY_SIZE> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Stamper").finish()
+        f.debug_struct("Stamper")
+            .field("cache_size", &self.cache.len())
+            .field("config", &self.config)
+            .finish()
     }
 }
 
-impl<D> Stamper<D>
+impl<D, const ENTRY_SIZE: usize> Stamper<D, ENTRY_SIZE>
 where
-    D: Digest + FixedOutputReset,
+    D: Digest + FixedOutputReset + 'static,
     Output<D>: Pod + Copy,
-    [u8; D::OutputSize::USIZE]: NoUninit,
+    [u8; ENTRY_SIZE]: NoUninit,
 {
+    const _SIZE_MATCHES: () = assert!(D::OutputSize::USIZE == ENTRY_SIZE);
+
+    /// Create a new Stamper
+    pub fn new(reader: JournalReader<ENTRY_SIZE>, storage: Arc<DB>, config: StamperConfig) -> Self {
+        Self {
+            reader,
+            storage,
+            cache: VecDeque::with_capacity(config.max_cache_size),
+            config,
+        }
+    }
+
     /// Work loop
     pub async fn run(&mut self) {
         let mut ticker =
@@ -83,7 +90,7 @@ where
         }
     }
 
-    async fn pack(&mut self, ticker: &mut Interval, buffer: &mut Vec<[u8; D::OutputSize::USIZE]>) {
+    async fn pack(&mut self, ticker: &mut Interval, buffer: &mut Vec<[u8; ENTRY_SIZE]>) {
         let entries = self
             .reader
             .wait_at_least(self.config.max_entries_per_timestamp);
