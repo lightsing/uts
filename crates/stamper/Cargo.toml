@@ -9,14 +9,14 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
+bytemuck = { workspace = true }
 digest = { workspace = true }
-uts-bmt = { workspace = true }
-uts-journal = { workspace = true }
+rocksdb = { workspace = true }
 tokio = { workspace = true, features = ["time", "macros"] }
 tracing = { workspace = true }
-bytemuck = { workspace = true }
-rocksdb = { workspace = true }
+uts-bmt = { workspace = true }
 uts-core = { workspace = true }
+uts-journal = { workspace = true }
 
 [lints]
 workspace = true
