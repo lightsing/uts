@@ -1,0 +1,20 @@
+[package]
+authors.workspace = true
+description = "High performance append-only journal for UTS"
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-journal"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+dyn-clone = { workspace = true }
+
+[dev-dependencies]
+eyre = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

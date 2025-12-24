@@ -43,6 +43,7 @@ compact_str = "0.9"
 config = "0.15"
 const_format = "0.2"
 criterion = { version = "0.8", features = ["html_reports"] }
+dyn-clone = "1.0"
 eyre = "0.6"
 hex = "0.4"
 itoa = "1.0"
@@ -67,6 +68,7 @@ sha3 = "0.11.0-rc.3"
 
 uts-bmt = { path = "crates/bmt" }
 uts-core = { path = "crates/core" }
+uts-journal = { path = "crates/journal" }
 
 [profile.bench]
 codegen-units = 1
