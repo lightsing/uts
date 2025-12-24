@@ -4537,6 +4537,7 @@ dependencies = [
  "axum",
  "bump-scope",
  "bytes",
+ "criterion 0.8.1",
  "eyre",
  "itoa",
  "sha3 0.11.0-rc.3",

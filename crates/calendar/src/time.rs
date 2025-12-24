@@ -3,10 +3,12 @@
 //! This is for performance optimization to avoid frequent syscalls for time retrieval.
 use std::{
     sync::atomic::{AtomicU64, Ordering},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+use tokio::time::MissedTickBehavior;
 
 static CURRENT_TIME_SEC: AtomicU64 = AtomicU64::new(0);
+const UPDATE_PERIOD: Duration = Duration::from_secs(1);
 
 /// Returns the current time in seconds since the Unix epoch.
 #[inline]
@@ -15,8 +17,9 @@ pub fn current_time_sec() -> u64 {
 }
 
 /// An asynchronous task that updates the current time every second.
-pub async fn updater() {
-    let mut interval = tokio::time::interval(Duration::from_secs(1));
+pub async fn async_updater() {
+    let mut interval = tokio::time::interval(UPDATE_PERIOD);
+    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
     loop {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -24,5 +27,23 @@ pub async fn updater() {
             .as_secs();
         CURRENT_TIME_SEC.store(now, Ordering::Relaxed);
         interval.tick().await;
+    }
+}
+
+/// A task that updates the current time every second.
+pub fn updater() {
+    let mut next_tick = Instant::now();
+
+    loop {
+        next_tick += UPDATE_PERIOD;
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        CURRENT_TIME_SEC.store(now, Ordering::Relaxed);
+
+        // Note: This behavior is different from the async version, which skips missed ticks.
+        std::thread::sleep_until(next_tick);
     }
 }

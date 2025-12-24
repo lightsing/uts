@@ -13,6 +13,7 @@ use uts_core::{
     utils::Hexed,
 };
 
+/// Maximum digest size accepted by the endpoint.
 pub const MAX_DIGEST_SIZE: usize = 64; // e.g., SHA3-512
 
 // Test this with official ots client:
@@ -34,6 +35,7 @@ pub const MAX_DIGEST_SIZE: usize = 64; // e.g., SHA3-512
 // result c15b4e8b93e9aaee5b8c736f5b73e5f313062e389925a0b1fc6495053f99d352
 // result attested by Pending: update URI https://localhost:3000
 // ```
+/// Submit digest to calendar server and get pending timestamp in response.
 pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) -> Bytes {
     let (output, _commitment) = submit_digest_inner(digest, &state.signer);
     // TODO: submit commitment to journal
@@ -41,6 +43,7 @@ pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) ->
 }
 
 // TODO: We need to benchmark this.
+/// inner function to submit digest, returns (encoded timestamp, commitment)
 pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u8; 32]) {
     const PRE_ALLOCATION_SIZE_HINT: usize = 4096;
     thread_local! {
@@ -117,4 +120,5 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
     })
 }
 
+/// Get current timestamp from calendar server.
 pub async fn get_timestamp() {}
