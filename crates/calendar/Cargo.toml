@@ -12,9 +12,14 @@ version.workspace = true
 alloy-primitives = { workspace = true }
 alloy-signer = { workspace = true }
 alloy-signer-local = { workspace = true }
-axum = { workspace = true, features = ["macros"] }
+axum = { workspace = true, default-features = false, features = [
+  "macros",
+  "http2",
+  "tokio",
+] } # http2 only
 bump-scope.workspace = true
 bytes = { workspace = true }
+digest = { workspace = true }
 eyre = { workspace = true }
 itoa = { workspace = true }
 sha3 = { workspace = true }
@@ -22,6 +27,7 @@ tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uts-core = { workspace = true, features = ["bytes"] }
+uts-journal = { workspace = true }
 
 [dev-dependencies]
 criterion.workspace = true
@@ -34,4 +40,5 @@ name = "submit_digest"
 workspace = true
 
 [features]
+dev = ["axum/http1"] # for easier testing
 performance = ["tracing/release_max_level_info"]

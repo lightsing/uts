@@ -1,9 +1,15 @@
 use crate::{AppState, time::current_time_sec};
 use alloy_signer::SignerSync;
-use axum::{body::Bytes, extract::State};
+use axum::{
+    body::Bytes,
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use bump_scope::Bump;
 use bytes::BytesMut;
-use sha3::{Digest, Keccak256};
+use digest::Digest;
+use sha3::Keccak256;
 use std::{cell::RefCell, sync::Arc};
 use uts_core::{
     codec::{
@@ -36,10 +42,15 @@ pub const MAX_DIGEST_SIZE: usize = 64; // e.g., SHA3-512
 // result attested by Pending: update URI https://localhost:3000
 // ```
 /// Submit digest to calendar server and get pending timestamp in response.
-pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) -> Bytes {
-    let (output, _commitment) = submit_digest_inner(digest, &state.signer);
-    // TODO: submit commitment to journal
-    output
+pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) -> Response {
+    let (output, commitment) = submit_digest_inner(digest, &state.signer);
+    match state.journal.try_commit(&commitment) {
+        Err(_) => {
+            return (StatusCode::SERVICE_UNAVAILABLE, r#"{"err":"server busy"}"#).into_response();
+        } // journal is full
+        Ok(fut) => fut.await,
+    }
+    output.into_response()
 }
 
 // TODO: We need to benchmark this.
@@ -114,7 +125,7 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
         timestamp.encode(&mut buf).unwrap();
 
         #[cfg(any(debug_assertions, not(feature = "performance")))]
-        trace!(timestamp = ?timestamp, encoded_length = buf.len());
+        trace!(encoded_length = buf.len(), timestamp = ?timestamp);
 
         (buf.freeze(), commitment)
     })

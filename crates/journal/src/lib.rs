@@ -227,7 +227,7 @@ pub struct CommitFuture<'a, const ENTRY_SIZE: usize> {
     active_waker: Option<Waker>,
 }
 
-impl<'a, const ENTRY_SIZE: usize> Future for CommitFuture<'a, ENTRY_SIZE> {
+impl<const ENTRY_SIZE: usize> Future for CommitFuture<'_, ENTRY_SIZE> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {

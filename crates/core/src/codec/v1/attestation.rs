@@ -27,12 +27,21 @@ const PENDING_TAG: &[u8; 8] = b"\x83\xdf\xe3\x0d\x2e\xf9\x0c\x8e";
 pub type AttestationTag = [u8; TAG_SIZE];
 
 /// Raw Proof that some data existed at a given time.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct RawAttestation<A: Allocator = Global> {
     pub tag: AttestationTag,
     pub data: Vec<u8, A>,
     /// Cached value for verifying the attestation.
     pub(crate) value: OnceLock<Vec<u8, A>>,
+}
+
+impl<A: Allocator> fmt::Debug for RawAttestation<A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RawAttestation")
+            .field("tag", &Hexed(&self.tag))
+            .field("data", &Hexed(&self.data))
+            .finish()
+    }
 }
 
 impl<A: Allocator> DecodeIn<A> for RawAttestation<A> {

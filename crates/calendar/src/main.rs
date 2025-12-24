@@ -9,6 +9,9 @@ use axum::{
 };
 use std::sync::Arc;
 use uts_calendar::{AppState, routes, shutdown_signal, time};
+use uts_journal::Journal;
+
+const RING_BUFFER_CAPACITY: usize = 1 << 20; // 1 million entries
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -19,6 +22,10 @@ async fn main() -> eyre::Result<()> {
     let signer = LocalSigner::from_bytes(&b256!(
         "9ba9926331eb5f4995f1e358f57ba1faab8b005b51928d2fdaea16e69a6ad225"
     ))?;
+    let journal = Journal::with_capacity(RING_BUFFER_CAPACITY);
+
+    let _reader = journal.reader();
+    // TODO: spawn stamper task
 
     let app = Router::new()
         .route(
@@ -30,7 +37,7 @@ async fn main() -> eyre::Result<()> {
             "/timestamp/{hex_commitment}",
             get(routes::ots::get_timestamp),
         )
-        .with_state(Arc::new(AppState { signer }));
+        .with_state(Arc::new(AppState { signer, journal }));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
 
