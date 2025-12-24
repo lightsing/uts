@@ -8,6 +8,9 @@ extern crate tracing;
 
 use alloy_signer::k256::ecdsa::SigningKey;
 use alloy_signer_local::LocalSigner;
+use digest::{OutputSizeUser, typenum::Unsigned};
+use sha3::Keccak256;
+use uts_journal::Journal;
 
 /// Calendar server routes and handlers.
 pub mod routes;
@@ -19,6 +22,8 @@ pub mod time;
 pub struct AppState {
     /// Local signer for signing OTS timestamps.
     pub signer: LocalSigner<SigningKey>,
+    /// Journal
+    pub journal: Journal<{ <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>,
 }
 
 /// Signal for graceful shutdown.
