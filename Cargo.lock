@@ -4583,6 +4583,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "uts-client"
+version = "0.1.0"
+
+[[package]]
 name = "uts-core"
 version = "0.1.0"
 dependencies = [
