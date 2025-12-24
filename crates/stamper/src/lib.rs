@@ -10,7 +10,7 @@ use bytemuck::{NoUninit, Pod};
 use digest::{Digest, FixedOutputReset, Output, typenum::Unsigned};
 use rocksdb::{DB, WriteBatch};
 use std::{collections::VecDeque, fmt, sync::Arc, time::Duration};
-use tokio::time::sleep;
+use tokio::time::{Interval, MissedTickBehavior};
 use uts_bmt::FlatMerkleTree;
 use uts_core::utils::Hexed;
 use uts_journal::reader::JournalReader;
@@ -74,20 +74,22 @@ where
 {
     /// Work loop
     pub async fn run(&mut self) {
+        let mut ticker =
+            tokio::time::interval(Duration::from_secs(self.config.max_interval_seconds));
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut leaves_buffer = Vec::with_capacity(self.config.max_entries_per_timestamp);
         loop {
-            self.pack(&mut leaves_buffer).await;
+            self.pack(&mut ticker, &mut leaves_buffer).await;
         }
     }
 
-    async fn pack(&mut self, buffer: &mut Vec<[u8; D::OutputSize::USIZE]>) {
-        let timeout = sleep(Duration::from_secs(self.config.max_interval_seconds));
+    async fn pack(&mut self, ticker: &mut Interval, buffer: &mut Vec<[u8; D::OutputSize::USIZE]>) {
         let entries = self
             .reader
             .wait_at_least(self.config.max_entries_per_timestamp);
 
         let target_size = tokio::select! {
-            _ = timeout => {
+            _ = ticker.tick() => {
                 // Timeout reached, create timestamp with available entries
                 let current_available = self.reader.available();
                 if current_available == 0 {
