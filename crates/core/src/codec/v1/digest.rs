@@ -1,25 +1,30 @@
 use crate::{
-    codec::{Decode, Decoder, Encode, Encoder, v1::opcode::DigestOp},
+    codec::{DecodeIn, Decoder, Encode, Encoder, v1::opcode::DigestOp},
     error::{DecodeError, EncodeError},
     utils::Hexed,
 };
-use std::fmt;
+use alloc::alloc::Allocator;
+use core::fmt;
 
 /// Header describing the digest that anchors a timestamp.
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DigestHeader {
     kind: DigestOp,
     digest: [u8; 32],
 }
 
+impl fmt::Debug for DigestHeader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DigestHeader")
+            .field("kind", &self.kind)
+            .field("digest", &Hexed(self.digest()))
+            .finish()
+    }
+}
+
 impl fmt::Display for DigestHeader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} {}",
-            self.kind,
-            Hexed(&self.digest[..self.kind.output_size()])
-        )
+        write!(f, "{} {}", self.kind, Hexed(self.digest()))
     }
 }
 
@@ -38,20 +43,20 @@ impl DigestHeader {
 impl Encode for DigestHeader {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(writer), err))]
     #[inline]
-    fn encode(&self, mut writer: impl Encoder) -> Result<(), EncodeError> {
-        writer.encode(&self.kind)?;
-        writer.write_all(&self.digest[..self.kind.output_size()])?;
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
+        encoder.encode(self.kind)?;
+        encoder.write_all(&self.digest[..self.kind.output_size()])?;
         Ok(())
     }
 }
 
-impl Decode for DigestHeader {
+impl<A: Allocator> DecodeIn<A> for DigestHeader {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(reader), ret, err))]
     #[inline]
-    fn decode(mut reader: impl Decoder) -> Result<DigestHeader, DecodeError> {
-        let kind = reader.decode()?;
+    fn decode_in(decoder: &mut impl Decoder, _alloc: A) -> Result<DigestHeader, DecodeError> {
+        let kind = decoder.decode()?;
         let mut digest = [0u8; 32];
-        reader.read_exact(&mut digest)?;
+        decoder.read_exact(&mut digest)?;
 
         Ok(DigestHeader { kind, digest })
     }

@@ -1,44 +1,50 @@
 use crate::{
-    codec::{Codec, Decode, Decoder, Encode, Encoder},
+    codec::{DecodeIn, Decoder, Encode, Encoder},
     error::{DecodeError, EncodeError},
 };
-use std::fmt;
+use alloc::alloc::{Allocator, Global};
+use core::fmt;
 
 /// Version number of the serialization format.
 pub type Version = u32;
 
 /// Trait implemented by proof payloads for a specific serialization version.
-pub trait Proof: Codec {
+pub trait Proof<A: Allocator = Global>: Encode + DecodeIn<A> {
     /// Version identifier that must match the encoded proof.
     const VERSION: Version;
 }
 
 /// Wrapper that prefixes a proof with its version and magic bytes.
 #[derive(Clone, PartialEq, Eq, Debug)]
-#[repr(transparent)]
-pub struct VersionedProof<T: Proof>(pub T);
+pub struct VersionedProof<T: Proof<A>, A: Allocator = Global> {
+    pub proof: T,
+    allocator: A,
+}
 
-impl<T: Proof> Decode for VersionedProof<T> {
-    fn decode(mut reader: impl Decoder) -> Result<Self, DecodeError> {
-        reader.assert_magic()?;
-        let version: Version = reader.decode()?;
+impl<T: Proof<A>, A: Allocator + Clone> DecodeIn<A> for VersionedProof<T, A> {
+    fn decode_in(decoder: &mut impl Decoder, alloc: A) -> Result<Self, DecodeError> {
+        decoder.assert_magic()?;
+        let version: Version = decoder.decode()?;
         if version != T::VERSION {
             return Err(DecodeError::BadVersion);
         }
-        Ok(VersionedProof(T::decode(&mut reader)?))
+        Ok(VersionedProof {
+            proof: T::decode_in(decoder, alloc.clone())?,
+            allocator: alloc,
+        })
     }
 }
 
-impl<T: Proof> Encode for VersionedProof<T> {
-    fn encode(&self, mut writer: impl Encoder) -> Result<(), EncodeError> {
-        writer.encode_magic()?;
-        writer.encode(T::VERSION)?;
-        self.0.encode(writer)
+impl<T: Proof<A>, A: Allocator> Encode for VersionedProof<T, A> {
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
+        encoder.encode_magic()?;
+        encoder.encode(T::VERSION)?;
+        self.proof.encode(encoder)
     }
 }
 
-impl<T: Proof + fmt::Display> fmt::Display for VersionedProof<T> {
+impl<T: Proof<A> + fmt::Display, A: Allocator> fmt::Display for VersionedProof<T, A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Version {} Proof {}", T::VERSION, self.0)
+        write!(f, "Version {} Proof {}", T::VERSION, self.proof)
     }
 }
