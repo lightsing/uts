@@ -44,6 +44,12 @@ pub fn updater() {
         CURRENT_TIME_SEC.store(now, Ordering::Relaxed);
 
         // Note: This behavior is different from the async version, which skips missed ticks.
-        std::thread::sleep_until(next_tick);
+        let now_instant = Instant::now();
+        if next_tick > now_instant {
+            std::thread::sleep_until(next_tick);
+        } else {
+            // If we've fallen behind, resynchronize to avoid accumulating drift.
+            next_tick = now_instant;
+        }
     }
 }

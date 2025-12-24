@@ -19,7 +19,7 @@ fn benchmark(c: &mut Criterion) {
                 "9ba9926331eb5f4995f1e358f57ba1faab8b005b51928d2fdaea16e69a6ad225"
             ))
             .unwrap();
-            let input = Bytes::from_static(&[0u8; 64]);
+            let input = Bytes::from(vec![0u8; size]);
 
             b.iter_batched(
                 || input.clone(),
