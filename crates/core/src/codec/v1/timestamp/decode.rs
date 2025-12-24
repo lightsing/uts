@@ -1,152 +1,86 @@
 use super::*;
 use crate::{
-    codec::{Decode, Decoder},
+    codec::{Decode, DecodeIn, Decoder},
     error::DecodeError,
 };
-use std::io::BufRead;
 
-impl Decode for Timestamp {
-    fn decode(mut reader: impl Decoder) -> Result<Timestamp, DecodeError> {
-        let mut steps = Vec::new();
-        let mut data = Vec::new();
-        let mut attestations = Vec::new();
+const RECURSION_LIMIT: usize = 256;
 
-        Self::decode_step_recurse(
-            &mut reader,
-            &mut steps,
-            &mut data,
-            &mut attestations,
-            None,
-            RECURSION_LIMIT,
-        )?;
-
-        Ok(Timestamp {
-            steps,
-            data,
-            attestations,
-        })
+impl<A: Allocator + Clone> DecodeIn<A> for Timestamp<A> {
+    fn decode_in(decoder: &mut impl Decoder, alloc: A) -> Result<Self, DecodeError> {
+        Self::decode_recursive(decoder, RECURSION_LIMIT, alloc)
     }
 }
 
-impl Timestamp {
-    fn decode_step_recurse<R: BufRead>(
-        reader: &mut R,
-        steps: &mut Vec<Step>,
-        data: &mut Vec<u8>,
-        attestations: &mut Vec<Attestation>,
-        op: Option<OpCode>,
+impl<A: Allocator + Clone> Timestamp<A> {
+    fn decode_recursive(
+        decoder: &mut impl Decoder,
         recursion_limit: usize,
-    ) -> Result<StepPtr, DecodeError> {
+        alloc: A,
+    ) -> Result<Timestamp<A>, DecodeError> {
         if recursion_limit == 0 {
             return Err(DecodeError::RecursionLimit);
         }
+        let op = OpCode::decode(&mut *decoder)?;
 
-        let op = match op {
-            Some(op) => op,
-            None => reader.decode()?,
-        };
+        Self::decode_from_op(op, decoder, recursion_limit, alloc)
+    }
 
-        let step = match op {
+    fn decode_from_op(
+        op: OpCode,
+        decoder: &mut impl Decoder,
+        limit: usize,
+        alloc: A,
+    ) -> Result<Timestamp<A>, DecodeError> {
+        match op {
             OpCode::ATTESTATION => {
-                let attest = Attestation::decode(reader)?;
-                let attest_idx = attestations.len();
-                attestations.push(attest);
-                let (data_offset, data_len) =
-                    Self::push_to_heap(data, &(attest_idx as u32).to_le_bytes());
-                Step {
-                    opcode: op,
-                    data_len,
-                    data_offset,
-                    ..Default::default()
-                }
+                let attestation = RawAttestation::decode_in(decoder, alloc)?;
+                Ok(Timestamp::Attestation(attestation))
             }
             OpCode::FORK => {
-                let mut first_child: StepPtr = None;
-                let mut prev_sibling_idx: Option<usize> = None;
-
+                let mut children = Vec::new_in(alloc.clone());
                 let mut next_op = OpCode::FORK;
-
                 while next_op == OpCode::FORK {
-                    let child_ptr = Self::decode_step_recurse(
-                        reader,
-                        steps,
-                        data,
-                        attestations,
-                        None,
-                        recursion_limit - 1,
-                    )?;
-
-                    // LCRS:
-                    // if prev sibling exist, link its next_sibling to current child
-                    // else it's first_child
-                    if let Some(prev) = prev_sibling_idx {
-                        steps[prev].next_sibling = child_ptr;
-                    } else {
-                        first_child = child_ptr;
-                    }
-
-                    // update prev_sibling_idx to current child
-                    prev_sibling_idx = resolve_ptr(child_ptr);
-
-                    next_op = reader.decode()?;
+                    let child = Self::decode_recursive(&mut *decoder, limit - 1, alloc.clone())?;
+                    children.push(child);
+                    next_op = OpCode::decode(&mut *decoder)?;
                 }
-
-                let child_ptr = Self::decode_step_recurse(
-                    reader,
-                    steps,
-                    data,
-                    attestations,
-                    Some(next_op),
-                    recursion_limit - 1,
-                )?;
-                if let Some(prev) = prev_sibling_idx {
-                    steps[prev].next_sibling = child_ptr;
-                } else {
-                    first_child = child_ptr;
-                }
-
-                Step {
-                    opcode: op,
-                    data_len: 0,
-                    data_offset: 0,
-                    first_child,
-                    ..Default::default()
-                }
+                children.push(Self::decode_from_op(
+                    next_op,
+                    decoder,
+                    limit - 1,
+                    alloc.clone(),
+                )?);
+                Ok(Timestamp::Step(Step {
+                    op: OpCode::FORK,
+                    data: Vec::new_in(alloc),
+                    input: OnceLock::new(),
+                    next: children,
+                }))
             }
             _ => {
-                debug_assert!(!op.is_control());
-                let (data_offset, data_len) = if op.has_immediate() {
-                    let length = reader.decode_ranged(1..=MAX_OP_LENGTH)?;
-                    // SAFETY: We will fill the buffer right after getting it.
-                    let (data_offset, data_len, buffer) =
-                        unsafe { Self::get_buffer_from_heap(data, length) };
-                    reader.read_exact(buffer)?;
-                    (data_offset, data_len)
+                let data = if op.has_immediate() {
+                    const MAX_OP_LENGTH: usize = 4096;
+                    let length = decoder.decode_ranged(1..=MAX_OP_LENGTH)?;
+                    let mut data = Vec::with_capacity_in(length, alloc.clone());
+                    data.resize(length, 0);
+                    decoder.read_exact(&mut data)?;
+
+                    data
                 } else {
-                    (0, 0)
+                    Vec::new_in(alloc.clone())
                 };
 
-                let next = Self::decode_step_recurse(
-                    reader,
-                    steps,
+                let mut next = Vec::with_capacity_in(1, alloc.clone());
+                next.push(Self::decode_recursive(decoder, limit - 1, alloc)?);
+
+                Ok(Timestamp::Step(Step {
+                    op,
                     data,
-                    attestations,
-                    None,
-                    recursion_limit - 1,
-                )?;
-
-                Step {
-                    opcode: op,
-                    data_len,
-                    data_offset,
-                    first_child: next,
-                    ..Default::default()
-                }
+                    input: OnceLock::new(),
+                    next,
+                }))
             }
-        };
-
-        let step_idx = steps.len();
-        steps.push(step);
-        Ok(make_ptr(step_idx))
+        }
     }
 }

@@ -1,5 +1,10 @@
 #![feature(exact_bitshifts)]
+#![feature(allocator_api)]
+#![cfg_attr(not(feature = "std"), no_std)]
 //! # Universal Timestamps Core Library
+
+extern crate alloc;
+extern crate core;
 
 mod tracing;
 

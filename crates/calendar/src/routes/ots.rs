@@ -1,21 +1,26 @@
-use alloy_primitives::{Keccak256, b256};
+use crate::{AppState, time::current_time_sec};
 use alloy_signer::SignerSync;
-use alloy_signer_local::LocalSigner;
-use axum::body::Bytes;
-use bytes::{BufMut, BytesMut};
-use smallvec::SmallVec;
-use std::time::SystemTime;
-use tracing::Level;
+use axum::{
+    body::Bytes,
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use bump_scope::Bump;
+use bytes::BytesMut;
+use digest::Digest;
+use sha3::Keccak256;
+use std::{cell::RefCell, sync::Arc};
 use uts_core::{
     codec::{
-        Encode, Encoder,
-        v1::{Attestation, opcode::OpCode},
+        Encode,
+        v1::{PendingAttestation, Timestamp},
     },
     utils::Hexed,
 };
 
+/// Maximum digest size accepted by the endpoint.
 pub const MAX_DIGEST_SIZE: usize = 64; // e.g., SHA3-512
-const ERC2098_SIGNATURE_SIZE: usize = 64;
 
 // Test this with official ots client:
 // ots stamp -c "http://localhost:3000/" -m 1 <input_file>
@@ -36,76 +41,95 @@ const ERC2098_SIGNATURE_SIZE: usize = 64;
 // result c15b4e8b93e9aaee5b8c736f5b73e5f313062e389925a0b1fc6495053f99d352
 // result attested by Pending: update URI https://localhost:3000
 // ```
-#[instrument(level = Level::TRACE, skip_all)]
-pub async fn submit_digest(digest: Bytes) -> Bytes {
-    const MAX_MESSAGE_SIZE: usize = MAX_DIGEST_SIZE + size_of::<u64>() + ERC2098_SIGNATURE_SIZE;
-
-    let uri = "https://localhost:3000".to_string();
-
-    let buf_size = 1 // OpCode::PREPEND
-        + 1 // length of u64 length in leb128
-        + 8 // u64 timestamp
-        + 1 // OpCode::APPEND
-        + 1 // length of signature length in leb128
-        + ERC2098_SIGNATURE_SIZE // signature
-        + 1 // FIXME: TBD: OpCode::KECCAK256
-        + 1 // OpCode::ATTESTATION
-        + 8 // Pending tag
-        + 1 // length of packed ATTESTATION data length in leb128
-        + (1 + uri.len()); // length of uri in leb128 + uri bytes
-    let attestation = Attestation::Pending { uri };
-
-    let mut timestamp = BytesMut::with_capacity(buf_size).writer(); // TODO: replace this with a builder
-
-    let mut pending_attestation = SmallVec::<[u8; MAX_MESSAGE_SIZE]>::new();
-
-    // ots uses 32-bit unix time, but we use u64 here for future proofing, as it's not part of the ots spec.
-    let recv_timestamp: u64 = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("Clock MUST not go backwards")
-        .as_secs();
-    trace!(recv_timestamp);
-    let recv_timestamp = recv_timestamp.to_le_bytes();
-    OpCode::PREPEND.encode(&mut timestamp).unwrap();
-    timestamp.encode_bytes(&recv_timestamp).unwrap();
-    pending_attestation.extend(recv_timestamp);
-
-    trace!(digest = ?Hexed(&digest));
-    pending_attestation.extend_from_slice(&digest);
-
-    let signer = LocalSigner::from_bytes(&b256!(
-        "9ba9926331eb5f4995f1e358f57ba1faab8b005b51928d2fdaea16e69a6ad225"
-    ))
-    .unwrap(); // TODO: load from app state
-    let undeniable_sig = signer.sign_message_sync(&digest).unwrap();
-    let undeniable_sig = undeniable_sig.as_erc2098();
-    trace!(undeniable_sig = ?Hexed(&undeniable_sig));
-    OpCode::APPEND.encode(&mut timestamp).unwrap();
-    timestamp.encode_bytes(&undeniable_sig).unwrap();
-    pending_attestation.extend(undeniable_sig);
-
-    trace!(pending_attestation = ?Hexed(&pending_attestation));
-
-    // FIXME:
-    // discussion: return the hash or the raw timestamp message?
-    // if using hash, client will request upgrade timestamp by hash (256 bits, 64 hex chars)
-    //
-    // if using raw timestamp message, client will request timestamp by whole message (variable size, 208 hex chars if request is 32 bytes),
-    // but we will have info about the receiving time of the request,
-    // which can narrow down the search space
-    let mut hasher = Keccak256::new();
-    hasher.update(&pending_attestation);
-    hasher.finalize_into(&mut pending_attestation[0..32]);
-    OpCode::KECCAK256.encode(&mut timestamp).unwrap();
-
-    OpCode::ATTESTATION.encode(&mut timestamp).unwrap();
-    attestation.encode(&mut timestamp).unwrap();
-
-    // TODO: store the pending_attestation into journal
-
-    let timestamp = timestamp.into_inner();
-    debug_assert_eq!(timestamp.len(), buf_size, "buffer size mismatch");
-    timestamp.freeze()
+/// Submit digest to calendar server and get pending timestamp in response.
+pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) -> Response {
+    let (output, commitment) = submit_digest_inner(digest, &state.signer);
+    match state.journal.try_commit(&commitment) {
+        Err(_) => {
+            return (StatusCode::SERVICE_UNAVAILABLE, r#"{"err":"server busy"}"#).into_response();
+        } // journal is full
+        Ok(fut) => fut.await,
+    }
+    output.into_response()
 }
 
+// TODO: We need to benchmark this.
+/// inner function to submit digest, returns (encoded timestamp, commitment)
+pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u8; 32]) {
+    const PRE_ALLOCATION_SIZE_HINT: usize = 4096;
+    thread_local! {
+        // We don't have `.await` in this function, so it's safe to borrow thread local.
+        static BUMP: RefCell<Bump> = RefCell::new(Bump::with_size(PRE_ALLOCATION_SIZE_HINT));
+        static HASHER: RefCell<Keccak256> = RefCell::new(Keccak256::new());
+    }
+
+    // ots uses 32-bit unix time, but we use u64 here for future proofing, as it's not part of the ots spec.
+    let recv_timestamp = current_time_sec().to_le_bytes();
+
+    let undeniable_sig = {
+        // sign_message_sync invokes heap allocation, so manually hash it.
+        const EIP191_PREFIX: &str = "\x19Ethereum Signed Message:\n";
+        let hash = HASHER.with(|hasher| {
+            let mut hasher = hasher.borrow_mut();
+            hasher.update(EIP191_PREFIX.as_bytes());
+            match digest.len() {
+                // 32 + 8
+                32 => hasher.update(b"40"),
+                // 64 + 8
+                64 => hasher.update(b"72"),
+                _ => {
+                    let length = digest.len() + size_of::<u64>();
+                    let mut buffer = itoa::Buffer::new();
+                    let printed = buffer.format(length);
+                    hasher.update(printed.as_bytes());
+                }
+            }
+            hasher.update(recv_timestamp);
+            hasher.update(&digest);
+            hasher.finalize_reset()
+        });
+
+        let undeniable_sig = signer.sign_hash_sync(&hash.0.into()).unwrap();
+        undeniable_sig.as_erc2098()
+    };
+
+    #[cfg(any(debug_assertions, not(feature = "performance")))]
+    trace!(
+        recv_timestamp = ?Hexed(&recv_timestamp),
+        digest = ?Hexed(&digest),
+        undeniable_sig = ?Hexed(&undeniable_sig),
+    );
+
+    BUMP.with(|bump| {
+        let mut bump = bump.borrow_mut();
+        bump.reset();
+
+        let builder = Timestamp::builder_in(&*bump)
+            .prepend(recv_timestamp.to_vec_in(&bump))
+            .append(undeniable_sig.to_vec_in(&bump))
+            .keccak256();
+
+        let mut commitment = [0u8; 32];
+        commitment.copy_from_slice(&builder.commitment(&digest));
+
+        let timestamp = builder
+            .attest(PendingAttestation {
+                uri: "https://localhost:3000".into(),
+            })
+            .unwrap();
+
+        // copy data out of bump
+        // TODO: eliminate this allocation by reusing from a pool
+        // TODO: wrap the buffer with a drop trait to return to pool
+        let mut buf = BytesMut::with_capacity(128);
+        timestamp.encode(&mut buf).unwrap();
+
+        #[cfg(any(debug_assertions, not(feature = "performance")))]
+        trace!(encoded_length = buf.len(), timestamp = ?timestamp);
+
+        (buf.freeze(), commitment)
+    })
+}
+
+/// Get current timestamp from calendar server.
 pub async fn get_timestamp() {}

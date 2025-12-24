@@ -70,7 +70,7 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
             target_index: u64,
         }
 
-        impl<'a, const ENTRY_SIZE: usize> Future for WaitForBatch<'a, ENTRY_SIZE> {
+        impl<const ENTRY_SIZE: usize> Future for WaitForBatch<'_, ENTRY_SIZE> {
             type Output = ();
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
                 if self.reader.journal.persisted_index.load(Ordering::Acquire) >= self.target_index
