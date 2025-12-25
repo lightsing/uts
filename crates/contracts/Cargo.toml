@@ -1,0 +1,25 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-contracts"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+alloy-contract = { workspace = true }
+alloy-sol-types = { workspace = true, features = ["json"] }
+
+[dev-dependencies]
+alloy = { workspace = true, features = ["full", "node-bindings"] }
+eyre = { workspace = true }
+futures = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true
+
+[features]
+erc1967 = []
