@@ -1,0 +1,18 @@
+[package]
+name = "uts-database"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true }
+sea-orm = { workspace = true, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
+serde = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

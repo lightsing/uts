@@ -1,5 +1,14 @@
 [workspace]
-members = ["crates/*"]
+members = [
+    "crates/bmt",
+    "crates/calendar",
+    "crates/contracts",
+    "crates/core",
+    "crates/database/db",
+    "crates/database/migration",
+    "crates/journal",
+    "crates/stamper"
+]
 resolver = "3"
 
 [workspace.package]
@@ -57,6 +66,7 @@ once_cell = { version = "1.21", default-features = false }
 paste = "1.0"
 regex = "1.12"
 rocksdb = "0.24"
+sea-orm = "2.0.0-rc"
 serde = "1.0"
 serde_with = "3.16"
 strum = "0.27"
