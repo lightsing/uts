@@ -1,0 +1,5 @@
+{
+  "solidity.packageDefaultDependenciesContractsDirectory": "contracts",
+  "solidity.packageDefaultDependenciesDirectory": "lib",
+  "solidity.exclude": ["lib/**"]
+}

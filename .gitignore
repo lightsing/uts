@@ -474,3 +474,10 @@ Icon[
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Hardhat/Foundry files
+cache
+cache-hardhat
+artifacts
+artifacts-hardhat
+broadcast

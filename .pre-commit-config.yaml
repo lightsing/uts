@@ -13,4 +13,8 @@ repos:
         language: system
         types: [toml]
         pass_filenames: true
-
+      - id: forge-fmt
+        name: forge fmt
+        entry: forge fmt
+        language: system
+        files: \.sol$
