@@ -31,6 +31,7 @@ unnecessary-debug-formatting = "warn"
 alloy = "1"
 alloy-contract = "1.2"
 alloy-primitives = "1.5"
+alloy-provider = "1.2"
 alloy-signer = "1.1"
 alloy-signer-local = "1.1"
 alloy-sol-types = "1.5"
@@ -75,6 +76,7 @@ sha2 = "0.11.0-rc.3"
 sha3 = "0.11.0-rc.3"
 
 uts-bmt = { path = "crates/bmt" }
+uts-contracts = { path = "crates/contracts" }
 uts-core = { path = "crates/core" }
 uts-journal = { path = "crates/journal" }
 uts-stamper = { path = "crates/stamper" }

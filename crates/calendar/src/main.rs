@@ -1,7 +1,8 @@
 //! Calendar server
 
-use alloy_primitives::b256;
-use alloy_signer_local::LocalSigner;
+use alloy_primitives::{address, b256};
+use alloy_provider::{ProviderBuilder, network::EthereumWallet};
+use alloy_signer_local::{LocalSigner, MnemonicBuilder};
 use axum::{
     Router,
     extract::DefaultBodyLimit,
@@ -10,8 +11,9 @@ use axum::{
 use digest::{OutputSizeUser, typenum::Unsigned};
 use rocksdb::DB;
 use sha3::Keccak256;
-use std::sync::Arc;
+use std::{env, sync::Arc};
 use uts_calendar::{AppState, routes, shutdown_signal, time};
+use uts_contracts::uts::UniversalTimestamps;
 use uts_journal::Journal;
 use uts_stamper::{Stamper, StamperConfig};
 
@@ -31,13 +33,30 @@ async fn main() -> eyre::Result<()> {
     // TODO: graceful shutdown
     let journal = Journal::with_capacity(RING_BUFFER_CAPACITY);
 
+    // ethereum provider
+    // Implementation deployed at: 0xf74254bf3c40b29259ce12bd35e74f40b0fda07d
+    // Proxy deployed at: 0x98c857e675e472cf2fd98c478ed4ecc4caf81fae
+    let key = MnemonicBuilder::from_phrase(env::var("MNEMONIC")?.as_str())
+        .index(0u32)?
+        .build()?;
+    let provider = ProviderBuilder::new()
+        .wallet(EthereumWallet::new(key))
+        .connect("https://0xrpc.io/sep")
+        .await?;
+
+    let contract = UniversalTimestamps::new(
+        address!("0x98c857e675e472cf2fd98c478ed4ecc4caf81fae"),
+        provider.clone(),
+    );
+
     // stamper
     let reader = journal.reader();
     let db = DB::open_default("./.db/tries")?;
     let mut stamper =
-        Stamper::<Keccak256, { <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>::new(
+        Stamper::<Keccak256, _, { <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>::new(
             reader,
             Arc::new(db),
+            contract,
             // TODO: tune configuration
             StamperConfig {
                 max_interval_seconds: 10,

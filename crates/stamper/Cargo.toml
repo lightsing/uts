@@ -9,12 +9,15 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
 bytemuck = { workspace = true }
 digest = { workspace = true }
 rocksdb = { workspace = true }
 tokio = { workspace = true, features = ["time", "macros"] }
 tracing = { workspace = true }
 uts-bmt = { workspace = true }
+uts-contracts = { workspace = true }
 uts-core = { workspace = true }
 uts-journal = { workspace = true }
 

@@ -6,12 +6,15 @@
 #[macro_use]
 extern crate tracing;
 
+use alloy_primitives::B256;
+use alloy_provider::Provider;
 use bytemuck::{NoUninit, Pod};
 use digest::{Digest, FixedOutputReset, Output, typenum::Unsigned};
 use rocksdb::{DB, WriteBatch};
 use std::{collections::VecDeque, fmt, sync::Arc, time::Duration};
 use tokio::time::{Interval, MissedTickBehavior};
 use uts_bmt::FlatMerkleTree;
+use uts_contracts::uts::UniversalTimestamps;
 use uts_core::utils::Hexed;
 use uts_journal::reader::JournalReader;
 
@@ -26,13 +29,15 @@ use uts_journal::reader::JournalReader;
 /// - if available entries size is not power of two, it will take:
 ///  - the largest power of two less than available entries, if that is >= `min_leaves`
 ///  - else, it will take all available entries
-pub struct Stamper<D: Digest, const ENTRY_SIZE: usize> {
+pub struct Stamper<D: Digest, P, const ENTRY_SIZE: usize> {
     /// Journal reader to read entries from
     reader: JournalReader<ENTRY_SIZE>,
     /// Storage for merkle trees and leaf->root mappings
     storage: Arc<DB>,
     /// FIFO cache of recent merkle trees
     cache: VecDeque<FlatMerkleTree<D>>,
+    /// The contract
+    contract: UniversalTimestamps<P>,
     /// Stamper configuration
     config: StamperConfig,
 }
@@ -52,7 +57,7 @@ pub struct StamperConfig {
     pub max_cache_size: usize,
 }
 
-impl<D: Digest, const ENTRY_SIZE: usize> fmt::Debug for Stamper<D, ENTRY_SIZE> {
+impl<D: Digest, P, const ENTRY_SIZE: usize> fmt::Debug for Stamper<D, P, ENTRY_SIZE> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Stamper")
             .field("cache_size", &self.cache.len())
@@ -61,20 +66,27 @@ impl<D: Digest, const ENTRY_SIZE: usize> fmt::Debug for Stamper<D, ENTRY_SIZE> {
     }
 }
 
-impl<D, const ENTRY_SIZE: usize> Stamper<D, ENTRY_SIZE>
+impl<D, P, const ENTRY_SIZE: usize> Stamper<D, P, ENTRY_SIZE>
 where
     D: Digest + FixedOutputReset + 'static,
+    P: Provider,
     Output<D>: Pod + Copy,
     [u8; ENTRY_SIZE]: NoUninit,
 {
     const _SIZE_MATCHES: () = assert!(D::OutputSize::USIZE == ENTRY_SIZE);
 
     /// Create a new Stamper
-    pub fn new(reader: JournalReader<ENTRY_SIZE>, storage: Arc<DB>, config: StamperConfig) -> Self {
+    pub fn new(
+        reader: JournalReader<ENTRY_SIZE>,
+        storage: Arc<DB>,
+        contract: UniversalTimestamps<P>,
+        config: StamperConfig,
+    ) -> Self {
         Self {
             reader,
             storage,
             cache: VecDeque::with_capacity(config.max_cache_size),
+            contract,
             config,
         }
     }
@@ -156,10 +168,23 @@ where
         .await
         .expect("Failed to create Merkle tree"); // FIXME: handle error properly
 
+        let root = B256::new(bytemuck::cast(*merkle_tree.root()));
+
         if self.cache.len() >= self.config.max_cache_size {
             self.cache.pop_front();
         }
         self.cache.push_back(merkle_tree);
+
+        let tx_hash = self
+            .contract
+            .attest(root)
+            .send()
+            .await
+            .expect("failed to build transaction")
+            .watch()
+            .await
+            .expect("failed to send transaction"); // FIXME: handle error properly
+        info!(%tx_hash, %root,"Timestamp attested on-chain");
 
         self.reader.commit();
     }
