@@ -10,7 +10,13 @@ import {SlotDerivation} from "@openzeppelin/contracts/utils/SlotDerivation.sol";
 
 /**
  * @title UniversalTimestamps
- * @dev
+ * @dev Records and exposes timestamps for attested Merkle roots using ERC-7201
+ * namespaced storage (`uts.storage.UniversalTimestamps`) derived via
+ * {SlotDerivation}, and is implemented as a UUPS upgradeable contract via
+ * OpenZeppelin's Initializable, OwnableUpgradeable, and UUPSUpgradeable
+ * base contracts. Storage is kept in a dedicated namespaced struct to remain
+ * layout-compatible across upgrades, while upgrades are authorized by the
+ * contract owner through {_authorizeUpgrade}.
  */
 contract UniversalTimestamps is Initializable, OwnableUpgradeable, UUPSUpgradeable, IUniversalTimestamps {
     using SlotDerivation for string;
@@ -56,5 +62,11 @@ contract UniversalTimestamps is Initializable, OwnableUpgradeable, UUPSUpgradeab
         }
     }
 
+    /**
+     * @dev Authorizes an upgrade to `newImplementation`.
+     *
+     * This function is restricted to the contract owner via the {onlyOwner} modifier,
+     * ensuring that only the owner can authorize upgrades to the implementation.
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
