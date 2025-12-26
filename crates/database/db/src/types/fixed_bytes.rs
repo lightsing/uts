@@ -6,6 +6,12 @@ use sea_orm::{
 };
 use std::{any::type_name, sync::Arc};
 
+impl<const N: usize> Wrapped<FixedBytes<N>> {
+    const _ASSERT_U32_SIZE: () = {
+        assert!(N <= u32::MAX as usize, "FixedBytes size exceeds u32::MAX");
+    };
+}
+
 impl<const N: usize> From<Wrapped<FixedBytes<N>>> for Value {
     fn from(x: Wrapped<FixedBytes<N>>) -> Self {
         Value::Bytes(Some(x.to_vec()))
