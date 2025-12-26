@@ -3,6 +3,8 @@
 use alloy_primitives::{B256, BlockNumber, BlockTimestamp, TxHash};
 use sea_orm::{DbErr, prelude::async_trait};
 
+pub(crate) mod types;
+
 mod models;
 use models::attestation::Model as AttestationModel;
 
@@ -16,9 +18,9 @@ pub struct Attestation {
     /// Tx hash of on-chain attestation.
     pub tx_hash: TxHash,
     /// Block number of the block in which on-chain attestation was included.
-    pub block_number: BlockNumber,
+    pub block_number: Option<BlockNumber>,
     /// Timestamp of the block in which on-chain attestation was included.
-    pub block_timestamp: BlockTimestamp,
+    pub block_timestamp: Option<BlockTimestamp>,
 }
 
 /// Database operations related to attestations.
