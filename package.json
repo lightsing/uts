@@ -1,0 +1,11 @@
+{
+  "name": "uts-monorepo",
+  "private": true,
+  "scripts": {
+    "build:wasm": "wasm-pack build crates/core-wasm --target web"
+  },
+  "devDependencies": {
+    "pnpm": "^10.26.2",
+    "wasm-pack": "^0.13.1"
+  }
+}

@@ -4,7 +4,7 @@
 //! comes from some server or from a blockchain.
 
 use crate::{
-    codec::{Decode, DecodeIn, Decoder, Encode, Encoder},
+    codec::{Decode, DecodeIn, Decoder, Encode, Encoder, v1::MayHaveInput},
     error::{DecodeError, EncodeError},
     utils::{Hexed, OnceLock},
 };
@@ -209,5 +209,12 @@ impl<A: Allocator> fmt::Display for RawAttestation<A> {
             }
             _ => write!(f, "Unknown Attestation with tag {}", Hexed(&self.tag)),
         }
+    }
+}
+
+impl<A: Allocator> MayHaveInput for RawAttestation<A> {
+    #[inline]
+    fn input(&self) -> Option<&[u8]> {
+        self.value.get().map(|v| v.as_slice())
     }
 }

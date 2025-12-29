@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { UtsSDK } from 'uts-sdk'
 
 defineProps<{ msg: string }>()
 
 const count = ref(0)
+
+const sdk = new UtsSDK();
+await sdk.ensureInit();
+
+sdk.mergeTimestamps([[]]);
 </script>
 
 <template>

@@ -1,7 +1,7 @@
 //! ** The implementation here is subject to change as this is a read-only version. **
 
 use crate::{
-    codec::v1::{attestation::RawAttestation, opcode::OpCode},
+    codec::v1::{MayHaveInput, attestation::RawAttestation, opcode::OpCode},
     utils::{Hexed, OnceLock},
 };
 use alloc::{alloc::Global, vec::Vec};
@@ -44,6 +44,9 @@ pub struct Step<A: Allocator = Global> {
     next: Vec<Timestamp<A>, A>,
 }
 
+#[derive(Debug)]
+pub struct FinalizationError;
+
 impl<A: Allocator> PartialEq for Timestamp<A> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -77,6 +80,22 @@ impl Timestamp {
     /// Creates a new timestamp builder.
     pub fn builder() -> builder::TimestampBuilder<Global> {
         builder::TimestampBuilder::new_in(Global)
+    }
+
+    /// Merges multiple timestamps into a single FORK timestamp.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if there are conflicting inputs when finalizing unfinalized timestamps.
+    pub fn merge(timestamps: Vec<Timestamp, Global>) -> Timestamp {
+        Self::merge_in(timestamps, Global)
+    }
+
+    /// Try to merge multiple timestamps into a single FORK timestamp.
+    ///
+    /// Returns an error if there are conflicting inputs when finalizing unfinalized timestamps.
+    pub fn try_merge(timestamps: Vec<Timestamp, Global>) -> Result<Timestamp, FinalizationError> {
+        Self::try_merge_in(timestamps, Global)
     }
 }
 
@@ -114,15 +133,6 @@ impl<A: Allocator> Timestamp<A> {
         }
     }
 
-    /// Returns the input data for this timestamp node, if finalized.
-    #[inline]
-    pub fn input(&self) -> Option<&[u8]> {
-        match self {
-            Timestamp::Step(step) => step.input.get().map(|v| v.as_slice()),
-            Timestamp::Attestation(attestation) => attestation.value.get().map(|v| v.as_slice()),
-        }
-    }
-
     /// Returns the allocator used by this timestamp node.
     #[inline]
     pub fn allocator(&self) -> &A {
@@ -130,6 +140,12 @@ impl<A: Allocator> Timestamp<A> {
             Self::Attestation(attestation) => attestation.allocator(),
             Self::Step(step) => step.allocator(),
         }
+    }
+
+    /// Returns true if this timestamp is finalized.
+    #[inline]
+    pub fn is_finalized(&self) -> bool {
+        self.input().is_some()
     }
 }
 
@@ -144,19 +160,34 @@ impl<A: Allocator + Clone> Timestamp<A> {
     /// # Panics
     ///
     /// Panics if the timestamp is already finalized with different input data.
+    #[inline]
     pub fn finalize(&self, input: Vec<u8, A>) {
+        self.try_finalize(input)
+            .expect("conflicting inputs when finalizing timestamp")
+    }
+
+    /// Try finalizes the timestamp with the given input data.
+    ///
+    /// Returns an error if the timestamp is already finalized with different input data.
+    pub fn try_finalize(&self, input: Vec<u8, A>) -> Result<(), FinalizationError> {
         match self {
             Self::Attestation(attestation) => {
                 if let Some(already) = attestation.value.get() {
-                    assert_eq!(&input, already, "trying to finalize with different input");
-                    return;
+                    return if &input != already {
+                        Err(FinalizationError)
+                    } else {
+                        Ok(())
+                    };
                 }
                 let _ = attestation.value.get_or_init(|| input);
             }
             Self::Step(step) => {
                 if let Some(already) = step.input.get() {
-                    assert_eq!(&input, already, "trying to finalize with different input");
-                    return;
+                    return if &input != already {
+                        Err(FinalizationError)
+                    } else {
+                        Ok(())
+                    };
                 }
                 let input = step.input.get_or_init(|| input);
 
@@ -176,6 +207,52 @@ impl<A: Allocator + Clone> Timestamp<A> {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Merges multiple timestamps into a single FORK timestamp.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if there are conflicting inputs when finalizing unfinalized timestamps.
+    pub fn merge_in(timestamps: Vec<Timestamp<A>, A>, alloc: A) -> Timestamp<A> {
+        Self::try_merge_in(timestamps, alloc).expect("conflicting inputs when merging timestamps")
+    }
+
+    /// Merges multiple timestamps into a single FORK timestamp.
+    ///
+    /// This will attempt to finalize unfinalized timestamps if any of the input timestamps are finalized.
+    ///
+    /// Returns an error if there are conflicting inputs when finalizing unfinalized timestamps.
+    pub fn try_merge_in(
+        timestamps: Vec<Timestamp<A>, A>,
+        alloc: A,
+    ) -> Result<Timestamp<A>, FinalizationError> {
+        // if any timestamp is finalized, ensure they are with the same input,
+        // finalize unfinalized timestamps with that input
+        let finalized_input = timestamps.iter().find_map(|ts| ts.input());
+        if let Some(ref input) = finalized_input {
+            for ts in timestamps.iter().filter(|ts| !ts.is_finalized()) {
+                ts.try_finalize(input.to_vec_in(alloc.clone()))?;
+            }
+        }
+
+        Ok(Timestamp::Step(Step {
+            op: OpCode::FORK,
+            data: Vec::new_in(alloc.clone()),
+            input: OnceLock::new(),
+            next: timestamps,
+        }))
+    }
+}
+
+impl<A: Allocator> MayHaveInput for Timestamp<A> {
+    #[inline]
+    fn input(&self) -> Option<&[u8]> {
+        match self {
+            Timestamp::Step(step) => step.input(),
+            Timestamp::Attestation(attestation) => attestation.input(),
+        }
     }
 }
 
@@ -185,3 +262,19 @@ impl<A: Allocator> Step<A> {
         self.data.allocator()
     }
 }
+
+impl<A: Allocator> MayHaveInput for Step<A> {
+    #[inline]
+    fn input(&self) -> Option<&[u8]> {
+        self.input.get().map(|v| v.as_slice())
+    }
+}
+
+impl core::fmt::Display for FinalizationError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "failed to finalize timestamp due to conflicting inputs")
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for FinalizationError {}

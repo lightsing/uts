@@ -11,4 +11,51 @@ pub use attestation::{
 };
 pub use detached_timestamp::DetachedTimestamp;
 pub use digest::DigestHeader;
-pub use timestamp::Timestamp;
+pub use timestamp::{Step, Timestamp};
+
+/// Trait for objects that may have input data.
+pub trait MayHaveInput {
+    /// Returns the input data for this object, if finalized.
+    fn input(&self) -> Option<&[u8]>;
+}
+
+trait ToInput {
+    fn to_input(&self) -> Option<&[u8]>;
+}
+impl<T: MayHaveInput> ToInput for T {
+    fn to_input(&self) -> Option<&[u8]> {
+        self.input()
+    }
+}
+impl ToInput for [u8] {
+    fn to_input(&self) -> Option<&[u8]> {
+        Some(self)
+    }
+}
+impl ToInput for Vec<u8> {
+    fn to_input(&self) -> Option<&[u8]> {
+        Some(self)
+    }
+}
+
+/// Trait for objects that can be checked for consistency with another object.
+#[allow(private_bounds)]
+pub trait ConsistentWith<T: ToInput + ?Sized>: MayHaveInput {
+    /// Checks if self is consistent with the given input.
+    ///
+    /// Note: Returns true if any of the inputs is not set.
+    fn is_consistent_with(&self, other: &T) -> bool {
+        self.input()
+            .zip(other.to_input())
+            .map_or(true, |(a, b)| a == b)
+    }
+
+    /// Checks if self is consistent with the given input.
+    ///
+    /// Note: Returns false if xor of the inputs is not set.
+    fn is_consistent_with_strict(&self, other: &T) -> bool {
+        self.input() == other.to_input()
+    }
+}
+
+impl<T: MayHaveInput, U: ToInput + ?Sized> ConsistentWith<U> for T {}
