@@ -1,0 +1,25 @@
+{
+  "name": "uts-sdk",
+  "version": "0.1.0",
+  "description": "",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [],
+  "author": "Akase Haruka <light.tsing@gmail.com>",
+  "license": "(MIT OR Apache-2.0)",
+  "dependencies": {
+    "uts-core-wasm": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

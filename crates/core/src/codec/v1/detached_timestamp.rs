@@ -1,6 +1,6 @@
 use crate::codec::{
     Decode, DecodeIn, Encode, Encoder, Proof, Version,
-    v1::{DigestHeader, Timestamp},
+    v1::{DigestHeader, FinalizationError, Timestamp},
 };
 use alloc::alloc::{Allocator, Global};
 use core::{fmt, fmt::Formatter};
@@ -63,6 +63,51 @@ impl<A: Allocator> DetachedTimestamp<A> {
     #[inline]
     pub fn allocator(&self) -> &A {
         self.timestamp.allocator()
+    }
+
+    /// Consumes the detached timestamp and returns its parts.
+    pub fn into_parts(self) -> (DigestHeader, Timestamp<A>) {
+        (self.header, self.timestamp)
+    }
+}
+
+impl<A: Allocator + Clone> DetachedTimestamp<A> {
+    /// Creates a new detached timestamp from the given header and timestamp.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timestamp cannot be finalized with the given header's digest.
+    pub fn from_parts(header: DigestHeader, timestamp: Timestamp<A>) -> Self {
+        Self::try_from_parts(header, timestamp)
+            .expect("conflicting inputs when finalizing detached timestamp")
+    }
+
+    /// Creates a new detached timestamp from the given header and timestamp.
+    ///
+    /// Returns an error if the timestamp cannot be finalized with the given header's digest.
+    pub fn try_from_parts(
+        header: DigestHeader,
+        timestamp: Timestamp<A>,
+    ) -> Result<Self, FinalizationError> {
+        timestamp.try_finalize(header.digest())?;
+        Ok(DetachedTimestamp { header, timestamp })
+    }
+
+    /// Finalize the detached timestamp's timestamp with the header's digest.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timestamp cannot be finalized.
+    pub fn finalize(&self) {
+        self.try_finalize()
+            .expect("conflicting inputs when finalizing detached timestamp");
+    }
+
+    /// Tries to finalize the detached timestamp's timestamp with the header's digest.
+    ///
+    /// Returns an error if the timestamp cannot be finalized.
+    pub fn try_finalize(&self) -> Result<(), FinalizationError> {
+        self.timestamp.try_finalize(self.header.digest())
     }
 }
 

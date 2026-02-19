@@ -18,6 +18,10 @@ use sha3::Keccak256;
 ///
 /// This is always a valid opcode.
 #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr)
+)]
 #[repr(transparent)]
 pub struct OpCode(u8);
 
@@ -171,6 +175,7 @@ impl PartialEq<u8> for OpCode {
 ///
 /// This is always a valid opcode.
 #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(transparent)]
 pub struct DigestOp(OpCode);
 
@@ -261,6 +266,31 @@ macro_rules! define_opcodes {
                 }
             }
         }
+
+        /// Error returned when parsing an invalid opcode from a string.
+        #[derive(Debug)]
+        pub struct OpCodeFromStrError;
+
+        impl core::fmt::Display for OpCodeFromStrError {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                write!(f, "invalid opcode string")
+            }
+        }
+
+        #[cfg(feature = "std")]
+        impl std::error::Error for OpCodeFromStrError {}
+
+        impl core::str::FromStr for OpCode {
+            type Err = OpCodeFromStrError;
+
+            #[inline]
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $( stringify!($variant) => Ok(Self::$variant), )*
+                    _ => Err(OpCodeFromStrError),
+                }
+            }
+         }
     };
 }
 
@@ -385,5 +415,21 @@ mod tests {
         assert_eq!(DigestOp::RIPEMD160.output_size(), 20);
         assert_eq!(DigestOp::SHA256.output_size(), 32);
         assert_eq!(DigestOp::KECCAK256.output_size(), 32);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_opcode() {
+        let opcode = OpCode::SHA256;
+        let serialized = serde_json::to_string(&opcode).unwrap();
+        assert_eq!(serialized, "\"SHA256\"");
+        let deserialized: OpCode = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, opcode);
+
+        let digest_op = DigestOp::SHA256;
+        let serialized = serde_json::to_string(&digest_op).unwrap();
+        assert_eq!(serialized, "\"SHA256\"");
+        let deserialized: DigestOp = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, digest_op);
     }
 }
