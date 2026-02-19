@@ -10,7 +10,9 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
+bytemuck = { workspace = true }
 digest.workspace = true
+hybrid-array = { workspace = true, features = ["bytemuck"] }
 
 [dev-dependencies]
 commonware-cryptography = "0.0.63" # for benchmarks
