@@ -193,14 +193,14 @@ impl<A: Allocator + Clone> Timestamp<A> {
                     OpCode::FORK => {
                         debug_assert!(step.next.len() >= 2, "FORK must have at least two children");
                         for child in &step.next {
-                            child.finalize(input);
+                            child.try_finalize(input)?;
                         }
                     }
                     OpCode::ATTESTATION => unreachable!("should not happen"),
                     op => {
                         let output = op.execute_in(input, &step.data, step.allocator().clone());
                         debug_assert!(step.next.len() == 1, "non-FORK must have exactly one child");
-                        step.next[0].finalize(&output);
+                        step.next[0].try_finalize(&output)?;
                     }
                 }
             }
