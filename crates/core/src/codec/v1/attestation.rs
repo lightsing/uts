@@ -22,6 +22,10 @@ const TAG_SIZE: usize = 8;
 const BITCOIN_TAG: &[u8; 8] = b"\x05\x88\x96\x0d\x73\xd7\x19\x01";
 /// Tag indicating a pending attestation.
 const PENDING_TAG: &[u8; 8] = b"\x83\xdf\xe3\x0d\x2e\xf9\x0c\x8e";
+/// Tag indicating an Ethereum UTS contract attestation.
+///
+/// TAG = keccak256("EthereumUTSAttestation")[:8]
+const ETHEREUM_UTS_TAG: &[u8; 8] = b"\xea\xf2\xbc\x69\x3c\x93\x25\x1c";
 
 /// Tag identifying the attestation kind.
 pub type AttestationTag = [u8; TAG_SIZE];
@@ -216,5 +220,20 @@ impl<A: Allocator> MayHaveInput for RawAttestation<A> {
     #[inline]
     fn input(&self) -> Option<&[u8]> {
         self.value.get().map(|v| v.as_slice())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ethereum_uts_tag() {
+        use sha3::{Digest, Keccak256};
+
+        let mut hasher = Keccak256::new();
+        hasher.update(b"EthereumUTSAttestation");
+        let result = hasher.finalize().to_vec();
+        assert_eq!(&result[..8], ETHEREUM_UTS_TAG);
     }
 }
