@@ -29,10 +29,13 @@ pub mod uts {
         use super::*;
         use crate::erc1967::ERC1967ProxyInstance;
         use alloy::{
+            network::EthereumWallet,
             primitives::{B256, Bytes, U256, b256},
             providers::ProviderBuilder,
+            signers::local::MnemonicBuilder,
         };
         use futures::StreamExt;
+        use std::env;
 
         const ROOT: B256 =
             b256!("5cd5c6763b9f2b3fb1cd66a15fe92b7ac913eec295d9927886e175f144ce3308");
@@ -54,6 +57,28 @@ pub mod uts {
 
             let (attested, _log) = attested_log.into_stream().next().await.unwrap()?;
             assert_eq!(attested.root, ROOT);
+
+            Ok(())
+        }
+
+        #[tokio::test]
+        #[ignore]
+        async fn deploy_to_sepolia() -> eyre::Result<()> {
+            let signer = MnemonicBuilder::from_phrase(env::var("MNEMONIC")?.as_str())
+                .index(0u32)?
+                .build()?;
+
+            let provider = ProviderBuilder::new()
+                .wallet(EthereumWallet::new(signer))
+                .connect("https://0xrpc.io/sep")
+                .await?;
+
+            let imp = deploy(&provider).await?;
+            println!("Implementation deployed at: {:?}", imp.address());
+
+            let proxy =
+                ERC1967ProxyInstance::deploy(&provider, *imp.address(), Bytes::new()).await?;
+            println!("Proxy deployed at: {:?}", proxy.address());
 
             Ok(())
         }

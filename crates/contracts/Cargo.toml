@@ -13,7 +13,7 @@ alloy-contract = { workspace = true }
 alloy-sol-types = { workspace = true, features = ["json"] }
 
 [dev-dependencies]
-alloy = { workspace = true, features = ["full", "node-bindings"] }
+alloy = { workspace = true, features = ["full", "node-bindings", "signer-mnemonic"] }
 eyre = { workspace = true }
 futures = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
