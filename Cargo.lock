@@ -83,6 +83,7 @@ checksum = "b163ff4acf0eac29af05a911397cc418a76e153467b859398adc26cb9335a611"
 dependencies = [
  "alloy-primitives",
  "num_enum",
+ "serde",
  "strum",
 ]
 
@@ -5781,6 +5782,8 @@ dependencies = [
 name = "uts-core"
 version = "0.1.0"
 dependencies = [
+ "alloy-chains",
+ "alloy-primitives",
  "auto_impl",
  "bytes",
  "criterion 0.5.1",

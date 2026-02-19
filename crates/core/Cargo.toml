@@ -15,6 +15,8 @@ path = "src/bin/uts_info.rs"
 required-features = ["std"]
 
 [dependencies]
+alloy-chains = { workspace = true }
+alloy-primitives = { workspace = true }
 auto_impl.workspace = true
 bytes = { workspace = true, optional = true }
 digest.workspace = true
@@ -36,6 +38,7 @@ default = ["std"]
 serde = ["dep:serde", "dep:serde_with", "serde/derive", "serde_with/hex"]
 std = []
 tracing = ["dep:tracing"]
+verifier = []
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

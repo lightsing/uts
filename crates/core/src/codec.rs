@@ -77,6 +77,13 @@ pub trait Decoder: Sized {
         T::decode(self)
     }
 
+    /// Decodes a trailing optional value implementing the [`Decode`] trait.
+    ///
+    /// See [`Decode::decode_trailing`] for details and caveats.
+    fn decode_trailing<T: Decode>(&mut self) -> Result<Option<T>, DecodeError> {
+        T::decode_trailing(self)
+    }
+
     /// Decodes a value implementing the [`Decode`] trait.
     fn decode_in<T: DecodeIn<A>, A: Allocator>(&mut self, alloc: A) -> Result<T, DecodeError> {
         T::decode_in(self, alloc)
@@ -95,15 +102,47 @@ pub trait Encode {
 /// Deserializes a value from an OpenTimestamps-compatible byte stream.
 pub trait Decode: Sized {
     fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError>;
+
+    /// Decodes a trailing optional value implementing the [`Decode`] trait.
+    ///
+    /// This treats any `UnexpectedEof` error as an indication that the value is absent, returning `Ok(None)`.
+    ///
+    /// If the implementor returns `UnexpectedEof` for any reason other than the absence of the value,
+    /// it should also override this method to avoid masking the error as `Ok(None)`.
+    fn decode_trailing(decoder: &mut impl Decoder) -> Result<Option<Self>, DecodeError> {
+        match Self::decode(decoder) {
+            Ok(value) => Ok(Some(value)),
+            Err(DecodeError::UnexpectedEof) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 /// Deserializes a value from an OpenTimestamps-compatible byte stream.
 pub trait DecodeIn<A: Allocator>: Sized {
+    /// See [`Decode::decode`] for details.
     fn decode_in(decoder: &mut impl Decoder, alloc: A) -> Result<Self, DecodeError>;
+
+    /// See [`Decode::decode_trailing`] for details and caveats.
+    fn decode_trailing(decoder: &mut impl Decoder, alloc: A) -> Result<Option<Self>, DecodeError> {
+        match Self::decode_in(decoder, alloc) {
+            Ok(value) => Ok(Some(value)),
+            Err(DecodeError::UnexpectedEof) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 impl<T: DecodeIn<Global>> Decode for T {
     fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
         T::decode_in(decoder, Global)
+    }
+
+    fn decode_trailing(decoder: &mut impl Decoder) -> Result<Option<Self>, DecodeError> {
+        match Self::decode_in(decoder, Global) {
+            Ok(value) => Ok(Some(value)),
+            Err(DecodeError::UnexpectedEof) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 }

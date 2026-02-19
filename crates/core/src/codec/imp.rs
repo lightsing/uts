@@ -1,6 +1,7 @@
 use crate::codec::*;
 use alloc::vec::Vec;
 
+mod alloy;
 #[cfg(feature = "bytes")]
 mod bytes;
 mod primitives;
