@@ -1,4 +1,3 @@
-#![feature(maybe_uninit_slice)]
 #![feature(maybe_uninit_fill)]
 #![feature(likely_unlikely)]
 //! High performance binary Merkle tree implementation in Rust.

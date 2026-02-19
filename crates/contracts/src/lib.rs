@@ -9,18 +9,12 @@ pub mod uts {
         sol!(
             #[sol(rpc, all_derives)]
             IUniversalTimestamps,
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../target/foundry/IUniversalTimestamps.sol/IUniversalTimestamps.json"
-            )
+            "abi/IUniversalTimestamps.json"
         );
         sol!(
             #[sol(rpc)]
             UniversalTimestamps,
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../target/foundry/UniversalTimestamps.sol/UniversalTimestamps.json"
-            )
+            "abi/UniversalTimestamps.json"
         );
     }
 
@@ -75,10 +69,7 @@ pub mod erc1967 {
         sol!(
             #[sol(rpc)]
             ERC1967Proxy,
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../target/foundry/ERC1967Proxy.sol/ERC1967Proxy.json"
-            )
+            "abi/ERC1967Proxy.json"
         );
     }
 
