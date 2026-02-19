@@ -8,8 +8,14 @@ use core::fmt;
 
 /// Header describing the digest that anchors a timestamp.
 #[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    serde_with::serde_as,
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct DigestHeader {
     kind: DigestOp,
+    #[cfg_attr(feature = "serde", serde_as(as = "serde_with::hex::Hex"))]
     digest: [u8; 32],
 }
 

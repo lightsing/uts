@@ -22,6 +22,8 @@ hex.workspace = true
 once_cell = { workspace = true, features = ["alloc"] }
 paste.workspace = true
 ripemd.workspace = true
+serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
 sha1.workspace = true
 sha2.workspace = true
 sha3.workspace = true
@@ -31,9 +33,11 @@ tracing = { workspace = true, optional = true }
 [features]
 bytes = ["dep:bytes"]
 default = ["std"]
+serde = ["dep:serde", "dep:serde_with", "serde/derive", "serde_with/hex"]
 std = []
 tracing = ["dep:tracing"]
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 opentimestamps = { git = "https://github.com/opentimestamps/rust-opentimestamps" }
+serde_json.workspace = true
