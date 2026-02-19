@@ -1,7 +1,7 @@
 //! ** The implementation here is subject to change as this is a read-only version. **
 
 use crate::{
-    codec::v1::{MayHaveInput, attestation::RawAttestation, opcode::OpCode},
+    codec::v1::{FinalizationError, MayHaveInput, attestation::RawAttestation, opcode::OpCode},
     utils::{Hexed, OnceLock},
 };
 use alloc::{alloc::Global, vec::Vec};
@@ -43,9 +43,6 @@ pub struct Step<A: Allocator = Global> {
     input: OnceLock<Vec<u8, A>>,
     next: Vec<Timestamp<A>, A>,
 }
-
-#[derive(Debug)]
-pub struct FinalizationError;
 
 impl<A: Allocator> PartialEq for Timestamp<A> {
     fn eq(&self, other: &Self) -> bool {
@@ -161,7 +158,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
     ///
     /// Panics if the timestamp is already finalized with different input data.
     #[inline]
-    pub fn finalize(&self, input: Vec<u8, A>) {
+    pub fn finalize(&self, input: &[u8]) {
         self.try_finalize(input)
             .expect("conflicting inputs when finalizing timestamp")
     }
@@ -169,7 +166,8 @@ impl<A: Allocator + Clone> Timestamp<A> {
     /// Try finalizes the timestamp with the given input data.
     ///
     /// Returns an error if the timestamp is already finalized with different input data.
-    pub fn try_finalize(&self, input: Vec<u8, A>) -> Result<(), FinalizationError> {
+    pub fn try_finalize(&self, input: &[u8]) -> Result<(), FinalizationError> {
+        let init_fn = || input.to_vec_in(self.allocator().clone());
         match self {
             Self::Attestation(attestation) => {
                 if let Some(already) = attestation.value.get() {
@@ -179,7 +177,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
                         Ok(())
                     };
                 }
-                let _ = attestation.value.get_or_init(|| input);
+                let _ = attestation.value.get_or_init(init_fn);
             }
             Self::Step(step) => {
                 if let Some(already) = step.input.get() {
@@ -189,20 +187,20 @@ impl<A: Allocator + Clone> Timestamp<A> {
                         Ok(())
                     };
                 }
-                let input = step.input.get_or_init(|| input);
+                let input = step.input.get_or_init(init_fn);
 
                 match step.op {
                     OpCode::FORK => {
                         debug_assert!(step.next.len() >= 2, "FORK must have at least two children");
                         for child in &step.next {
-                            child.finalize(input.clone());
+                            child.finalize(input);
                         }
                     }
                     OpCode::ATTESTATION => unreachable!("should not happen"),
                     op => {
                         let output = op.execute_in(input, &step.data, step.allocator().clone());
                         debug_assert!(step.next.len() == 1, "non-FORK must have exactly one child");
-                        step.next[0].finalize(output);
+                        step.next[0].finalize(&output);
                     }
                 }
             }
@@ -233,7 +231,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
         let finalized_input = timestamps.iter().find_map(|ts| ts.input());
         if let Some(ref input) = finalized_input {
             for ts in timestamps.iter().filter(|ts| !ts.is_finalized()) {
-                ts.try_finalize(input.to_vec_in(alloc.clone()))?;
+                ts.try_finalize(input)?;
             }
         }
 
@@ -257,8 +255,23 @@ impl<A: Allocator> MayHaveInput for Timestamp<A> {
 }
 
 impl<A: Allocator> Step<A> {
+    /// Returns the opcode of this step.
+    pub fn op(&self) -> OpCode {
+        self.op
+    }
+
+    /// Returns the immediate data of this step.
+    pub fn data(&self) -> &[u8] {
+        self.data.as_slice()
+    }
+
+    /// Returns the next timestamps of this step.
+    pub fn next(&self) -> &[Timestamp<A>] {
+        self.next.as_slice()
+    }
+
     /// Returns the allocator used by this step.
-    pub(crate) fn allocator(&self) -> &A {
+    pub fn allocator(&self) -> &A {
         self.data.allocator()
     }
 }
@@ -269,12 +282,3 @@ impl<A: Allocator> MayHaveInput for Step<A> {
         self.input.get().map(|v| v.as_slice())
     }
 }
-
-impl core::fmt::Display for FinalizationError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "failed to finalize timestamp due to conflicting inputs")
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for FinalizationError {}

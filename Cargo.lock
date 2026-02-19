@@ -5413,6 +5413,9 @@ dependencies = [
  "opentimestamps",
  "paste",
  "ripemd",
+ "serde",
+ "serde_json",
+ "serde_with",
  "sha1 0.11.0-rc.3",
  "sha2 0.11.0-rc.3",
  "sha3 0.11.0-rc.3",
@@ -5424,7 +5427,10 @@ dependencies = [
 name = "uts-core-wasm"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "serde-wasm-bindgen",
+ "serde_json",
+ "serde_with",
  "uts-core",
  "wasm-bindgen",
 ]

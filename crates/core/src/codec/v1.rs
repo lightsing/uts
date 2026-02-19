@@ -13,6 +13,19 @@ pub use detached_timestamp::DetachedTimestamp;
 pub use digest::DigestHeader;
 pub use timestamp::{Step, Timestamp};
 
+/// Error indicating that finalization of a timestamp failed due to conflicting inputs.
+#[derive(Debug)]
+pub struct FinalizationError;
+
+impl core::fmt::Display for FinalizationError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "failed to finalize timestamp due to conflicting inputs")
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for FinalizationError {}
+
 /// Trait for objects that may have input data.
 pub trait MayHaveInput {
     /// Returns the input data for this object, if finalized.

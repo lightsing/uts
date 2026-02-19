@@ -12,8 +12,11 @@ version.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
+serde = { workspace = true, features = ["derive"] }
 serde-wasm-bindgen = { workspace = true }
-uts-core = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true, features = ["hex"] }
+uts-core = { workspace = true, features = ["serde"] }
 wasm-bindgen = { workspace = true }
 
 [lints]
