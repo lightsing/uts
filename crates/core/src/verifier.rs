@@ -23,9 +23,10 @@ pub enum VerifyError {
     /// An error occurred while decoding the attestation.
     #[error("error decoding attestation: {0}")]
     Decode(DecodeError),
-    /// An error occurred while verifying the attestation.
-    #[error("error verifying attestation: {0}")]
-    Verify(#[source] Box<dyn core::error::Error + Send + Sync>),
+    /// An error occurred while verifying the ethereum uts attestation.
+    #[cfg(feature = "ethereum-uts-verifier")]
+    #[error("error verifying ethereum uts attestation: {0}")]
+    EthereumUTS(#[from] ethereum_uts::EthereumUTSVerifierError),
 }
 
 pub trait AttestationVerifier<P>
@@ -33,10 +34,12 @@ where
     P: for<'a> Attestation<'a> + Send,
     Self: Send + Sync,
 {
+    type Output;
+
     fn verify_raw(
         &self,
         raw: &RawAttestation,
-    ) -> impl Future<Output = Result<(), VerifyError>> + Send {
+    ) -> impl Future<Output = Result<Self::Output, VerifyError>> + Send {
         async {
             if raw.tag == PendingAttestation::TAG {
                 return Err(VerifyError::Pending);
@@ -58,5 +61,5 @@ where
         &self,
         attestation: &P,
         value: &[u8],
-    ) -> impl Future<Output = Result<(), VerifyError>> + Send;
+    ) -> impl Future<Output = Result<Self::Output, VerifyError>> + Send;
 }

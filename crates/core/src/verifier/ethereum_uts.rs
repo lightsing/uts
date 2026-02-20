@@ -1,8 +1,8 @@
 use super::{AttestationVerifier, VerifyError};
 use crate::codec::v1::EthereumUTSAttestation;
-use alloy_primitives::ChainId;
+use alloy_primitives::{Address, ChainId, TxHash};
 use alloy_provider::{Provider, transport::TransportError};
-use alloy_rpc_types_eth::Filter;
+use alloy_rpc_types_eth::{Filter, Log};
 use alloy_sol_types::SolEvent;
 use digest::OutputSizeUser;
 use sha3::Keccak256;
@@ -22,8 +22,10 @@ pub enum EthereumUTSVerifierError {
     ChainIdMismatch,
     #[error("root not found in attested logs")]
     NotFound,
-    #[error("different contract address in attested log than expected")]
-    ContractAddressMismatch,
+    #[error("contract address mismatch, expected {expected}, found {found}")]
+    ContractMismatch { expected: Address, found: Address },
+    #[error("transaction hash mismatch, expected {expected}, found {found}")]
+    TransactionMismatch { expected: TxHash, found: TxHash },
     #[error(transparent)]
     Rpc(#[from] TransportError),
 }
@@ -36,14 +38,14 @@ impl<P: Provider> EthereumUTSVerifier<P> {
 }
 
 impl<P: Provider> AttestationVerifier<EthereumUTSAttestation> for EthereumUTSVerifier<P> {
+    type Output = Log<Attested>;
+
     async fn verify(
         &self,
         attestation: &EthereumUTSAttestation,
         value: &[u8],
-    ) -> Result<(), VerifyError> {
-        self.verify_attestation(attestation, value)
-            .await
-            .map_err(|e| VerifyError::Verify(Box::new(e)))
+    ) -> Result<Self::Output, VerifyError> {
+        Ok(self.verify_attestation(attestation, value).await?)
     }
 }
 
@@ -52,7 +54,7 @@ impl<P: Provider> EthereumUTSVerifier<P> {
         &self,
         attestation: &EthereumUTSAttestation,
         value: &[u8],
-    ) -> Result<(), EthereumUTSVerifierError> {
+    ) -> Result<Log<Attested>, EthereumUTSVerifierError> {
         if value.len() != Keccak256::output_size() {
             return Err(EthereumUTSVerifierError::InvalidLength);
         }
@@ -67,19 +69,77 @@ impl<P: Provider> EthereumUTSVerifier<P> {
         let logs = self.provider.get_logs(&filter).await?;
 
         let Some(log) = logs
-            .iter()
-            .filter_map(|log| Attested::decode_log(&log.inner).ok())
-            .find(|log| log.data.root == value)
+            .into_iter()
+            .filter_map(|log| {
+                Attested::decode_log(&log.inner)
+                    .map(|inner| Log {
+                        inner,
+                        block_hash: log.block_hash,
+                        block_number: log.block_number,
+                        block_timestamp: log.block_timestamp,
+                        transaction_hash: log.transaction_hash,
+                        transaction_index: log.transaction_index,
+                        log_index: log.log_index,
+                        removed: log.removed,
+                    })
+                    .ok()
+            })
+            .find(|log| log.inner.data.root == value)
         else {
             return Err(EthereumUTSVerifierError::NotFound);
         };
 
         // perform additional checks if available
-        if let Some(contract_address) = attestation.metadata.contract() {
-            if log.address != contract_address {
-                return Err(EthereumUTSVerifierError::ContractAddressMismatch);
+        if let Some(contract) = attestation.metadata.contract() {
+            if log.inner.address != contract {
+                return Err(EthereumUTSVerifierError::ContractMismatch {
+                    expected: contract,
+                    found: log.inner.address,
+                });
+            }
+            if let Some(expect_tx) = attestation.metadata.tx()
+                && let Some(found_tx) = log.transaction_hash
+                && expect_tx != found_tx
+            {
+                return Err(EthereumUTSVerifierError::TransactionMismatch {
+                    expected: expect_tx,
+                    found: found_tx,
+                });
             }
         }
-        Ok(())
+        Ok(log)
+    }
+}
+
+impl EthereumUTSVerifierError {
+    /// The error indicates this attestation is invalid and cannot be verified.
+    #[inline]
+    pub fn is_fatal(&self) -> bool {
+        matches!(
+            self,
+            EthereumUTSVerifierError::InvalidLength | EthereumUTSVerifierError::NotFound
+        )
+    }
+
+    /// The error indicates this attestation is valid but not attested by the expected contract or transaction.
+    #[inline]
+    pub fn is_mismatch(&self) -> bool {
+        matches!(
+            self,
+            EthereumUTSVerifierError::ContractMismatch { .. }
+                | EthereumUTSVerifierError::TransactionMismatch { .. }
+        )
+    }
+
+    /// The error indicates this attestation may be valid but cannot be verified at the moment.
+    #[inline]
+    pub fn should_retry(&self) -> bool {
+        matches!(self, EthereumUTSVerifierError::Rpc(_))
+    }
+
+    /// The error indicates this attestation may be valid but the provider is not suitable for verifying it.
+    #[inline]
+    pub fn is_wrong_provider(&self) -> bool {
+        matches!(self, EthereumUTSVerifierError::ChainIdMismatch)
     }
 }
