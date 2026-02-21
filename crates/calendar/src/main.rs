@@ -1,7 +1,7 @@
 //! Calendar server
 
 use alloy_primitives::b256;
-use alloy_provider::{ProviderBuilder, network::EthereumWallet};
+use alloy_provider::{Provider, ProviderBuilder, network::EthereumWallet};
 use alloy_signer_local::{LocalSigner, MnemonicBuilder};
 use axum::{
     Router,
@@ -12,6 +12,7 @@ use digest::{OutputSizeUser, typenum::Unsigned};
 use rocksdb::DB;
 use sha3::Keccak256;
 use std::{env, sync::Arc};
+use tracing::info;
 use uts_calendar::{AppState, routes, shutdown_signal, time};
 use uts_contracts::uts::UniversalTimestamps;
 use uts_journal::Journal;
@@ -36,20 +37,22 @@ async fn main() -> eyre::Result<()> {
     let key = MnemonicBuilder::from_phrase(env::var("MNEMONIC")?.as_str())
         .index(0u32)?
         .build()?;
+    info!("Using address: {:?}", key.address());
     let provider = ProviderBuilder::new()
         .wallet(EthereumWallet::new(key))
-        .connect("https://0xrpc.io/sep")
+        .connect("https://sepolia-rpc.scroll.io")
         .await?;
+    provider.get_chain_id().await?; // sanity check
 
     let contract = UniversalTimestamps::new(uts_contracts::uts::DEFAULT_ADDRESS, provider.clone());
 
     // stamper
     let reader = journal.reader();
-    let db = DB::open_default("./.db/tries")?;
+    let db = Arc::new(DB::open_default("./.db/tries")?);
     let mut stamper =
         Stamper::<Keccak256, _, { <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>::new(
             reader,
-            Arc::new(db),
+            db.clone(),
             contract,
             // TODO: tune configuration
             StamperConfig {
@@ -64,20 +67,18 @@ async fn main() -> eyre::Result<()> {
         stamper.run().await;
     });
 
-    // TODO: maybe we can separate "/timestamp/{hex_commitment}" into another service with DB::open_as_secondary()
-    // TODO: write/read separate, reader can scale horizontally? would this be better?
-
     let app = Router::new()
         .route(
             "/digest",
             post(routes::ots::submit_digest)
                 .layer(DefaultBodyLimit::max(routes::ots::MAX_DIGEST_SIZE)),
         )
-        .route(
-            "/timestamp/{hex_commitment}",
-            get(routes::ots::get_timestamp),
-        )
-        .with_state(Arc::new(AppState { signer, journal }));
+        .route("/timestamp/{commitment}", get(routes::ots::get_timestamp))
+        .with_state(Arc::new(AppState {
+            signer,
+            journal,
+            db,
+        }));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
 

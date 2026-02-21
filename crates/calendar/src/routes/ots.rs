@@ -1,8 +1,9 @@
 use crate::{AppState, time::current_time_sec};
+use alloy_primitives::{B256, hex};
 use alloy_signer::SignerSync;
 use axum::{
     body::Bytes,
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -11,13 +12,15 @@ use bytes::BytesMut;
 use digest::Digest;
 use sha3::Keccak256;
 use std::{cell::RefCell, sync::Arc};
+use uts_bmt::{FlatMerkleTree, NodePosition};
 use uts_core::{
     codec::{
         Encode,
-        v1::{PendingAttestation, Timestamp},
+        v1::{EthereumUTSAttestation, PendingAttestation, Timestamp},
     },
     utils::Hexed,
 };
+use uts_stamper::DbExt;
 
 /// Maximum digest size accepted by the endpoint.
 pub const MAX_DIGEST_SIZE: usize = 64; // e.g., SHA3-512
@@ -114,7 +117,7 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
 
         let timestamp = builder
             .attest(PendingAttestation {
-                uri: "https://localhost:3000".into(),
+                uri: "http://localhost:3000".into(),
             })
             .unwrap();
 
@@ -132,4 +135,61 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
 }
 
 /// Get current timestamp from calendar server.
-pub async fn get_timestamp() {}
+pub async fn get_timestamp(
+    State(state): State<Arc<AppState>>,
+    Path(commitment): Path<B256>,
+) -> Response {
+    const PRE_ALLOCATION_SIZE_HINT: usize = 4096;
+    thread_local! {
+        // We don't have `.await` in this function, so it's safe to borrow thread local.
+        static BUMP: RefCell<Bump> = RefCell::new(Bump::with_size(PRE_ALLOCATION_SIZE_HINT));
+    }
+
+    let Some(root) = state.db.get_root_for_leaf(commitment).expect("DB error") else {
+        return (StatusCode::NOT_FOUND, r#"{"err":"timestamp not found"}"#).into_response();
+    };
+    let entry = state
+        .db
+        .load_entry(root)
+        .expect("DB error")
+        .expect("bug: entry not found");
+    let trie: FlatMerkleTree<Keccak256> = entry.trie();
+
+    let mut proof_iter = trie
+        .get_proof_iter(bytemuck::cast_ref(&*commitment))
+        .expect("bug: proof not found");
+    let output = BUMP.with(|bump| {
+        let mut bump = bump.borrow_mut();
+        bump.reset();
+
+        let mut builder = Timestamp::builder_in(&*bump);
+
+        while let Some((side, sibling_hash)) = proof_iter.next() {
+            builder = match side {
+                NodePosition::Left => builder.append(sibling_hash.to_vec_in(&bump)),
+                NodePosition::Right => builder.prepend(sibling_hash.to_vec_in(&bump)),
+            }
+            .keccak256();
+        }
+        let timestamp = builder
+            .attest(EthereumUTSAttestation::new(
+                entry.chain_id,
+                entry.height,
+                Default::default(),
+            ))
+            .unwrap();
+
+        // copy data out of bump
+        // TODO: eliminate this allocation by reusing from a pool
+        // TODO: wrap the buffer with a drop trait to return to pool
+        let mut buf = BytesMut::with_capacity(128);
+        timestamp.encode(&mut buf).unwrap();
+
+        #[cfg(any(debug_assertions, not(feature = "performance")))]
+        trace!(encoded_length = buf.len(), timestamp = ?timestamp);
+
+        buf.freeze()
+    });
+
+    output.into_response()
+}

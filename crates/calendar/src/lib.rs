@@ -9,7 +9,9 @@ extern crate tracing;
 use alloy_signer::k256::ecdsa::SigningKey;
 use alloy_signer_local::LocalSigner;
 use digest::{OutputSizeUser, typenum::Unsigned};
+use rocksdb::DB;
 use sha3::Keccak256;
+use std::sync::Arc;
 use uts_journal::Journal;
 
 /// Calendar server routes and handlers.
@@ -24,6 +26,8 @@ pub struct AppState {
     pub signer: LocalSigner<SigningKey>,
     /// Journal
     pub journal: Journal<{ <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>,
+    /// RocksDB
+    pub db: Arc<DB>,
 }
 
 /// Signal for graceful shutdown.
