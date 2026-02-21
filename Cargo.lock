@@ -5785,6 +5785,7 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "alloy-contract",
+ "alloy-primitives",
  "alloy-sol-types",
  "eyre",
  "futures",

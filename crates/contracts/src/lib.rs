@@ -2,6 +2,8 @@
 
 /// UniversalTimestamps contract
 pub mod uts {
+    use alloy_primitives::{Address, address};
+
     #[doc(hidden)]
     pub mod binding {
         use alloy_sol_types::sol;
@@ -23,6 +25,9 @@ pub mod uts {
     };
 
     pub use binding::UniversalTimestamps::{BYTECODE, DEPLOYED_BYTECODE, deploy, deploy_builder};
+
+    /// Default address for the UniversalTimestamps contract.
+    pub const DEFAULT_ADDRESS: Address = address!("0xceB7a9E77bd00D0391349B9bC989167cAB5e35e7");
 
     #[cfg(test)]
     mod tests {
