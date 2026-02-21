@@ -164,6 +164,21 @@ pub struct EthereumUTSAttestationExtraMetadata {
     tx: Option<TxHash>,
 }
 
+impl EthereumUTSAttestation {
+    /// Creates a new Ethereum UTS attestation with the given chain id, block number, and extra metadata.
+    pub fn new(
+        chain_id: ChainId,
+        height: BlockNumber,
+        metadata: EthereumUTSAttestationExtraMetadata,
+    ) -> Self {
+        Self {
+            chain: Chain::from_id(chain_id),
+            height,
+            metadata,
+        }
+    }
+}
+
 impl fmt::Display for EthereumUTSAttestation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -192,7 +207,7 @@ impl Attestation<'_> for EthereumUTSAttestation {
     fn to_raw_data_in<A: Allocator>(&self, alloc: A) -> Result<Vec<u8, A>, EncodeError> {
         // chain id + block number + optional address + optional tx hash
         const SIZE: usize = size_of::<ChainId>() + size_of::<BlockNumber>() + 20 + 32;
-        let mut buffer = Vec::with_capacity_in(20 + 32 + 32, alloc);
+        let mut buffer = Vec::with_capacity_in(SIZE, alloc);
         buffer.encode(self.chain)?;
         buffer.encode(self.height)?;
         buffer.encode(&self.metadata)?;
@@ -325,12 +340,17 @@ impl<'a> Attestation<'a> for PendingAttestation<'a> {
 impl<A: Allocator> fmt::Display for RawAttestation<A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.tag {
+            tag if *tag == *PENDING_TAG => {
+                let att = PendingAttestation::from_raw(self).expect("Valid Pending attestation");
+                write!(f, "{}", att)
+            }
             tag if *tag == *BITCOIN_TAG => {
                 let att = BitcoinAttestation::from_raw(self).expect("Valid Bitcoin attestation");
                 write!(f, "{}", att)
             }
-            tag if *tag == *PENDING_TAG => {
-                let att = PendingAttestation::from_raw(self).expect("Valid Pending attestation");
+            tag if *tag == *ETHEREUM_UTS_TAG => {
+                let att =
+                    EthereumUTSAttestation::from_raw(self).expect("Valid Ethereum UTS attestation");
                 write!(f, "{}", att)
             }
             _ => write!(f, "Unknown Attestation with tag {}", Hexed(&self.tag)),
