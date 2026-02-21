@@ -29,9 +29,11 @@ unnecessary-debug-formatting = "warn"
 
 [workspace.dependencies]
 alloy = "1"
+alloy-chains = "0.2"
 alloy-contract = "1.2"
 alloy-primitives = "1.5"
 alloy-provider = "1.2"
+alloy-rpc-types-eth = "1.6"
 alloy-signer = "1.1"
 alloy-signer-local = "1.1"
 alloy-sol-types = "1.5"

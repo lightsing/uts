@@ -13,6 +13,8 @@ use alloc::{
     borrow::Cow,
     vec::Vec,
 };
+use alloy_chains::Chain;
+use alloy_primitives::{Address, BlockNumber, ChainId, TxHash};
 use core::fmt;
 
 /// Size in bytes of the tag identifying the attestation type.
@@ -22,6 +24,10 @@ const TAG_SIZE: usize = 8;
 const BITCOIN_TAG: &[u8; 8] = b"\x05\x88\x96\x0d\x73\xd7\x19\x01";
 /// Tag indicating a pending attestation.
 const PENDING_TAG: &[u8; 8] = b"\x83\xdf\xe3\x0d\x2e\xf9\x0c\x8e";
+/// Tag indicating an Ethereum UTS contract attestation.
+///
+/// TAG = keccak256("EthereumUTSAttestation")[:8]
+const ETHEREUM_UTS_TAG: &[u8; 8] = b"\xea\xf2\xbc\x69\x3c\x93\x25\x1c";
 
 /// Tag identifying the attestation kind.
 pub type AttestationTag = [u8; TAG_SIZE];
@@ -139,6 +145,126 @@ impl Attestation<'_> for BitcoinAttestation {
     }
 }
 
+/// Attestation by an Ethereum UTS contract.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EthereumUTSAttestation {
+    pub chain: Chain,
+    pub height: BlockNumber,
+    /// Optional extra metadata about the attestation, such as the contract address and transaction hash.
+    pub metadata: EthereumUTSAttestationExtraMetadata,
+}
+
+/// Extra metadata for an Ethereum UTS attestation.
+///
+/// The tx field is only present if the contract field is present,
+/// and should be ignored if the contract field is None.
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct EthereumUTSAttestationExtraMetadata {
+    contract: Option<Address>,
+    tx: Option<TxHash>,
+}
+
+impl fmt::Display for EthereumUTSAttestation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UTS on chain {} at block #{}({})",
+            self.chain, self.height, self.metadata
+        )
+    }
+}
+
+impl Attestation<'_> for EthereumUTSAttestation {
+    const TAG: AttestationTag = *ETHEREUM_UTS_TAG;
+
+    fn from_raw_data(data: &[u8]) -> Result<Self, DecodeError> {
+        let data = &mut &data[..];
+        let chain = Chain::decode(data)?;
+        let height = BlockNumber::decode(data)?;
+        let metadata = EthereumUTSAttestationExtraMetadata::decode(data)?;
+        Ok(EthereumUTSAttestation {
+            chain,
+            height,
+            metadata,
+        })
+    }
+
+    fn to_raw_data_in<A: Allocator>(&self, alloc: A) -> Result<Vec<u8, A>, EncodeError> {
+        // chain id + block number + optional address + optional tx hash
+        const SIZE: usize = size_of::<ChainId>() + size_of::<BlockNumber>() + 20 + 32;
+        let mut buffer = Vec::with_capacity_in(20 + 32 + 32, alloc);
+        buffer.encode(self.chain)?;
+        buffer.encode(self.height)?;
+        buffer.encode(&self.metadata)?;
+        Ok(buffer)
+    }
+}
+
+impl Encode for EthereumUTSAttestationExtraMetadata {
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
+        if let Some(contract) = self.contract {
+            encoder.encode(&contract)?;
+            if let Some(tx) = self.tx {
+                encoder.encode(&tx)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Decode for EthereumUTSAttestationExtraMetadata {
+    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
+        let contract = Address::decode_trailing(decoder)?;
+        let tx = if contract.is_some() {
+            TxHash::decode_trailing(decoder)?
+        } else {
+            None
+        };
+        Ok(Self { contract, tx })
+    }
+}
+
+impl fmt::Display for EthereumUTSAttestationExtraMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (self.contract, self.tx) {
+            (Some(contract), Some(tx)) => write!(f, "{contract} by tx: {tx}"),
+            (Some(contract), None) => write!(f, "{contract}"),
+            (None, Some(_)) => unreachable!("Tx should not be present without contract"),
+            (None, None) => write!(f, "no extra metadata"),
+        }
+    }
+}
+
+impl EthereumUTSAttestationExtraMetadata {
+    /// Creates new extra metadata with the given contract address and no transaction hash.
+    pub fn new(contract: Address) -> Self {
+        Self {
+            contract: Some(contract),
+            tx: None,
+        }
+    }
+
+    /// Creates new extra metadata with the given contract address and transaction hash.
+    pub fn new_with_tx(contract: Address, tx: TxHash) -> Self {
+        Self {
+            contract: Some(contract),
+            tx: Some(tx),
+        }
+    }
+
+    /// Returns the contract address if present, or None if not.
+    #[inline]
+    pub fn contract(&self) -> Option<Address> {
+        self.contract
+    }
+
+    /// Returns the transaction hash if present, or None if not.
+    #[inline]
+    pub fn tx(&self) -> Option<TxHash> {
+        self.tx
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingAttestation<'a> {
     pub uri: Cow<'a, str>,
@@ -216,5 +342,20 @@ impl<A: Allocator> MayHaveInput for RawAttestation<A> {
     #[inline]
     fn input(&self) -> Option<&[u8]> {
         self.value.get().map(|v| v.as_slice())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ethereum_uts_tag() {
+        use sha3::{Digest, Keccak256};
+
+        let mut hasher = Keccak256::new();
+        hasher.update(b"EthereumUTSAttestation");
+        let result = hasher.finalize().to_vec();
+        assert_eq!(&result[..8], ETHEREUM_UTS_TAG);
     }
 }

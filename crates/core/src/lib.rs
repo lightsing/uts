@@ -16,3 +16,5 @@ pub mod codec;
 /// Error types raised by codec operations.
 pub mod error;
 pub mod utils;
+#[cfg(feature = "verifier")]
+pub mod verifier;

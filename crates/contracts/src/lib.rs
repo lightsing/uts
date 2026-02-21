@@ -2,6 +2,8 @@
 
 /// UniversalTimestamps contract
 pub mod uts {
+    use alloy_primitives::{Address, address};
+
     #[doc(hidden)]
     pub mod binding {
         use alloy_sol_types::sol;
@@ -9,18 +11,12 @@ pub mod uts {
         sol!(
             #[sol(rpc, all_derives)]
             IUniversalTimestamps,
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../target/foundry/IUniversalTimestamps.sol/IUniversalTimestamps.json"
-            )
+            "abi/IUniversalTimestamps.json"
         );
         sol!(
             #[sol(rpc)]
             UniversalTimestamps,
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../target/foundry/UniversalTimestamps.sol/UniversalTimestamps.json"
-            )
+            "abi/UniversalTimestamps.json"
         );
     }
 
@@ -29,6 +25,9 @@ pub mod uts {
     };
 
     pub use binding::UniversalTimestamps::{BYTECODE, DEPLOYED_BYTECODE, deploy, deploy_builder};
+
+    /// Default address for the UniversalTimestamps contract.
+    pub const DEFAULT_ADDRESS: Address = address!("0xceB7a9E77bd00D0391349B9bC989167cAB5e35e7");
 
     #[cfg(test)]
     mod tests {
@@ -100,10 +99,7 @@ pub mod erc1967 {
         sol!(
             #[sol(rpc)]
             ERC1967Proxy,
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../target/foundry/ERC1967Proxy.sol/ERC1967Proxy.json"
-            )
+            "abi/ERC1967Proxy.json"
         );
     }
 

@@ -6,8 +6,8 @@ use serde_with::{hex::Hex, serde_as};
 use uts_core::codec::{
     Decode, Encode,
     v1::{
-        Attestation, BitcoinAttestation, DetachedTimestamp, DigestHeader, MayHaveInput,
-        PendingAttestation, Timestamp, opcode::OpCode,
+        Attestation, BitcoinAttestation, DetachedTimestamp, DigestHeader, EthereumUTSAttestation,
+        MayHaveInput, PendingAttestation, Timestamp, opcode::OpCode,
     },
 };
 use wasm_bindgen::prelude::*;
@@ -89,6 +89,10 @@ fn serialize_chain(mut current_node: &Timestamp) -> Value {
         Bitcoin {
             height: u32,
         },
+        EthereumUTS {
+            chain: u64,
+            height: u64,
+        },
         Unknown {
             #[serde_as(as = "Hex")]
             tag: Vec<u8>,
@@ -108,6 +112,12 @@ fn serialize_chain(mut current_node: &Timestamp) -> Value {
                 } else if raw.tag == BitcoinAttestation::TAG {
                     let btc = BitcoinAttestation::from_raw(raw).unwrap();
                     chain.push(json!(AttestationStep::Bitcoin { height: btc.height }));
+                } else if raw.tag == EthereumUTSAttestation::TAG {
+                    let eth = EthereumUTSAttestation::from_raw(raw).unwrap();
+                    chain.push(json!(AttestationStep::EthereumUTS {
+                        chain: eth.chain.id(),
+                        height: eth.height,
+                    }));
                 } else {
                     chain.push(json!(AttestationStep::Unknown {
                         tag: raw.tag.to_vec(),
