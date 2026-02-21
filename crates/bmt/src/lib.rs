@@ -6,6 +6,9 @@ use bytemuck::Pod;
 use digest::{Digest, FixedOutputReset, Output};
 use std::hint::unlikely;
 
+/// Prefix byte to distinguish internal nodes from leaves when hashing.
+pub const INNER_NODE_PREFIX: u8 = 0x01;
+
 /// Flat, Fixed-Size, Read only Merkle Tree
 ///
 /// Expects the length of leaves to be equal or near(less) to a power of two.
@@ -138,6 +141,7 @@ where
                 let left = maybe_uninit.get_unchecked(2 * i).assume_init_ref();
                 let right = maybe_uninit.get_unchecked(2 * i + 1).assume_init_ref();
 
+                Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
                 Digest::update(&mut hasher, left);
                 Digest::update(&mut hasher, right);
                 let parent_hash = hasher.finalize_reset();
