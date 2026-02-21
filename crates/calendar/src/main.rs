@@ -1,6 +1,6 @@
 //! Calendar server
 
-use alloy_primitives::{address, b256};
+use alloy_primitives::b256;
 use alloy_provider::{ProviderBuilder, network::EthereumWallet};
 use alloy_signer_local::{LocalSigner, MnemonicBuilder};
 use axum::{
@@ -33,9 +33,6 @@ async fn main() -> eyre::Result<()> {
     // TODO: graceful shutdown
     let journal = Journal::with_capacity(RING_BUFFER_CAPACITY);
 
-    // ethereum provider
-    // Implementation deployed at: 0xf74254bf3c40b29259ce12bd35e74f40b0fda07d
-    // Proxy deployed at: 0x98c857e675e472cf2fd98c478ed4ecc4caf81fae
     let key = MnemonicBuilder::from_phrase(env::var("MNEMONIC")?.as_str())
         .index(0u32)?
         .build()?;
@@ -44,10 +41,7 @@ async fn main() -> eyre::Result<()> {
         .connect("https://0xrpc.io/sep")
         .await?;
 
-    let contract = UniversalTimestamps::new(
-        address!("0x98c857e675e472cf2fd98c478ed4ecc4caf81fae"),
-        provider.clone(),
-    );
+    let contract = UniversalTimestamps::new(uts_contracts::uts::DEFAULT_ADDRESS, provider.clone());
 
     // stamper
     let reader = journal.reader();
