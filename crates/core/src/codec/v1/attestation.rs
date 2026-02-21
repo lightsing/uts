@@ -90,6 +90,12 @@ impl<A: Allocator> RawAttestation<A> {
     pub fn allocator(&self) -> &A {
         self.data.allocator()
     }
+
+    /// Returns the cached value for verifying the attestation, if it exists.
+    #[inline]
+    pub fn value(&self) -> Option<&[u8]> {
+        self.value.get().map(|v| v.as_slice())
+    }
 }
 
 pub trait Attestation<'a>: Sized {

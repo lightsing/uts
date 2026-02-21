@@ -4,6 +4,7 @@ use crate::codec::{
 };
 use alloc::alloc::{Allocator, Global};
 use core::{fmt, fmt::Formatter};
+use std::ops::Deref;
 
 /// A file containing a timestamp for another file
 /// Contains a timestamp, along with a header and the digest of the file.
@@ -108,6 +109,14 @@ impl<A: Allocator + Clone> DetachedTimestamp<A> {
     /// Returns an error if the timestamp cannot be finalized.
     pub fn try_finalize(&self) -> Result<(), FinalizationError> {
         self.timestamp.try_finalize(self.header.digest())
+    }
+}
+
+impl Deref for DetachedTimestamp {
+    type Target = Timestamp;
+
+    fn deref(&self) -> &Self::Target {
+        &self.timestamp
     }
 }
 

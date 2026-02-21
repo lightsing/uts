@@ -144,6 +144,12 @@ impl<A: Allocator> Timestamp<A> {
     pub fn is_finalized(&self) -> bool {
         self.input().is_some()
     }
+
+    /// Iterates over all attestations in this timestamp.
+    #[inline]
+    pub fn attestations(&self) -> AttestationIter<'_, A> {
+        AttestationIter { stack: vec![self] }
+    }
 }
 
 impl<A: Allocator + Clone> Timestamp<A> {
@@ -280,5 +286,28 @@ impl<A: Allocator> MayHaveInput for Step<A> {
     #[inline]
     fn input(&self) -> Option<&[u8]> {
         self.input.get().map(|v| v.as_slice())
+    }
+}
+
+#[must_use = "AttestationIter is an iterator, it does nothing unless consumed"]
+pub struct AttestationIter<'a, A: Allocator> {
+    stack: Vec<&'a Timestamp<A>>,
+}
+
+impl<'a, A: Allocator> Iterator for AttestationIter<'a, A> {
+    type Item = &'a RawAttestation<A>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(ts) = self.stack.pop() {
+            match ts {
+                Timestamp::Step(step) => {
+                    for next in step.next().iter().rev() {
+                        self.stack.push(next);
+                    }
+                }
+                Timestamp::Attestation(attestation) => return Some(attestation),
+            }
+        }
+        None
     }
 }
