@@ -131,7 +131,10 @@ async fn main() -> eyre::Result<()> {
             let zdt = ts.to_zoned(TimeZone::system());
             eprintln!("\ttime attested: {zdt}");
             eprintln!("\tmerkle root: {}", result.inner.root);
+            continue;
         }
+
+        eprintln!("Unverifiable attestation: {attestation}");
     }
 
     Ok(())
