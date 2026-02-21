@@ -166,8 +166,12 @@ pub async fn get_timestamp(
 
         while let Some((side, sibling_hash)) = proof_iter.next() {
             builder = match side {
-                NodePosition::Left => builder.append(sibling_hash.to_vec_in(&bump)),
-                NodePosition::Right => builder.prepend(sibling_hash.to_vec_in(&bump)),
+                NodePosition::Left => builder
+                    .prepend([uts_bmt::INNER_NODE_PREFIX].to_vec_in(&bump))
+                    .append(sibling_hash.to_vec_in(&bump)),
+                NodePosition::Right => builder
+                    .prepend(sibling_hash.to_vec_in(&bump))
+                    .prepend([uts_bmt::INNER_NODE_PREFIX].to_vec_in(&bump)),
             }
             .keccak256();
         }
