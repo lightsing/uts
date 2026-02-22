@@ -17,10 +17,11 @@ use uts_core::{
 
 static DEFAULT_CALENDARS: LazyLock<Vec<Url>> = LazyLock::new(|| {
     vec![
-        Url::parse("https://a.pool.opentimestamps.org/").unwrap(),
-        Url::parse("https://b.pool.opentimestamps.org/").unwrap(),
-        Url::parse("https://a.pool.eternitywall.com/").unwrap(),
-        Url::parse("https://ots.btc.catallaxy.com/").unwrap(),
+        // Url::parse("https://a.pool.opentimestamps.org/").unwrap(),
+        // Url::parse("https://b.pool.opentimestamps.org/").unwrap(),
+        // Url::parse("https://a.pool.eternitywall.com/").unwrap(),
+        // Url::parse("https://ots.btc.catallaxy.com/").unwrap(),
+        Url::parse("http://127.0.0.1:3000/").unwrap(),
     ]
 });
 
@@ -135,7 +136,11 @@ impl Stamp {
                 self.quorum
             );
         }
-        let merged = Timestamp::merge(stamps);
+        let merged = if stamps.len() == 1 {
+            stamps.into_iter().next().unwrap()
+        } else {
+            Timestamp::merge(stamps)
+        };
 
         let writes =
             futures::future::join_all(builders.into_iter().zip(digests).map(

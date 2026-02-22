@@ -4,7 +4,7 @@ use crate::codec::{
 };
 use alloc::alloc::{Allocator, Global};
 use core::{fmt, fmt::Formatter};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 /// A file containing a timestamp for another file
 /// Contains a timestamp, along with a header and the digest of the file.
@@ -29,7 +29,9 @@ impl<A: Allocator + Clone> DecodeIn<A> for DetachedTimestamp<A> {
     ) -> Result<Self, crate::error::DecodeError> {
         let header = DigestHeader::decode(decoder)?;
         let timestamp = Timestamp::decode_in(decoder, alloc)?;
-        Ok(DetachedTimestamp { header, timestamp })
+        let detached = DetachedTimestamp { header, timestamp };
+        detached.finalize();
+        Ok(detached)
     }
 }
 
@@ -117,6 +119,12 @@ impl Deref for DetachedTimestamp {
 
     fn deref(&self) -> &Self::Target {
         &self.timestamp
+    }
+}
+
+impl DerefMut for DetachedTimestamp {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.timestamp
     }
 }
 

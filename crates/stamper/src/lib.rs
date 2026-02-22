@@ -94,12 +94,12 @@ impl MerkleEntry<'_> {
 /// Errors that can occur during storage operations
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
+    /// Errors from RocksDB
     #[error(transparent)]
     Rocks(#[from] rocksdb::Error),
+    /// Errors from bitcode serialization/deserialization
     #[error(transparent)]
     Bitcode(#[from] bitcode::Error),
-    #[error("invalid data")]
-    InvalidData,
 }
 
 /// Extension trait for DB to load Merkle entries and leaf->root mappings

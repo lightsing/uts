@@ -5,4 +5,6 @@ mod sync;
 pub use sync::OnceLock;
 
 mod hash;
-pub use hash::{HashAsyncFsExt, HashFsExt};
+#[cfg(feature = "io-utils")]
+pub use hash::HashAsyncFsExt;
+pub use hash::HashFsExt;
