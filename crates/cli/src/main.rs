@@ -2,6 +2,7 @@
 use crate::commands::Commands;
 use clap::Parser;
 
+mod client;
 mod commands;
 
 #[derive(Debug, Parser)]

@@ -8,7 +8,7 @@ use crate::{
 };
 use alloc::{alloc::Allocator, vec::Vec};
 use core::{fmt, hint::unreachable_unchecked};
-use digest::{Digest, OutputSizeUser, typenum::Unsigned};
+use digest::Digest;
 use ripemd::Ripemd160;
 use sha1::Sha1;
 use sha2::Sha256;
@@ -234,6 +234,13 @@ impl DigestOp {
     }
 }
 
+/// Extension trait for `Digest` implementors to get the corresponding `DigestOp`.
+pub trait DigestOpExt: Digest {
+    const OPCODE: DigestOp;
+
+    fn opcode() -> DigestOp;
+}
+
 macro_rules! define_opcodes {
     ($($val:literal => $variant:ident),* $(,)?) => {
          $(
@@ -307,9 +314,10 @@ macro_rules! define_digest_opcodes {
             /// Returns the output length of the digest in bytes.
             #[inline]
             pub const fn output_size(&self) -> usize {
+                use digest::typenum::Unsigned;
                 paste::paste! {
                     match *self {
-                        $( Self::$variant => <[<$variant:camel>] as OutputSizeUser>::OutputSize::USIZE, )*
+                        $( Self::$variant => <[<$variant:camel>] as ::digest::OutputSizeUser>::OutputSize::USIZE, )*
                         // SAFETY: unreachable as all variants are covered.
                         _ => unsafe { unreachable_unchecked() }
                     }
@@ -336,6 +344,18 @@ macro_rules! define_digest_opcodes {
                 }
             }
         }
+        paste::paste! {
+            $(
+                impl DigestOpExt for [<$variant:camel>] {
+                    const OPCODE: DigestOp = DigestOp::$variant;
+
+                    #[inline]
+                    fn opcode() -> DigestOp {
+                        DigestOp::$variant
+                    }
+                }
+            )*
+        }
     };
 }
 
@@ -343,7 +363,7 @@ macro_rules! impl_simple_step {
     ($variant:ident) => {paste::paste! {
         impl<A: Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
             #[doc = concat!("Push the `", stringify!($variant), "` opcode.")]
-            pub fn [< $variant:lower >](self) -> Self {
+            pub fn [< $variant:lower >](&mut self) -> &mut Self {
                 self.push_step(OpCode::[<$variant>])
             }
         }
@@ -359,7 +379,7 @@ macro_rules! impl_step_with_data {
     ($variant:ident) => {paste::paste! {
         impl<A: Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
             #[doc = concat!("Push the `", stringify!($variant), "` opcode.")]
-            pub fn [< $variant:lower >](self, data: ::alloc::vec::Vec<u8, A>) -> Self {
+            pub fn [< $variant:lower >](&mut self, data: ::alloc::vec::Vec<u8, A>) -> &mut Self {
                 self.push_immediate_step(OpCode::[<$variant>], data)
             }
         }

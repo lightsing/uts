@@ -8,24 +8,39 @@ name = "uts-cli"
 repository.workspace = true
 version.workspace = true
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "uts"
 path = "src/main.rs"
 
 [dependencies]
 alloy-provider = { workspace = true }
+bytemuck = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 color-eyre = { workspace = true }
 digest = { workspace = true }
 eyre = { workspace = true }
+futures = { workspace = true }
 jiff = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true, default-features = false, features = ["http2"] }
 ripemd = { workspace = true }
 sha1 = { workspace = true }
 sha2 = { workspace = true }
 sha3 = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
-uts-core = { workspace = true, features = ["std", "ethereum-uts-verifier"] }
+url = { workspace = true }
+uts-bmt = { workspace = true }
+uts-core = { workspace = true, features = ["std", "ethereum-uts-verifier", "io-utils"] }
 
-[lints]
-workspace = true
+[features]
+default = ["reqwest-default-tls"]
+reqwest-default-tls = ["reqwest/default-tls"]
+reqwest-native-tls = ["reqwest/native-tls"]
+reqwest-native-tls-no-alpn = ["reqwest/native-tls-no-alpn"]
+reqwest-native-tls-vendored = ["reqwest/native-tls-vendored"]
+reqwest-native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn"]
+reqwest-rustls = ["reqwest/rustls"]

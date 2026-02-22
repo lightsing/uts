@@ -1,5 +1,5 @@
 use crate::{AppState, time::current_time_sec};
-use alloy_primitives::{B256, hex};
+use alloy_primitives::B256;
 use alloy_signer::SignerSync;
 use axum::{
     body::Bytes,
@@ -12,7 +12,7 @@ use bytes::BytesMut;
 use digest::Digest;
 use sha3::Keccak256;
 use std::{cell::RefCell, sync::Arc};
-use uts_bmt::{FlatMerkleTree, NodePosition};
+use uts_bmt::UnorderdMerkleTree;
 use uts_core::{
     codec::{
         Encode,
@@ -107,7 +107,8 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
         let mut bump = bump.borrow_mut();
         bump.reset();
 
-        let builder = Timestamp::builder_in(&*bump)
+        let mut builder = Timestamp::builder_in(&*bump);
+        builder
             .prepend(recv_timestamp.to_vec_in(&bump))
             .append(undeniable_sig.to_vec_in(&bump))
             .keccak256();
@@ -153,9 +154,9 @@ pub async fn get_timestamp(
         .load_entry(root)
         .expect("DB error")
         .expect("bug: entry not found");
-    let trie: FlatMerkleTree<Keccak256> = entry.trie();
+    let trie: UnorderdMerkleTree<Keccak256> = entry.trie();
 
-    let mut proof_iter = trie
+    let proof = trie
         .get_proof_iter(bytemuck::cast_ref(&*commitment))
         .expect("bug: proof not found");
     let output = BUMP.with(|bump| {
@@ -163,18 +164,8 @@ pub async fn get_timestamp(
         bump.reset();
 
         let mut builder = Timestamp::builder_in(&*bump);
+        builder.merkle_proof(proof);
 
-        while let Some((side, sibling_hash)) = proof_iter.next() {
-            builder = match side {
-                NodePosition::Left => builder
-                    .prepend([uts_bmt::INNER_NODE_PREFIX].to_vec_in(&bump))
-                    .append(sibling_hash.to_vec_in(&bump)),
-                NodePosition::Right => builder
-                    .prepend(sibling_hash.to_vec_in(&bump))
-                    .prepend([uts_bmt::INNER_NODE_PREFIX].to_vec_in(&bump)),
-            }
-            .keccak256();
-        }
         let timestamp = builder
             .attest(EthereumUTSAttestation::new(
                 entry.chain_id,

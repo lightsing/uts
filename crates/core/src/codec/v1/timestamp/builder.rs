@@ -1,11 +1,16 @@
 //! Timestamp Builder
 
 use crate::{
-    codec::v1::{Attestation, Timestamp, opcode::OpCode, timestamp::Step},
+    codec::v1::{
+        Attestation, Timestamp,
+        opcode::{DigestOpExt, OpCode},
+        timestamp::Step,
+    },
     error::EncodeError,
     utils::OnceLock,
 };
 use alloc::alloc::{Allocator, Global};
+use uts_bmt::{NodePosition, SiblingIter};
 
 #[derive(Debug, Clone)]
 pub struct TimestampBuilder<A: Allocator = Global> {
@@ -31,7 +36,7 @@ impl<A: Allocator + Clone> TimestampBuilder<A> {
     /// # Panics
     ///
     /// Panics if the opcode is not an opcode with immediate data.
-    pub(crate) fn push_immediate_step(mut self, op: OpCode, data: Vec<u8, A>) -> Self {
+    pub(crate) fn push_immediate_step(&mut self, op: OpCode, data: Vec<u8, A>) -> &mut Self {
         assert!(op.has_immediate());
         self.steps.push(LinearStep { op, data });
         self
@@ -44,11 +49,34 @@ impl<A: Allocator + Clone> TimestampBuilder<A> {
     /// Panics if:
     /// - the opcode is control opcode
     /// - the opcode is an opcode with immediate data
-    pub(crate) fn push_step(mut self, op: OpCode) -> Self {
+    pub fn push_step(&mut self, op: OpCode) -> &mut Self {
         self.steps.push(LinearStep {
             op,
             data: Vec::new_in(self.allocator().clone()),
         });
+        self
+    }
+
+    /// Pushes a new digest step to the timestamp.
+    pub fn digest<D: DigestOpExt>(&mut self) -> &mut Self {
+        self.push_step(D::OPCODE.to_opcode());
+        self
+    }
+
+    /// Pushes the steps corresponding to the given Merkle proof to the timestamp.
+    pub fn merkle_proof<D: DigestOpExt>(&mut self, mut proof: SiblingIter<'_, D>) -> &mut Self {
+        let alloc = self.allocator().clone();
+        while let Some((side, sibling_hash)) = proof.next() {
+            match side {
+                NodePosition::Left => self
+                    .prepend([uts_bmt::INNER_NODE_PREFIX].to_vec_in(alloc.clone()))
+                    .append(sibling_hash.to_vec_in(alloc.clone())),
+                NodePosition::Right => self
+                    .prepend(sibling_hash.to_vec_in(alloc.clone()))
+                    .prepend([uts_bmt::INNER_NODE_PREFIX].to_vec_in(alloc.clone())),
+            }
+            .digest::<D>();
+        }
         self
     }
 
@@ -85,9 +113,15 @@ impl<A: Allocator + Clone> TimestampBuilder<A> {
         self,
         attestation: T,
     ) -> Result<Timestamp<A>, EncodeError> {
+        let current = Timestamp::Attestation(attestation.to_raw_in(self.allocator().clone())?);
+        Ok(self.concat(current))
+    }
+
+    /// Append the given timestamp after the steps in the builder.
+    pub fn concat(self, timestamp: Timestamp<A>) -> Timestamp<A> {
         let alloc = self.allocator().clone();
 
-        let mut current = Timestamp::Attestation(attestation.to_raw_in(alloc.clone())?);
+        let mut current = timestamp;
 
         for step in self.steps.into_iter().rev() {
             let step_node = Step {
@@ -103,7 +137,7 @@ impl<A: Allocator + Clone> TimestampBuilder<A> {
             current = Timestamp::Step(step_node);
         }
 
-        Ok(current)
+        current
     }
 
     #[inline]

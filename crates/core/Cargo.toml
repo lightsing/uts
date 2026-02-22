@@ -28,13 +28,16 @@ sha1.workspace = true
 sha2.workspace = true
 sha3.workspace = true
 thiserror.workspace = true
+tokio = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
+uts-bmt = { workspace = true }
 uts-contracts = { workspace = true, optional = true }
 
 [features]
 bytes = ["dep:bytes"]
 default = ["std"]
 ethereum-uts-verifier = ["verifier", "dep:alloy-provider", "dep:alloy-rpc-types-eth", "dep:alloy-sol-types", "dep:uts-contracts"]
+io-utils = ["dep:tokio", "tokio/fs"]
 serde = ["dep:serde", "dep:serde_with", "serde/derive", "serde_with/hex"]
 std = []
 tracing = ["dep:tracing"]

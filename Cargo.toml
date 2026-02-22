@@ -60,7 +60,9 @@ itoa = "1.0"
 jiff = "0.2.20"
 once_cell = { version = "1.21", default-features = false }
 paste = "1.0"
+rand = "0.10"
 regex = "1.12"
+reqwest = { version = "0.13", default-features = false }
 rocksdb = "0.24"
 serde = "1.0"
 serde-wasm-bindgen = "0.6"
@@ -73,6 +75,7 @@ toml = "0.9"
 tower-http = "0.6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2.5"
 wasm-bindgen = "0.2"
 
 crypto-common = "0.2.0-rc.5"
