@@ -1,4 +1,5 @@
 //! Benchmark for Merkle tree construction.
+use bytemuck::Pod;
 use criterion::{
     BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
     measurement::WallTime,
@@ -7,7 +8,7 @@ use digest::{Digest, FixedOutputReset, Output};
 use sha2::Sha256;
 use sha3::Keccak256;
 use std::hint::black_box;
-use uts_bmt::FlatMerkleTree;
+use uts_bmt::UnorderdMerkleTree;
 
 const INPUT_SIZES: &[usize] = &[8, 1024, 65536, 1_048_576];
 
@@ -25,7 +26,7 @@ fn benchmark(c: &mut Criterion) {
 fn bench_digest<D>(group: &mut BenchmarkGroup<'_, WallTime>, id: &str)
 where
     D: Digest + FixedOutputReset,
-    Output<D>: Copy,
+    Output<D>: Pod + Copy,
 {
     for &size in INPUT_SIZES {
         let leaves = generate_leaves::<D>(size);
@@ -33,7 +34,7 @@ where
         group.bench_function(BenchmarkId::new(id, size), move |b| {
             // Tree construction is the operation under test.
             b.iter(|| {
-                let tree = FlatMerkleTree::<D>::new(black_box(leaves.as_slice()));
+                let tree = UnorderdMerkleTree::<D>::new(black_box(leaves.as_slice()));
                 black_box(tree);
             });
         });

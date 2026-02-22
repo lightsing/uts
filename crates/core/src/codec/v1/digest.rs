@@ -1,10 +1,14 @@
 use crate::{
-    codec::{DecodeIn, Decoder, Encode, Encoder, v1::opcode::DigestOp},
+    codec::{
+        DecodeIn, Decoder, Encode, Encoder,
+        v1::opcode::{DigestOp, DigestOpExt},
+    },
     error::{DecodeError, EncodeError},
     utils::Hexed,
 };
 use alloc::alloc::Allocator;
 use core::fmt;
+use digest::{Output, typenum::Unsigned};
 
 /// Header describing the digest that anchors a timestamp.
 #[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -14,9 +18,9 @@ use core::fmt;
     derive(serde::Serialize, serde::Deserialize)
 )]
 pub struct DigestHeader {
-    kind: DigestOp,
+    pub(crate) kind: DigestOp,
     #[cfg_attr(feature = "serde", serde_as(as = "serde_with::hex::Hex"))]
-    digest: [u8; 32],
+    pub(crate) digest: [u8; 32],
 }
 
 impl fmt::Debug for DigestHeader {
@@ -35,6 +39,16 @@ impl fmt::Display for DigestHeader {
 }
 
 impl DigestHeader {
+    /// Creates a new digest header from the given digest output.
+    pub fn new<D: DigestOpExt>(digest: Output<D>) -> Self {
+        let mut digest_bytes = [0u8; 32];
+        digest_bytes[..D::OutputSize::USIZE].copy_from_slice(&digest);
+        DigestHeader {
+            kind: D::OPCODE,
+            digest: digest_bytes,
+        }
+    }
+
     /// Returns the digest opcode recorded in the header.
     pub fn kind(&self) -> DigestOp {
         self.kind

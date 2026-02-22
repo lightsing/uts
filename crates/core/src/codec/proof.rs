@@ -21,6 +21,33 @@ pub struct VersionedProof<T: Proof<A>, A: Allocator = Global> {
     allocator: A,
 }
 
+impl<T: Proof<Global>> VersionedProof<T, Global> {
+    /// Creates a new versioned proof with the global allocator.
+    pub fn new(proof: T) -> Self {
+        VersionedProof {
+            proof,
+            allocator: Global,
+        }
+    }
+}
+
+impl<T: Proof<A>, A: Allocator> VersionedProof<T, A> {
+    /// Creates a new versioned proof with the specified allocator.
+    pub fn new_with_allocator(proof: T, allocator: A) -> Self {
+        VersionedProof { proof, allocator }
+    }
+
+    /// Returns a reference to the proof payload.
+    pub fn proof(&self) -> &T {
+        &self.proof
+    }
+
+    /// Returns a reference to the allocator used by this proof.
+    pub fn allocator(&self) -> &A {
+        &self.allocator
+    }
+}
+
 impl<T: Proof<A>, A: Allocator + Clone> DecodeIn<A> for VersionedProof<T, A> {
     fn decode_in(decoder: &mut impl Decoder, alloc: A) -> Result<Self, DecodeError> {
         decoder.assert_magic()?;

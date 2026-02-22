@@ -15,7 +15,7 @@ pub const INNER_NODE_PREFIX: u8 = 0x01;
 ///
 /// Leaves are **sorted** starting at index `len`.
 #[derive(Debug, Clone, Default)]
-pub struct FlatMerkleTree<D: Digest> {
+pub struct UnorderdMerkleTree<D: Digest> {
     /// Index 0 is not used, leaves start at index `len`.
     nodes: Box<[Output<D>]>,
     len: usize,
@@ -28,7 +28,7 @@ pub struct UnhashedFlatMerkleTree<D: Digest> {
     len: usize,
 }
 
-impl<D: Digest + FixedOutputReset> FlatMerkleTree<D>
+impl<D: Digest + FixedOutputReset> UnorderdMerkleTree<D>
 where
     Output<D>: Pod + Copy,
 {
@@ -128,7 +128,7 @@ where
     Output<D>: Pod + Copy,
 {
     /// Finalizes the Merkle tree by hashing internal nodes
-    pub fn finalize(self) -> FlatMerkleTree<D> {
+    pub fn finalize(self) -> UnorderdMerkleTree<D> {
         let mut nodes = self.buffer;
         let len = self.len;
         unsafe {
@@ -152,7 +152,7 @@ where
             // SAFETY: initialized all elements.
             nodes.set_len(2 * len);
         }
-        FlatMerkleTree {
+        UnorderdMerkleTree {
             nodes: nodes.into_boxed_slice(),
             len,
         }
@@ -234,7 +234,7 @@ mod tests {
         ];
         leaves.sort_unstable();
 
-        let tree = FlatMerkleTree::<D>::new(&leaves);
+        let tree = UnorderdMerkleTree::<D>::new(&leaves);
 
         // Manually compute the expected root
         let mut hasher = D::new();
@@ -265,7 +265,7 @@ mod tests {
         ];
         leaves.sort_unstable();
 
-        let tree = FlatMerkleTree::<D>::new(&leaves);
+        let tree = UnorderdMerkleTree::<D>::new(&leaves);
 
         for leaf in &leaves {
             let mut iter = tree

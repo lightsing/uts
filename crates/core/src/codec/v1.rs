@@ -12,7 +12,7 @@ pub use attestation::{
 };
 pub use detached_timestamp::DetachedTimestamp;
 pub use digest::DigestHeader;
-pub use timestamp::{Step, Timestamp};
+pub use timestamp::{Step, Timestamp, builder::TimestampBuilder};
 
 /// Error indicating that finalization of a timestamp failed due to conflicting inputs.
 #[derive(Debug)]

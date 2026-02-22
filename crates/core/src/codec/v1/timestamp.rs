@@ -1,7 +1,10 @@
 //! ** The implementation here is subject to change as this is a read-only version. **
 
 use crate::{
-    codec::v1::{FinalizationError, MayHaveInput, attestation::RawAttestation, opcode::OpCode},
+    codec::v1::{
+        Attestation, FinalizationError, MayHaveInput, PendingAttestation,
+        attestation::RawAttestation, opcode::OpCode,
+    },
     utils::{Hexed, OnceLock},
 };
 use alloc::{alloc::Global, vec::Vec};
@@ -150,6 +153,16 @@ impl<A: Allocator> Timestamp<A> {
     pub fn attestations(&self) -> AttestationIter<'_, A> {
         AttestationIter { stack: vec![self] }
     }
+
+    /// Iterates over all pending attestation steps in this timestamp.
+    ///
+    /// # Note
+    ///
+    /// This iterator will yield `Timestamp` instead of `RawAttestation`.
+    #[inline]
+    pub fn pending_attestations_mut(&mut self) -> PendingAttestationIterMut<'_, A> {
+        PendingAttestationIterMut { stack: vec![self] }
+    }
 }
 
 impl<A: Allocator + Clone> Timestamp<A> {
@@ -276,6 +289,11 @@ impl<A: Allocator> Step<A> {
         self.next.as_slice()
     }
 
+    /// Returns the next timestamps of this step.
+    pub fn next_mut(&mut self) -> &mut [Timestamp<A>] {
+        self.next.as_mut_slice()
+    }
+
     /// Returns the allocator used by this step.
     pub fn allocator(&self) -> &A {
         self.data.allocator()
@@ -306,6 +324,32 @@ impl<'a, A: Allocator> Iterator for AttestationIter<'a, A> {
                     }
                 }
                 Timestamp::Attestation(attestation) => return Some(attestation),
+            }
+        }
+        None
+    }
+}
+
+pub struct PendingAttestationIterMut<'a, A: Allocator> {
+    stack: Vec<&'a mut Timestamp<A>>,
+}
+
+impl<'a, A: Allocator> Iterator for PendingAttestationIterMut<'a, A> {
+    type Item = &'a mut Timestamp<A>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(ts) = self.stack.pop() {
+            match ts {
+                Timestamp::Step(step) => {
+                    for next in step.next_mut().iter_mut().rev() {
+                        self.stack.push(next);
+                    }
+                }
+                Timestamp::Attestation(attestation) => {
+                    if attestation.tag == PendingAttestation::TAG {
+                        return Some(ts);
+                    }
+                }
             }
         }
         None
