@@ -1,4 +1,5 @@
 //! Benchmark for Merkle tree construction.
+use bytemuck::Pod;
 use criterion::{
     BatchSize, BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
     measurement::WallTime,
@@ -25,7 +26,7 @@ fn benchmark(c: &mut Criterion) {
 fn bench_digest<D>(group: &mut BenchmarkGroup<'_, WallTime>, id: &str)
 where
     D: Digest + FixedOutputReset,
-    Output<D>: Copy,
+    Output<D>: Pod + Copy,
 {
     for &size in INPUT_SIZES {
         let leaves = generate_leaves::<D>(size);
