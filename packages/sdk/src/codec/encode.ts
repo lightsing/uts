@@ -177,23 +177,28 @@ export default class Encoder {
   }
 
   writePendingAttestation(attestation: PendingAttestation): Encoder {
-    const urlStr = attestation.url.toString()
+    let urlStr = attestation.url.toString()
+    // trim url ends with slash
+    if (urlStr.endsWith('/')) {
+      urlStr = urlStr.slice(0, -1)
+    }
+
     if (urlStr.length > MAX_URI_LEN) {
       throw new EncodeError(
         ErrorCode.INVALID_URI,
-        `URL in pending attestation exceeds maximum length of ${MAX_URI_LEN}: ${attestation.url}`,
-        { offset: this.offset, context: { url: attestation.url } },
+        `URL in pending attestation exceeds maximum length of ${MAX_URI_LEN}: ${urlStr}`,
+        { offset: this.offset, context: { url: urlStr } },
       )
     }
     if (!URI_SAFE_CHAR_REGEX.test(urlStr)) {
       throw new EncodeError(
         ErrorCode.INVALID_URI,
-        `Invalid URL in pending attestation: ${attestation.url}`,
-        { offset: this.offset, context: { url: attestation.url } },
+        `Invalid URL in pending attestation: ${urlStr}`,
+        { offset: this.offset, context: { url: urlStr } },
       )
     }
     // Encode URL as UTF-8 bytes
-    const urlBytes = Encoder.textEncoder.encode(attestation.url.toString())
+    const urlBytes = Encoder.textEncoder.encode(urlStr)
     this.writeLengthPrefixedBytes(urlBytes)
     return this
   }
@@ -242,19 +247,23 @@ export default class Encoder {
   }
 
   writeAttestationStep(step: AttestationStep): Encoder {
-    this.writeOp(step.op)
+    this.writeOp('ATTESTATION')
+    const encoder = new Encoder()
     switch (step.attestation.kind) {
       case 'pending':
         this.writeBytes(PENDING_ATTESTATION_TAG)
-        this.writePendingAttestation(step.attestation)
+        encoder.writePendingAttestation(step.attestation)
+        this.writeLengthPrefixedBytes(encoder.toUint8Array())
         break
       case 'bitcoin':
         this.writeBytes(BITCOIN_ATTESTATION_TAG)
-        this.writeBitcoinAttestation(step.attestation)
+        encoder.writeBitcoinAttestation(step.attestation)
+        this.writeLengthPrefixedBytes(encoder.toUint8Array())
         break
       case 'ethereum-uts':
         this.writeBytes(ETHEREUM_UTS_ATTESTATION_TAG)
-        this.writeEthereumUTSAttestation(step.attestation)
+        encoder.writeEthereumUTSAttestation(step.attestation)
+        this.writeLengthPrefixedBytes(encoder.toUint8Array())
         break
       case 'unknown':
         this.writeBytes(getBytes(step.attestation.tag))

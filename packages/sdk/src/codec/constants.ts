@@ -43,4 +43,4 @@ export const ETHEREUM_UTS_ATTESTATION_TAG = new Uint8Array([
 ])
 
 export const MAX_URI_LEN = 1000
-export const URI_SAFE_CHAR_REGEX = /^[a-zA-Z0-9.\-_/]+$/
+export const URI_SAFE_CHAR_REGEX = /^[a-zA-Z0-9.\-_/:\s]+$/
