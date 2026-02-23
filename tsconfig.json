@@ -12,7 +12,7 @@
     "composite": true
   },
   "references": [
-    { "path": "./packages/uts-sdk" },
+    { "path": "./packages/sdk"},
     { "path": "./apps/web" }
   ]
 }

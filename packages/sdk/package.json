@@ -1,5 +1,5 @@
 {
-  "name": "uts-sdk",
+  "name": "@uts/sdk",
   "version": "0.1.0",
   "description": "",
   "type": "module",
@@ -16,9 +16,7 @@
   "keywords": [],
   "author": "Akase Haruka <light.tsing@gmail.com>",
   "license": "(MIT OR Apache-2.0)",
-  "dependencies": {
-    "uts-core-wasm": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.9.3"
   }

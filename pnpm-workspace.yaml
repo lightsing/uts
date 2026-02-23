@@ -1,7 +1,6 @@
 packages:
   - apps/*
   - packages/*
-  - crates/core-wasm/pkg
 
 onlyBuiltDependencies:
   - esbuild

@@ -20,7 +20,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::{Interval, MissedTickBehavior};
-use uts_bmt::UnorderdMerkleTree;
+use uts_bmt::UnorderedMerkleTree;
 use uts_contracts::uts::UniversalTimestamps;
 use uts_core::utils::Hexed;
 use uts_journal::reader::JournalReader;
@@ -42,7 +42,7 @@ pub struct Stamper<D: Digest, P, const ENTRY_SIZE: usize> {
     /// Storage for merkle trees and leaf->root mappings
     storage: Arc<DB>,
     /// FIFO cache of recent merkle trees
-    cache: VecDeque<UnorderdMerkleTree<D>>,
+    cache: VecDeque<UnorderedMerkleTree<D>>,
     /// FIFO cache index of recent merkle trees
     cache_index: HashMap<B256, usize>,
     /// The contract
@@ -81,13 +81,13 @@ pub struct MerkleEntry<'a> {
 
 impl MerkleEntry<'_> {
     /// Get the Merkle tree from the entry
-    pub fn trie<D>(&self) -> UnorderdMerkleTree<D>
+    pub fn trie<D>(&self) -> UnorderedMerkleTree<D>
     where
         D: Digest + FixedOutputReset,
         Output<D>: Pod + Copy,
     {
         // SAFETY: We trust that the data in the database is valid, and that the trie was serialized correctly.
-        unsafe { UnorderdMerkleTree::from_raw_bytes(&self.trie) }
+        unsafe { UnorderedMerkleTree::from_raw_bytes(&self.trie) }
     }
 }
 
@@ -237,7 +237,7 @@ where
         }
         debug_assert_eq!(buffer.len(), target_size);
 
-        let merkle_tree = UnorderdMerkleTree::<D>::new_unhashed(bytemuck::cast_slice(&buffer));
+        let merkle_tree = UnorderedMerkleTree::<D>::new_unhashed(bytemuck::cast_slice(&buffer));
         let storage = self.storage.clone();
 
         let merkle_tree = tokio::task::spawn_blocking(move || {
