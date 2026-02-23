@@ -1,33 +1,16 @@
-export type HexString = string
+export type * from './types'
 
-export type DigestOp = 'SHA1' | 'SHA512' | 'RIPEMD160' | 'KECCAK256'
+export type {
+  Attestation,
+  PendingAttestation,
+  BitcoinAttestation,
+  EthereumUTSAttestation,
+  EthereumUTSAttestationExtraMetadata,
+} from './types'
 
-export interface DigestHeader {
-  kind: DigestOp
-  digest: HexString
-}
+export { default as Encoder } from './codec/encode'
+export { default as Decoder } from './codec/decode'
 
-export interface BaseExecutionStep {
-  input: HexString
-  output: HexString
-}
+export * from './errors'
 
-export interface DataExecutionStep extends BaseExecutionStep {
-  op: 'APPEND' | 'PREPEND'
-  data: HexString
-}
-
-export interface UnaryExecutionStep extends BaseExecutionStep {
-  op: DigestOp | 'REVERSE' | 'HEXLIFY'
-}
-
-export type ExecutionStep = DataExecutionStep | UnaryExecutionStep
-
-export type AttestationStep =
-  | { kind: 'pending'; url: string }
-  | { kind: 'bitcoin'; height: number }
-  | { kind: 'unknown'; tag: HexString; data: HexString }
-
-export type TraceNode = ExecutionStep | AttestationStep | TraceNode[]
-
-export type TraceResult = TraceNode[]
+export * from './codec/constants'

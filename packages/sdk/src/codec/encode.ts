@@ -1,0 +1,298 @@
+import {
+  OP_CODE_MAP,
+  MAGIC_BYTES,
+  PENDING_ATTESTATION_TAG,
+  BITCOIN_ATTESTATION_TAG,
+  ETHEREUM_UTS_ATTESTATION_TAG,
+  MAX_URI_LEN,
+  URI_SAFE_CHAR_REGEX,
+} from './constants'
+import {
+  type DetachedTimestamp,
+  type Step,
+  type ForkStep,
+  type AttestationStep,
+  type ExecutionStep,
+  type DigestHeader,
+  type Timestamp,
+  type Op,
+  type PendingAttestation,
+  type BitcoinAttestation,
+  type EthereumUTSAttestation,
+} from '../types'
+import { getBytes, hexlify } from 'ethers/utils'
+import { EncodeError, ErrorCode } from '../errors'
+
+export default class Encoder {
+  private buffer: Uint8Array
+  private offset: number = 0
+
+  private static textEncoder = new TextEncoder()
+
+  constructor(initialSize: number = 1024) {
+    this.buffer = new Uint8Array(initialSize)
+  }
+
+  toUint8Array(): Uint8Array {
+    return this.buffer.slice(0, this.offset)
+  }
+
+  private ensureCapacity(required: number) {
+    if (this.offset + required > this.buffer.length) {
+      const newLen = Math.max(this.buffer.length * 2, this.offset + required)
+      const newBuffer = new Uint8Array(newLen)
+      newBuffer.set(this.buffer)
+      this.buffer = newBuffer
+    }
+  }
+
+  writeByte(byte: number): Encoder {
+    this.ensureCapacity(1)
+    this.buffer[this.offset++] = byte
+    return this
+  }
+
+  writeBytes(data: Uint8Array): Encoder {
+    this.ensureCapacity(data.length)
+    this.buffer.set(data, this.offset)
+    this.offset += data.length
+    return this
+  }
+
+  writeU32(value: number): Encoder {
+    if (value < 0 || !Number.isInteger(value)) {
+      throw new EncodeError(
+        ErrorCode.NEGATIVE_LEB128_INPUT,
+        `LEB128 only supports non-negative integers, got ${value}`,
+        { offset: this.offset },
+      )
+    }
+    if (value > 0xffffffff) {
+      throw new EncodeError(
+        ErrorCode.EXCEEDS_MAX_U32,
+        `Value exceeds maximum for u32: ${value}, use writeBigUint instead`,
+        { offset: this.offset },
+      )
+    }
+
+    let n = value
+    do {
+      // Get bottom 7 bits
+      let byte = n & 0x7f
+      n >>>= 7 // Unsigned right shift
+
+      // If there are more bits to come, set the continuation bit (0x80)
+      if (n !== 0) {
+        byte |= 0x80
+      }
+
+      this.writeByte(byte)
+    } while (n !== 0)
+
+    return this
+  }
+
+  writeBigUint(value: bigint): Encoder {
+    if (value < 0n) {
+      throw new EncodeError(
+        ErrorCode.NEGATIVE_LEB128_INPUT,
+        `LEB128 only supports non-negative integers, got ${value}`,
+        { offset: this.offset },
+      )
+    }
+
+    let n = value
+    do {
+      // Get bottom 7 bits
+      let byte = Number(n & 0x7fn)
+      n >>= 7n // Right shift by 7 bits
+
+      // If there are more bits to come, set the continuation bit (0x80)
+      if (n !== 0n) {
+        byte |= 0x80
+      }
+
+      this.writeByte(byte)
+    } while (n !== 0n)
+
+    return this
+  }
+
+  writeLengthPrefixedBytes(data: Uint8Array): Encoder {
+    const len = data.length
+    this.writeU32(len)
+    this.writeBytes(data)
+    return this
+  }
+
+  writeOp(op: Op): Encoder {
+    const opCode = OP_CODE_MAP[op]
+    if (opCode === undefined) {
+      throw new EncodeError(ErrorCode.UNKNOWN_OP, `Unknown operation: ${op}`, {
+        offset: this.offset,
+        context: { op },
+      })
+    }
+    return this.writeByte(opCode)
+  }
+
+  writeVersionedMagic(version: number): Encoder {
+    this.writeBytes(MAGIC_BYTES)
+    this.writeByte(version)
+    return this
+  }
+
+  writeHeader(header: DigestHeader): Encoder {
+    this.writeOp(header.kind)
+    const digestBytes = getBytes(header.digest)
+    this.writeBytes(digestBytes)
+    return this
+  }
+
+  writeExecutionStep(step: ExecutionStep): Encoder {
+    this.writeOp(step.op)
+    switch (step.op) {
+      case 'APPEND':
+      case 'PREPEND':
+        this.writeLengthPrefixedBytes(getBytes(step.data))
+        break
+    }
+    return this
+  }
+
+  writeForkStep(step: ForkStep): Encoder {
+    if (step.steps.length < 2) {
+      throw new EncodeError(
+        ErrorCode.INVALID_FORK,
+        'FORK step must have at least 2 branches',
+        { offset: this.offset, context: { step } },
+      )
+    }
+    for (const branch of step.steps.slice(0, step.steps.length - 1)) {
+      this.writeOp(step.op)
+      this.writeStep(branch)
+    }
+    this.writeStep(step.steps[step.steps.length - 1])
+    return this
+  }
+
+  writePendingAttestation(attestation: PendingAttestation): Encoder {
+    const urlStr = attestation.url.toString()
+    if (urlStr.length > MAX_URI_LEN) {
+      throw new EncodeError(
+        ErrorCode.INVALID_URI,
+        `URL in pending attestation exceeds maximum length of ${MAX_URI_LEN}: ${attestation.url}`,
+        { offset: this.offset, context: { url: attestation.url } },
+      )
+    }
+    if (!URI_SAFE_CHAR_REGEX.test(urlStr)) {
+      throw new EncodeError(
+        ErrorCode.INVALID_URI,
+        `Invalid URL in pending attestation: ${attestation.url}`,
+        { offset: this.offset, context: { url: attestation.url } },
+      )
+    }
+    // Encode URL as UTF-8 bytes
+    const urlBytes = Encoder.textEncoder.encode(attestation.url.toString())
+    this.writeLengthPrefixedBytes(urlBytes)
+    return this
+  }
+
+  writeBitcoinAttestation(attestation: BitcoinAttestation): Encoder {
+    this.writeU32(attestation.height)
+    return this
+  }
+
+  writeEthereumUTSAttestation(attestation: EthereumUTSAttestation): Encoder {
+    this.writeU32(attestation.chain)
+    this.writeU32(attestation.height)
+    if (attestation.metadata) {
+      // trailing optional
+      if (attestation.metadata.contract) {
+        const contractBytes = getBytes(attestation.metadata.contract)
+        if (contractBytes.length !== 20) {
+          throw new EncodeError(
+            ErrorCode.LENGTH_MISMATCH,
+            `Invalid contract address in Ethereum UTS attestation: ${attestation.metadata.contract}`,
+            {
+              offset: this.offset,
+              context: { contract: hexlify(attestation.metadata.contract) },
+            },
+          )
+        }
+        this.writeBytes(contractBytes)
+
+        if (attestation.metadata.txHash) {
+          const txHashBytes = getBytes(attestation.metadata.txHash)
+          if (txHashBytes.length !== 32) {
+            throw new EncodeError(
+              ErrorCode.LENGTH_MISMATCH,
+              `Invalid transaction hash in Ethereum UTS attestation: ${attestation.metadata.txHash}`,
+              {
+                offset: this.offset,
+                context: { txHash: hexlify(attestation.metadata.txHash) },
+              },
+            )
+          }
+          this.writeBytes(txHashBytes)
+        }
+      }
+    }
+    return this
+  }
+
+  writeAttestationStep(step: AttestationStep): Encoder {
+    this.writeOp(step.op)
+    switch (step.attestation.kind) {
+      case 'pending':
+        this.writeBytes(PENDING_ATTESTATION_TAG)
+        this.writePendingAttestation(step.attestation)
+        break
+      case 'bitcoin':
+        this.writeBytes(BITCOIN_ATTESTATION_TAG)
+        this.writeBitcoinAttestation(step.attestation)
+        break
+      case 'ethereum-uts':
+        this.writeBytes(ETHEREUM_UTS_ATTESTATION_TAG)
+        this.writeEthereumUTSAttestation(step.attestation)
+        break
+      case 'unknown':
+        this.writeBytes(getBytes(step.attestation.tag))
+        this.writeLengthPrefixedBytes(getBytes(step.attestation.data))
+        break
+      default:
+        throw new EncodeError(
+          ErrorCode.GENERAL_ERROR,
+          `Unsupported attestation: ${step.attestation}`,
+          { offset: this.offset, context: { attestation: step.attestation } },
+        )
+    }
+    return this
+  }
+
+  writeStep(step: Step): Encoder {
+    switch (step.op) {
+      case 'FORK':
+        return this.writeForkStep(step as ForkStep)
+      case 'ATTESTATION':
+        return this.writeAttestationStep(step as AttestationStep)
+      default:
+        return this.writeExecutionStep(step as ExecutionStep)
+    }
+  }
+
+  writeTimestamp(timestamp: Timestamp): Encoder {
+    for (const step of timestamp) {
+      this.writeStep(step)
+    }
+    return this
+  }
+
+  static encodeDetachedTimestamp(ots: DetachedTimestamp): Uint8Array {
+    return new Encoder()
+      .writeVersionedMagic(0x01)
+      .writeHeader(ots.header)
+      .writeTimestamp(ots.timestamp)
+      .toUint8Array()
+  }
+}

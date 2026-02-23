@@ -1,0 +1,45 @@
+import { type DigestOp, type Op } from '../types'
+
+export const OP_CODE_MAP: Record<Op, number> = {
+  SHA1: 0x02,
+  RIPEMD160: 0x03,
+  SHA256: 0x08,
+  KECCAK256: 0x67,
+  APPEND: 0xf0,
+  PREPEND: 0xf1,
+  REVERSE: 0xf2,
+  HEXLIFY: 0xf3,
+  ATTESTATION: 0x00,
+  FORK: 0xff,
+}
+
+export const DIGEST_LENGTHS: Record<DigestOp, number> = {
+  SHA1: 20,
+  RIPEMD160: 20,
+  SHA256: 32,
+  KECCAK256: 32,
+}
+
+export const getOpName = (code: number): Op => {
+  return Object.entries(OP_CODE_MAP).find(([_, v]) => v === code)?.[0] as Op
+}
+
+// b"\x00OpenTimestamps\x00\x00Proof\x00\xbf\x89\xe2\xe8\x84\xe8\x92\x94";
+export const MAGIC_BYTES = new Uint8Array([
+  0x0, 0x4f, 0x70, 0x65, 0x6e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d,
+  0x70, 0x73, 0x0, 0x0, 0x50, 0x72, 0x6f, 0x6f, 0x66, 0x0, 0xbf, 0x89, 0xe2,
+  0xe8, 0x84, 0xe8, 0x92, 0x94,
+])
+
+export const BITCOIN_ATTESTATION_TAG = new Uint8Array([
+  0x05, 0x88, 0x96, 0x0d, 0x73, 0xd7, 0x19, 0x01,
+])
+export const PENDING_ATTESTATION_TAG = new Uint8Array([
+  0x83, 0xdf, 0xe3, 0x0d, 0x2e, 0xf9, 0x0c, 0x8e,
+])
+export const ETHEREUM_UTS_ATTESTATION_TAG = new Uint8Array([
+  0xea, 0xf2, 0xbc, 0x69, 0x3c, 0x93, 0x25, 0x1c,
+])
+
+export const MAX_URI_LEN = 1000
+export const URI_SAFE_CHAR_REGEX = /^[a-zA-Z0-9.\-_/]+$/
