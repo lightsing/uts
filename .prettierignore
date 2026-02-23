@@ -1,0 +1,6 @@
+**/*.toml
+**/*.sol
+
+crates/*
+lib/*
+target/*

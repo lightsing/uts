@@ -12,7 +12,8 @@
     "composite": true
   },
   "references": [
-    { "path": "./packages/sdk"},
+    { "path": "./packages/bmt" },
+    { "path": "./packages/sdk" },
     { "path": "./apps/web" }
   ]
 }

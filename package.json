@@ -1,10 +1,9 @@
 {
   "name": "uts-monorepo",
   "private": true,
-  "scripts": {
-  },
+  "scripts": {},
   "devDependencies": {
     "pnpm": "^10.26.2",
-    "wasm-pack": "^0.13.1"
+    "prettier": "^3.8.1"
   }
 }
