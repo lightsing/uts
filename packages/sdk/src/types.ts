@@ -1,6 +1,8 @@
 import { type BytesLike } from 'ethers/utils'
 
-export type DigestOp = 'SHA1' | 'SHA256' | 'RIPEMD160' | 'KECCAK256'
+export const DIGEST_OPS = ['SHA1', 'SHA256', 'RIPEMD160', 'KECCAK256'] as const
+
+export type DigestOp = (typeof DIGEST_OPS)[number]
 export type Op =
   | DigestOp
   | 'APPEND'

@@ -7,18 +7,18 @@ import {
   MAX_URI_LEN,
   URI_SAFE_CHAR_REGEX,
 } from './constants'
-import {
-  type DetachedTimestamp,
-  type Step,
-  type ForkStep,
-  type AttestationStep,
-  type ExecutionStep,
-  type DigestHeader,
-  type Timestamp,
-  type Op,
-  type PendingAttestation,
-  type BitcoinAttestation,
-  type EthereumUTSAttestation,
+import type {
+  DetachedTimestamp,
+  Step,
+  ForkStep,
+  AttestationStep,
+  ExecutionStep,
+  DigestHeader,
+  Timestamp,
+  Op,
+  PendingAttestation,
+  BitcoinAttestation,
+  EthereumUTSAttestation,
 } from '../types'
 import { getBytes, hexlify } from 'ethers/utils'
 import { EncodeError, ErrorCode } from '../errors'
@@ -69,7 +69,7 @@ export default class Encoder {
     }
     if (value > 0xffffffff) {
       throw new EncodeError(
-        ErrorCode.EXCEEDS_MAX_U32,
+        ErrorCode.OVERFLOW,
         `Value exceeds maximum for u32: ${value}, use writeBigUint instead`,
         { offset: this.offset },
       )
@@ -163,7 +163,7 @@ export default class Encoder {
   writeForkStep(step: ForkStep): Encoder {
     if (step.steps.length < 2) {
       throw new EncodeError(
-        ErrorCode.INVALID_FORK,
+        ErrorCode.INVALID_STRUCTURE,
         'FORK step must have at least 2 branches',
         { offset: this.offset, context: { step } },
       )
