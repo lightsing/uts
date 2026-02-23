@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { UnorderedMerkleTree } from '../src'
+import { UnorderedMerkleTree } from '../src/bmt'
 import { sha256 } from '@noble/hashes/sha2.js'
 
 describe('UnorderedMerkleTree', () => {

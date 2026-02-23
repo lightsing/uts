@@ -170,9 +170,9 @@ export default class Encoder {
     }
     for (const branch of step.steps.slice(0, step.steps.length - 1)) {
       this.writeOp(step.op)
-      this.writeStep(branch)
+      this.writeTimestamp(branch)
     }
-    this.writeStep(step.steps[step.steps.length - 1])
+    this.writeTimestamp(step.steps[step.steps.length - 1])
     return this
   }
 

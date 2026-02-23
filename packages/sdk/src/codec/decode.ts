@@ -186,7 +186,7 @@ export default class Decoder {
   }
 
   readForkStep(): ForkStep {
-    const steps: Step[] = []
+    const steps: Timestamp[] = []
     if (this.peekOp() !== 'FORK') {
       throw new DecodeError(
         ErrorCode.INVALID_STRUCTURE,
@@ -200,10 +200,10 @@ export default class Decoder {
       if (op === 'FORK') {
         // not the last branch, consume the FORK op and continue
         this.readOp()
-        steps.push(this.readStep())
+        steps.push(this.readTimestamp())
       } else {
         // last branch, read it and break
-        steps.push(this.readStep())
+        steps.push(this.readTimestamp())
         break
       }
     }

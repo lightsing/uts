@@ -60,7 +60,7 @@ export type Attestation =
 
 export type AttestationStep = { op: 'ATTESTATION'; attestation: Attestation }
 
-export type ForkStep = { op: 'FORK'; steps: Step[] }
+export type ForkStep = { op: 'FORK'; steps: Timestamp[] }
 
 export interface EthereumUTSAttestationExtraMetadata {
   contract?: BytesLike

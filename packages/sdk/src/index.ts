@@ -14,3 +14,5 @@ export { default as Decoder } from './codec/decode'
 export * from './errors'
 
 export * from './codec/constants'
+
+export * from './bmt'
