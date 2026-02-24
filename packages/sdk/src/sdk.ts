@@ -173,6 +173,7 @@ export default class SDK {
    * @param timeout The maximum time to wait for calendar responses.
    */
   async stamp(digests: DigestHeader[]): Promise<DetachedTimestamp[]> {
+    let nonces: Uint8Array[] = []
     let nonceDigests: Uint8Array[] = []
 
     for (const digest of digests) {
@@ -181,6 +182,7 @@ export default class SDK {
       const nonce = crypto.getRandomValues(new Uint8Array(this.nonceSize))
       hasher.update(nonce)
       const nonceDigest = new Uint8Array(hasher.digest())
+      nonces.push(nonce)
       nonceDigests.push(nonceDigest)
     }
 
@@ -216,7 +218,7 @@ export default class SDK {
 
     return digests.map((digest, i) => {
       let timestamp: Timestamp = [
-        { op: 'APPEND', data: nonceDigests[i] },
+        { op: 'APPEND', data: nonces[i] },
         { op: this.hashAlg },
       ]
 
@@ -470,12 +472,12 @@ export default class SDK {
         case 'FORK':
           // verify sub stamps
           for (const branch of step.steps) {
-            const result = await this.verifyTimestamp(input, branch)
+            const result = await this.verifyTimestamp(current, branch)
             attestations.push(...result)
           }
           break
         case 'ATTESTATION':
-          const status = await this.verifyAttestation(input, step.attestation)
+          const status = await this.verifyAttestation(current, step.attestation)
           attestations.push(status)
           break
         default:
@@ -523,17 +525,18 @@ export default class SDK {
       const header = await this.btcRPC
         .getBlockHash(attestation.height)
         .then((hash) => this.btcRPC.getBlockHeader(hash))
-      const blockHashBytes = getBytes(header.hash)
+      // sha256d reverse the displayed hash, so we need to reverse it back to compare with the input
+      const merkleRoot = getBytes(`0x${header.merkleroot}`).reverse()
       if (
-        blockHashBytes.length !== input.length ||
-        !blockHashBytes.every((byte, i) => byte === input[i])
+        merkleRoot.length !== input.length ||
+        !merkleRoot.every((byte, i) => byte === input[i])
       ) {
         return {
           attestation,
           status: AttestationStatusKind.INVALID,
           error: new VerifyError(
             ErrorCode.ATTESTATION_MISMATCH,
-            `Bitcoin attestation does not match the expected block hash at height ${attestation.height}`,
+            `Bitcoin attestation does not match the expected merkle root at height ${attestation.height}`,
           ),
         }
       }

@@ -166,8 +166,7 @@ export class UnorderedMerkleTree<T extends CHash> {
     bytes: Uint8Array,
     factory: T,
   ): UnorderedMerkleTree<T> {
-    const hashLength = bytes.length / factory.outputLen
-    if (bytes.length % hashLength !== 0) {
+    if (bytes.length % factory.outputLen !== 0) {
       throw new Error('Bytes length must be a multiple of hashLength')
     }
     const totalNodes = bytes.length / factory.outputLen

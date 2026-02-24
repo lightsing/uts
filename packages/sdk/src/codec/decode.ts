@@ -359,7 +359,9 @@ export default class Decoder {
   readTimestamp(strict?: boolean): Timestamp {
     const steps: Step[] = []
     while (this.remaining > 0) {
-      steps.push(this.readStep(strict))
+      const step = this.readStep(strict)
+      steps.push(step)
+      if (step.op == 'FORK' || step.op == 'ATTESTATION') break
     }
     return steps
   }

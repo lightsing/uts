@@ -4,9 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Encoder from '../src/codec/encode'
 import Decoder from '../src/codec/decode'
-import { DecodeError, ErrorCode } from '../src/errors'
 import type { DetachedTimestamp } from '../src/types'
-import exp from 'node:constants'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
