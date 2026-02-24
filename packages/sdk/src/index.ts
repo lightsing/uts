@@ -16,3 +16,5 @@ export * from './errors'
 export * from './codec/constants'
 
 export * from './bmt'
+
+export { default as BitcoinRPC } from './rpc/btc'

@@ -14,6 +14,11 @@ export enum ErrorCode {
   LENGTH_MISMATCH = 'LENGTH_MISMATCH',
 
   UNEXPECTED_EOF = 'UNEXPECTED_EOF',
+
+  REMOTE_ERROR = 'REMOTE_ERROR',
+
+  UNSUPPORTED_ATTESTATION = 'UNSUPPORTED_ATTESTATION',
+  ATTESTATION_MISMATCH = 'ATTESTATION_MISMATCH',
 }
 
 export class UTSError extends Error {
@@ -60,5 +65,23 @@ export class DecodeError extends UTSError {
   ) {
     super(code, `[Decode] ${message}`, options)
     this.name = 'DecodeError'
+  }
+}
+
+export class RemoteError extends UTSError {
+  constructor(message: string, options?: { context?: Record<string, any> }) {
+    super(ErrorCode.REMOTE_ERROR, `[Remote] ${message}`, options)
+    this.name = 'RemoteError'
+  }
+}
+
+export class VerifyError extends UTSError {
+  constructor(
+    code: ErrorCode,
+    message: string,
+    options?: { context?: Record<string, any> },
+  ) {
+    super(code, `[Verify] ${message}`, options)
+    this.name = 'VerifyError'
   }
 }

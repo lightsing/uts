@@ -27,7 +27,6 @@
   "license": "(MIT OR Apache-2.0)",
   "dependencies": {
     "@noble/hashes": "^2.0.1",
-    "@uts/bmt": "workspace:*",
     "ethers": "^6.16.0"
   },
   "devDependencies": {

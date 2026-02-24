@@ -77,3 +77,43 @@ export interface DetachedTimestamp {
   header: DigestHeader
   timestamp: Timestamp
 }
+
+export enum UpgradeStatus {
+  Upgraded = 'UPGRADED',
+  Pending = 'PENDING',
+  Failed = 'FAILED',
+}
+export type UpgradeResult =
+  | {
+      status: UpgradeStatus.Upgraded
+      original: PendingAttestation
+      upgraded: Timestamp
+    }
+  | { status: UpgradeStatus.Pending; original: PendingAttestation }
+  | { status: UpgradeStatus.Failed; original: PendingAttestation; error: Error }
+
+export enum AttestationStatusKind {
+  VALID = 'VALID',
+  INVALID = 'INVALID',
+  PENDING = 'PENDING',
+  UNKNOWN = 'UNKNOWN',
+}
+
+export type AttestationStatus =
+  | {
+      attestation: Attestation
+      status: 'VALID' | 'PENDING'
+      additionalInfo?: Record<string, any>
+    }
+  | {
+      attestation: Attestation
+      status: 'INVALID' | 'UNKNOWN'
+      error: Error
+    }
+
+export enum VerifyStatus {
+  VALID = 'VALID',
+  PARTIAL_VALID = 'PARTIAL_VALID',
+  INVALID = 'INVALID',
+  PENDING = 'PENDING',
+}
