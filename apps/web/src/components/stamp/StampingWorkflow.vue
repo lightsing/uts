@@ -55,12 +55,6 @@ const phaseOrder: StampPhase[] = [
 
 const currentIndex = computed(() => phaseOrder.indexOf(props.phase))
 
-const showDownloadButton = computed(() => {
-  const ci = currentIndex.value
-  const completeIndex = phaseOrder.indexOf('complete')
-  return ci >= completeIndex && props.phase !== 'error'
-})
-
 function getStepStatus(stepId: StampPhase) {
   if (props.phase === 'error') return 'error'
   const stepIndex = phaseOrder.indexOf(stepId)
@@ -140,6 +134,14 @@ function getStepDescription(step: WorkflowStep): string {
             {{ step.label }}
           </div>
           <div class="font-mono text-[11px] text-white/30">{{ getStepDescription(step) }}</div>
+
+          <!-- Download button inside the Complete step only when phase is 'complete' -->
+          <div v-if="step.id === 'complete' && phase === 'complete'" class="mt-2">
+            <BaseButton variant="secondary" @click="emit('download')">
+              <Download class="h-3.5 w-3.5" />
+              Download pending .ots
+            </BaseButton>
+          </div>
         </div>
 
         <!-- Active indicator -->
@@ -148,14 +150,6 @@ function getStepDescription(step: WorkflowStep): string {
           class="mt-1 h-1.5 w-1.5 animate-glow-pulse rounded-full bg-neon-cyan"
         />
       </div>
-    </div>
-
-    <!-- Download button (shown when complete or later) -->
-    <div v-if="showDownloadButton" class="mt-4">
-      <BaseButton variant="secondary" @click="emit('download')">
-        <Download class="h-3.5 w-3.5" />
-        Download .ots
-      </BaseButton>
     </div>
 
     <!-- Error message -->

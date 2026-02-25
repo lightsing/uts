@@ -10,9 +10,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import { useTimestampSDK, setWeb3Provider, getSDK } from '@/composables/useTimestampSDK'
 import { useWallet } from '@/composables/useWallet'
 import type { FileDigestResult } from '@/composables/useFileDigest'
-import { Encoder } from '@uts/sdk'
 import { useAppStore } from '@/stores/app'
-import JSZip from 'jszip'
 
 const store = useAppStore()
 const { stampPhase, stampError, broadcastProgress, stamp, downloadPendingStamp } = useTimestampSDK()
@@ -57,32 +55,12 @@ async function handleStampFromDigest(digests: FileDigestResult[]) {
   // Apply internal hash algorithm setting
   getSDK().hashAlgorithm = store.internalHashAlgo
 
-  const isBatch = digests.length > 1
-  const firstFileName = digests[0]?.fileName
+  const fileNames = digests.map((d) => d.fileName)
 
   try {
     const headers = digests.map((d) => d.header)
-    const results = await stamp(headers, firstFileName)
+    const results = await stamp(headers, fileNames)
     for (const r of results) store.addStamp(r)
-
-    // For batch (directory): download all as zip
-    if (isBatch && results.length > 0) {
-      const zip = new JSZip()
-      for (let i = 0; i < results.length; i++) {
-        const fileName = digests[i]?.fileName ?? `file-${i}`
-        const encoded = Encoder.encodeDetachedTimestamp(results[i]!)
-        zip.file(`${fileName}.ots`, encoded)
-      }
-      const blob = await zip.generateAsync({ type: 'blob' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'timestamps.zip'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    }
   } catch {
     // error is tracked in stampError
   }

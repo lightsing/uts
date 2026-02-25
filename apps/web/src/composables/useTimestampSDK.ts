@@ -14,6 +14,7 @@ import type {
   StampEventCallback,
 } from '@uts/sdk'
 import type { Eip1193Provider } from 'ethers'
+import JSZip from 'jszip'
 
 export type StampPhase =
   | 'idle'
@@ -49,17 +50,33 @@ export function setWeb3Provider(provider: Eip1193Provider | null) {
   sdk.web3Provider = provider
 }
 
-export function downloadOtsFile(stamp: DetachedTimestamp, fileName?: string) {
-  const encoded = Encoder.encodeDetachedTimestamp(stamp)
-  const blob = new Blob([encoded as BlobPart], { type: 'application/octet-stream' })
+function triggerDownload(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = fileName ? `${fileName}.ots` : 'timestamp.ots'
+  a.download = fileName
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+export function downloadOtsFile(stamp: DetachedTimestamp, fileName?: string) {
+  const encoded = Encoder.encodeDetachedTimestamp(stamp)
+  const blob = new Blob([encoded as BlobPart], { type: 'application/octet-stream' })
+  triggerDownload(blob, fileName ? `${fileName}.ots` : 'timestamp.ots')
+}
+
+async function downloadStampsAsZip(stamps: DetachedTimestamp[], names: string[]) {
+  const zip = new JSZip()
+  for (let i = 0; i < stamps.length; i++) {
+    const fileName = names[i] ?? `file-${i}`
+    const encoded = Encoder.encodeDetachedTimestamp(stamps[i]!)
+    // Preserve directory structure in zip (fileName may contain path separators)
+    zip.file(`${fileName}.ots`, encoded)
+  }
+  const blob = await zip.generateAsync({ type: 'blob' })
+  triggerDownload(blob, 'timestamps.zip')
 }
 
 export function useTimestampSDK() {
@@ -68,7 +85,7 @@ export function useTimestampSDK() {
   const stampPhase = ref<StampPhase>('idle')
   const stampError = ref<string | null>(null)
   const stampResult = shallowRef<DetachedTimestamp[] | null>(null)
-  const stampFileName = ref<string | undefined>(undefined)
+  const stampFileNames = ref<string[]>([])
   const broadcastProgress = ref('')
   const upgradeResults = shallowRef<UpgradeResult[] | null>(null)
 
@@ -79,11 +96,11 @@ export function useTimestampSDK() {
 
   let upgradeTimer: ReturnType<typeof setInterval> | null = null
 
-  async function stamp(digests: DigestHeader[], fileName?: string): Promise<DetachedTimestamp[]> {
+  async function stamp(digests: DigestHeader[], fileNames?: string[]): Promise<DetachedTimestamp[]> {
     stampPhase.value = 'generating-nonce'
     stampError.value = null
     stampResult.value = null
-    stampFileName.value = fileName
+    stampFileNames.value = fileNames ?? []
     broadcastProgress.value = ''
     upgradeResults.value = null
 
@@ -117,7 +134,7 @@ export function useTimestampSDK() {
       stampPhase.value = 'complete'
       stampResult.value = results
 
-      // Start polling for upgrade
+      // Start polling for upgrade (no auto-download — user uses the download button)
       startUpgradePolling(results)
 
       return results
@@ -128,10 +145,15 @@ export function useTimestampSDK() {
     }
   }
 
-  function downloadPendingStamp() {
+  async function downloadPendingStamp() {
     if (!stampResult.value) return
-    for (const result of stampResult.value) {
-      downloadOtsFile(result, stampFileName.value)
+    const results = stampResult.value
+    const names = stampFileNames.value
+
+    if (results.length === 1) {
+      downloadOtsFile(results[0]!, names[0])
+    } else if (results.length > 1) {
+      await downloadStampsAsZip(results, names)
     }
   }
 
@@ -155,9 +177,12 @@ export function useTimestampSDK() {
         const hasUpgraded = allResults.some((r) => r.status === UpgradeStatus.Upgraded)
         if (hasUpgraded) {
           stampPhase.value = 'upgraded'
-          // Download upgraded file with original filename
-          for (const s of stamps) {
-            downloadOtsFile(s, stampFileName.value)
+          // Auto-download upgraded timestamps with correct per-file names
+          const names = stampFileNames.value
+          if (stamps.length === 1) {
+            downloadOtsFile(stamps[0]!, names[0])
+          } else if (stamps.length > 1) {
+            await downloadStampsAsZip(stamps, names)
           }
           stopUpgradePolling()
         } else if (attempts >= maxAttempts) {
@@ -215,7 +240,7 @@ export function useTimestampSDK() {
     stampPhase.value = 'idle'
     stampError.value = null
     stampResult.value = null
-    stampFileName.value = undefined
+    stampFileNames.value = []
     broadcastProgress.value = ''
     upgradeResults.value = null
     stopUpgradePolling()
@@ -232,7 +257,7 @@ export function useTimestampSDK() {
     stampPhase,
     stampError,
     stampResult,
-    stampFileName,
+    stampFileNames,
     broadcastProgress,
     upgradeResults,
     stamp,

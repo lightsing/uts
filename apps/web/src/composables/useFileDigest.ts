@@ -67,7 +67,7 @@ export function useFileDigest() {
       const digestHex = hexlify(digestBytes)
 
       const digestResult: FileDigestResult = {
-        fileName: file.name,
+        fileName: file.webkitRelativePath || file.name,
         fileSize: file.size,
         algorithm,
         digest: digestHex,
