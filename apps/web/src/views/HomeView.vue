@@ -13,7 +13,7 @@ import type { FileDigestResult } from '@/composables/useFileDigest'
 import { useAppStore } from '@/stores/app'
 
 const store = useAppStore()
-const { stampPhase, stampError, broadcastProgress, stamp, resetStamp } = useTimestampSDK()
+const { stampPhase, stampError, broadcastProgress, stamp, downloadPendingStamp } = useTimestampSDK()
 const {
   walletAddress,
   walletChainName,
@@ -26,10 +26,15 @@ const {
   truncateAddress,
 } = useWallet()
 
-const activeTab = ref<'stamp' | 'verify'>('stamp')
+const savedTab = localStorage.getItem('uts-active-tab') as 'stamp' | 'verify' | null
+const activeTab = ref<'stamp' | 'verify'>(savedTab === 'verify' ? 'verify' : 'stamp')
 const showWorkflow = ref(false)
 const showSettings = ref(false)
 const newCalendarUrl = ref('')
+
+watch(activeTab, (tab) => {
+  localStorage.setItem('uts-active-tab', tab)
+})
 
 onMounted(() => {
   store.checkChains()
@@ -66,11 +71,6 @@ async function handleStampFromHash(hash: string) {
   } catch {
     // error is tracked in stampError
   }
-}
-
-function handleResetWorkflow() {
-  resetStamp()
-  showWorkflow.value = false
 }
 
 function addCalendar() {
@@ -211,6 +211,21 @@ function handleWalletClick() {
                 </BaseButton>
               </div>
             </div>
+
+            <!-- Upgrade behavior -->
+            <div class="mt-4 border-t border-glass-border pt-3">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                  v-model="store.keepPending"
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-glass-border bg-surface accent-neon-cyan"
+                />
+                <div>
+                  <div class="font-heading text-xs font-medium text-white/70">Keep pending attestations after upgrade</div>
+                  <div class="font-mono text-[10px] text-white/30">When enabled, the original pending attestation is preserved alongside the upgraded one</div>
+                </div>
+              </label>
+            </div>
           </GlassCard>
         </div>
       </div>
@@ -237,7 +252,7 @@ function handleWalletClick() {
               ? 'bg-neon-cyan/10 text-neon-cyan'
               : 'text-white/40 hover:text-white/60'
           "
-          @click="activeTab = 'stamp'; handleResetWorkflow()"
+          @click="activeTab = 'stamp'"
         >
           <Zap class="h-4 w-4" />
           Stamp
@@ -260,29 +275,26 @@ function handleWalletClick() {
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <!-- Main panel (2/3) -->
         <div class="space-y-6 lg:col-span-2">
-          <Transition name="fade" mode="out-in">
-            <!-- Stamp tab -->
-            <div v-if="activeTab === 'stamp'" key="stamp" class="space-y-6">
-              <HeroTerminal
-                @submit="handleStampFromDigest"
-                @submit-raw="handleStampFromHash"
-              />
+          <!-- Stamp tab (preserved with v-show) -->
+          <div v-show="activeTab === 'stamp'" class="space-y-6">
+            <HeroTerminal
+              @submit="handleStampFromDigest"
+              @submit-raw="handleStampFromHash"
+            />
 
-              <Transition name="fade">
-                <StampingWorkflow
-                  v-if="showWorkflow"
-                  :phase="stampPhase"
-                  :error="stampError"
-                  :broadcast-progress="broadcastProgress"
-                />
-              </Transition>
-            </div>
+            <StampingWorkflow
+              v-if="showWorkflow"
+              :phase="stampPhase"
+              :error="stampError"
+              :broadcast-progress="broadcastProgress"
+              @download="downloadPendingStamp"
+            />
+          </div>
 
-            <!-- Verify tab -->
-            <div v-else key="verify">
-              <VerificationResult />
-            </div>
-          </Transition>
+          <!-- Verify tab (preserved with v-show) -->
+          <div v-show="activeTab === 'verify'">
+            <VerificationResult />
+          </div>
         </div>
 
         <!-- Sidebar (1/3) -->

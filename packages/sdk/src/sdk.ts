@@ -384,12 +384,14 @@ export default class SDK {
   /**
    * Perform in-place upgrade of the provided detached timestamp by replacing any pending attestations with their upgraded timestamp steps, if they have become available.
    * @param detached The detached timestamp to be upgraded.
+   * @param keepPending Whether to keep the original pending attestation alongside the upgraded one. Default is false (purge pending on success).
    * @returns The result of the upgrade operation, including the original and upgraded timestamps if applicable.
    */
-  async upgrade(detached: DetachedTimestamp): Promise<UpgradeResult[]> {
+  async upgrade(detached: DetachedTimestamp, keepPending: boolean = false): Promise<UpgradeResult[]> {
     return this.upgradeTimestamp(
       getBytes(detached.header.digest),
       detached.timestamp,
+      keepPending,
     )
   }
 
@@ -398,11 +400,13 @@ export default class SDK {
    * This function will recursively traverse the timestamp steps and perform in-place upgrades of any pending attestations encountered.
    * @param input The original digest input associated with the timestamp, which is needed to verify and upgrade the pending attestations.
    * @param timestamp The timestamp steps to be upgraded, which may contain pending attestations that need to be replaced with their upgraded timestamp steps if they have become available.
+   * @param keepPending Whether to keep the original pending attestation alongside the upgraded one. Default is false (purge pending on success).
    * @returns The result of the upgrade operation, including the original and upgraded timestamps if applicable.
    */
   async upgradeTimestamp(
     input: Uint8Array,
     timestamp: Timestamp,
+    keepPending: boolean = false,
   ): Promise<UpgradeResult[]> {
     let current = input
 
@@ -426,7 +430,7 @@ export default class SDK {
           // upgrade sub stamps
           const results = (
             await Promise.all(
-              step.steps.map((branch) => this.upgradeTimestamp(input, branch)),
+              step.steps.map((branch) => this.upgradeTimestamp(input, branch, keepPending)),
             )
           ).flat()
           result.push(...results)
@@ -447,10 +451,15 @@ export default class SDK {
               })
               continue
             }
-            // preserve the original attestation in the upgraded timestamp for transparency
-            timestamp[i] = {
-              op: 'FORK',
-              steps: [[step], upgraded],
+            if (keepPending) {
+              // preserve the original attestation in the upgraded timestamp for transparency
+              timestamp[i] = {
+                op: 'FORK',
+                steps: [[step], upgraded],
+              }
+            } else {
+              // replace the pending attestation with the upgraded one
+              timestamp.splice(i, 1, ...upgraded)
             }
             result.push({
               status: UpgradeStatus.Upgraded,

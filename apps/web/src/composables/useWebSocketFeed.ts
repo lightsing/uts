@@ -26,21 +26,34 @@ export interface FeedEntry {
 export function useWebSocketFeed() {
   const entries = ref<FeedEntry[]>([])
   const isConnected = ref(false)
+  const seenIds = new Set<string>()
   let intervalId: ReturnType<typeof setInterval> | null = null
-  let lastBlock: Record<number, number> = {}
+  let lastBlockWeb3: Record<number, number> = {}
+  let lastBlockRPC: Record<number, number> = {}
 
-  async function fetchEventsFromWeb3(web3Provider: Eip1193Provider) {
+  function addEntry(entry: FeedEntry) {
+    if (seenIds.has(entry.id)) return
+    seenIds.add(entry.id)
+    entries.value.unshift(entry)
+    if (entries.value.length > 50) {
+      const removed = entries.value.splice(50)
+      for (const r of removed) seenIds.delete(r.id)
+    }
+  }
+
+  /** Poll web3Provider. Returns the wallet's chainId on success, or null. */
+  async function fetchEventsFromWeb3(web3Provider: Eip1193Provider): Promise<number | null> {
     try {
       const provider = new BrowserProvider(web3Provider)
       const network = await provider.getNetwork()
       const chainId = Number(network.chainId)
 
       const currentBlock = await provider.getBlockNumber()
-      const fromBlock = lastBlock[chainId]
-        ? lastBlock[chainId] + 1
+      const fromBlock = lastBlockWeb3[chainId]
+        ? lastBlockWeb3[chainId] + 1
         : currentBlock - 10
 
-      if (fromBlock > currentBlock) return
+      if (fromBlock > currentBlock) return chainId
 
       const logs = await provider.getLogs({
         fromBlock,
@@ -52,46 +65,40 @@ export function useWebSocketFeed() {
         const parsed = SDK.utsInterface.parseLog(log)
         if (!parsed) continue
 
-        const root: string = parsed.args[0]
-        const sender: string = parsed.args[1]
-        const ts: bigint = parsed.args[2]
-
-        const entryId = `${chainId}-${log.blockNumber}-${log.index}`
-        if (!entries.value.some((e) => e.id === entryId)) {
-          entries.value.unshift({
-            id: entryId,
-            hash: root,
-            type: 'ethereum',
-            chain: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
-            chainId,
-            blockHeight: log.blockNumber,
-            sender,
-            timestamp: Number(ts) * 1000,
-          })
-        }
+        addEntry({
+          id: `${chainId}-${log.blockNumber}-${log.index}`,
+          hash: parsed.args[0],
+          type: 'ethereum',
+          chain: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
+          chainId,
+          blockHeight: log.blockNumber,
+          sender: parsed.args[1],
+          timestamp: Number(parsed.args[2] as bigint) * 1000,
+        })
       }
 
-      lastBlock[chainId] = currentBlock
-
-      if (entries.value.length > 50) {
-        entries.value.length = 50
-      }
+      lastBlockWeb3[chainId] = currentBlock
+      return chainId
     } catch (e) {
       console.warn('Feed: failed to poll web3Provider:', e)
+      return null
     }
   }
 
-  async function fetchEventsFromRPCs(sdk: SDK) {
+  /** Poll ethRPCs, skipping chains already covered by web3Provider. */
+  async function fetchEventsFromRPCs(sdk: SDK, skipChainIds: Set<number> = new Set()) {
     const chainIds = Object.keys(sdk.ethRPCs).map(Number)
 
     for (const chainId of chainIds) {
+      if (skipChainIds.has(chainId)) continue
+
       const provider = sdk.getEthProvider(chainId)
       if (!provider) continue
 
       try {
         const currentBlock = await provider.getBlockNumber()
-        const fromBlock = lastBlock[chainId]
-          ? lastBlock[chainId] + 1
+        const fromBlock = lastBlockRPC[chainId]
+          ? lastBlockRPC[chainId] + 1
           : currentBlock - 5
 
         if (fromBlock > currentBlock) continue
@@ -106,53 +113,52 @@ export function useWebSocketFeed() {
           const parsed = SDK.utsInterface.parseLog(log)
           if (!parsed) continue
 
-          const root: string = parsed.args[0]
-          const sender: string = parsed.args[1]
-          const ts: bigint = parsed.args[2]
-
-          entries.value.unshift({
+          addEntry({
             id: `${chainId}-${log.blockNumber}-${log.index}`,
-            hash: root,
+            hash: parsed.args[0],
             type: 'ethereum',
             chain: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
             chainId,
             blockHeight: log.blockNumber,
-            sender,
-            timestamp: Number(ts) * 1000,
+            sender: parsed.args[1],
+            timestamp: Number(parsed.args[2] as bigint) * 1000,
           })
         }
 
-        lastBlock[chainId] = currentBlock
-
-        if (entries.value.length > 50) {
-          entries.value.length = 50
-        }
+        lastBlockRPC[chainId] = currentBlock
       } catch (e) {
         console.warn(`Feed: failed to poll chain ${chainId}:`, e)
       }
     }
   }
 
-  async function connect() {
+  /** Poll both web3Provider and ethRPCs, deduplicating by entry id. */
+  async function pollAll() {
     const sdk = getSDK()
-    isConnected.value = true
-    lastBlock = {}
+    const skipChainIds = new Set<number>()
 
-    // Initial fetch: prefer web3Provider
+    // Poll web3Provider first (if available)
     if (sdk.web3Provider) {
-      await fetchEventsFromWeb3(sdk.web3Provider)
-    } else {
-      await fetchEventsFromRPCs(sdk)
+      const web3ChainId = await fetchEventsFromWeb3(sdk.web3Provider)
+      if (web3ChainId !== null) {
+        // Skip this chain in ethRPCs since web3Provider already covers it
+        skipChainIds.add(web3ChainId)
+      }
     }
 
-    // Poll every 15s — prefer web3Provider when available
+    // Also poll ethRPCs for all remaining chains
+    await fetchEventsFromRPCs(sdk, skipChainIds)
+  }
+
+  async function connect() {
+    isConnected.value = true
+    lastBlockWeb3 = {}
+    lastBlockRPC = {}
+
+    await pollAll()
+
     intervalId = setInterval(() => {
-      const currentSdk = getSDK()
-      if (currentSdk.web3Provider) {
-        fetchEventsFromWeb3(currentSdk.web3Provider)
-      } else {
-        fetchEventsFromRPCs(currentSdk)
-      }
+      pollAll()
     }, 15000)
   }
 

@@ -49,7 +49,7 @@ export function setWeb3Provider(provider: Eip1193Provider | null) {
   sdk.web3Provider = provider
 }
 
-function downloadOtsFile(stamp: DetachedTimestamp, fileName?: string) {
+export function downloadOtsFile(stamp: DetachedTimestamp, fileName?: string) {
   const encoded = Encoder.encodeDetachedTimestamp(stamp)
   const blob = new Blob([encoded as BlobPart], { type: 'application/octet-stream' })
   const url = URL.createObjectURL(blob)
@@ -68,6 +68,7 @@ export function useTimestampSDK() {
   const stampPhase = ref<StampPhase>('idle')
   const stampError = ref<string | null>(null)
   const stampResult = shallowRef<DetachedTimestamp[] | null>(null)
+  const stampFileName = ref<string | undefined>(undefined)
   const broadcastProgress = ref('')
   const upgradeResults = shallowRef<UpgradeResult[] | null>(null)
 
@@ -82,6 +83,7 @@ export function useTimestampSDK() {
     stampPhase.value = 'generating-nonce'
     stampError.value = null
     stampResult.value = null
+    stampFileName.value = fileName
     broadcastProgress.value = ''
     upgradeResults.value = null
 
@@ -115,11 +117,6 @@ export function useTimestampSDK() {
       stampPhase.value = 'complete'
       stampResult.value = results
 
-      // Download the stamped .ots file
-      for (const result of results) {
-        downloadOtsFile(result, fileName)
-      }
-
       // Start polling for upgrade
       startUpgradePolling(results)
 
@@ -131,7 +128,14 @@ export function useTimestampSDK() {
     }
   }
 
-  function startUpgradePolling(stamps: DetachedTimestamp[]) {
+  function downloadPendingStamp() {
+    if (!stampResult.value) return
+    for (const result of stampResult.value) {
+      downloadOtsFile(result, stampFileName.value)
+    }
+  }
+
+  function startUpgradePolling(stamps: DetachedTimestamp[], keepPending?: boolean) {
     stopUpgradePolling()
     stampPhase.value = 'upgrading'
 
@@ -143,7 +147,7 @@ export function useTimestampSDK() {
       try {
         const allResults: UpgradeResult[] = []
         for (const s of stamps) {
-          const results = await sdk.upgrade(s)
+          const results = await sdk.upgrade(s, keepPending ?? false)
           allResults.push(...results)
         }
         upgradeResults.value = allResults
@@ -151,9 +155,9 @@ export function useTimestampSDK() {
         const hasUpgraded = allResults.some((r) => r.status === UpgradeStatus.Upgraded)
         if (hasUpgraded) {
           stampPhase.value = 'upgraded'
-          // Download upgraded file
+          // Download upgraded file with original filename
           for (const s of stamps) {
-            downloadOtsFile(s)
+            downloadOtsFile(s, stampFileName.value)
           }
           stopUpgradePolling()
         } else if (attempts >= maxAttempts) {
@@ -197,8 +201,9 @@ export function useTimestampSDK() {
 
   async function upgrade(
     detached: DetachedTimestamp,
+    keepPending?: boolean,
   ): Promise<UpgradeResult[]> {
-    return sdk.upgrade(detached)
+    return sdk.upgrade(detached, keepPending ?? false)
   }
 
   function decodeOtsFile(data: Uint8Array): DetachedTimestamp {
@@ -210,6 +215,7 @@ export function useTimestampSDK() {
     stampPhase.value = 'idle'
     stampError.value = null
     stampResult.value = null
+    stampFileName.value = undefined
     broadcastProgress.value = ''
     upgradeResults.value = null
     stopUpgradePolling()
@@ -226,9 +232,11 @@ export function useTimestampSDK() {
     stampPhase,
     stampError,
     stampResult,
+    stampFileName,
     broadcastProgress,
     upgradeResults,
     stamp,
+    downloadPendingStamp,
     resetStamp,
 
     verifyStatus,

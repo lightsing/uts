@@ -9,14 +9,20 @@ import {
   AlertCircle,
   RefreshCw,
   ShieldCheck,
+  Download,
 } from 'lucide-vue-next'
 import type { StampPhase } from '@/composables/useTimestampSDK'
 import GlassCard from '@/components/base/GlassCard.vue'
+import BaseButton from '@/components/base/BaseButton.vue'
 
 const props = defineProps<{
   phase: StampPhase
   error?: string | null
   broadcastProgress?: string
+}>()
+
+const emit = defineEmits<{
+  download: []
 }>()
 
 interface WorkflowStep {
@@ -31,7 +37,7 @@ const steps: WorkflowStep[] = [
   { id: 'building-merkle-tree', label: 'Building Merkle Tree', description: 'Constructing proof tree from leaves', icon: GitBranch },
   { id: 'broadcasting', label: 'Broadcasting', description: 'Submitting to calendar nodes', icon: Radio },
   { id: 'building-proof', label: 'Building Proof', description: 'Constructing Merkle proof paths', icon: Blocks },
-  { id: 'complete', label: 'Complete', description: 'Timestamp recorded & downloaded', icon: CheckCircle2 },
+  { id: 'complete', label: 'Complete', description: 'Timestamp recorded (pending attestation)', icon: CheckCircle2 },
   { id: 'upgrading', label: 'Polling for Upgrade', description: 'Waiting for on-chain attestation...', icon: RefreshCw },
   { id: 'upgraded', label: 'Upgraded', description: 'Attestation confirmed on-chain', icon: ShieldCheck },
 ]
@@ -48,6 +54,12 @@ const phaseOrder: StampPhase[] = [
 ]
 
 const currentIndex = computed(() => phaseOrder.indexOf(props.phase))
+
+const showDownloadButton = computed(() => {
+  const ci = currentIndex.value
+  const completeIndex = phaseOrder.indexOf('complete')
+  return ci >= completeIndex && props.phase !== 'error'
+})
 
 function getStepStatus(stepId: StampPhase) {
   if (props.phase === 'error') return 'error'
@@ -136,6 +148,14 @@ function getStepDescription(step: WorkflowStep): string {
           class="mt-1 h-1.5 w-1.5 animate-glow-pulse rounded-full bg-neon-cyan"
         />
       </div>
+    </div>
+
+    <!-- Download button (shown when complete or later) -->
+    <div v-if="showDownloadButton" class="mt-4">
+      <BaseButton variant="secondary" @click="emit('download')">
+        <Download class="h-3.5 w-3.5" />
+        Download .ots
+      </BaseButton>
     </div>
 
     <!-- Error message -->

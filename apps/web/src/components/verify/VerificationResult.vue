@@ -6,6 +6,7 @@ import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import StatusBadge from '@/components/base/StatusBadge.vue'
 import MerkleTreeViz from '@/components/verify/MerkleTreeViz.vue'
+import AttestationDetail from '@/components/verify/AttestationDetail.vue'
 import { useTimestampSDK } from '@/composables/useTimestampSDK'
 import { VerifyStatus } from '@uts/sdk'
 import type { DetachedTimestamp } from '@uts/sdk'
@@ -111,35 +112,16 @@ function handleReset() {
         </div>
       </div>
 
-      <!-- Attestation details -->
+      <!-- Attestation details (collapsible) -->
       <div v-if="verifyAttestations.length > 0" class="space-y-2">
         <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
           Attestations ({{ verifyAttestations.length }})
         </div>
-        <div
+        <AttestationDetail
           v-for="(att, i) in verifyAttestations"
           :key="i"
-          class="rounded-lg border border-glass-border bg-surface/40 p-3"
-        >
-          <div class="flex items-center gap-2">
-            <StatusBadge
-              :status="att.status === 'VALID' ? 'valid' : att.status === 'PENDING' ? 'pending' : att.status === 'INVALID' ? 'invalid' : 'unknown'"
-              size="sm"
-            />
-            <span class="font-mono text-xs text-white/60">
-              <template v-if="att.attestation.kind === 'bitcoin'">
-                Bitcoin block #{{ att.attestation.height }}
-              </template>
-              <template v-else-if="att.attestation.kind === 'ethereum-uts'">
-                Ethereum (chain {{ att.attestation.chain }}) block #{{ att.attestation.height }}
-              </template>
-              <template v-else-if="att.attestation.kind === 'pending'">
-                Pending → {{ att.attestation.url }}
-              </template>
-              <template v-else>Unknown attestation</template>
-            </span>
-          </div>
-        </div>
+          :attestation="att"
+        />
       </div>
 
       <!-- Proof path toggle -->

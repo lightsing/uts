@@ -20,6 +20,7 @@ export interface EthChainNode {
 }
 
 const STORAGE_KEY = 'uts-calendars'
+const SETTINGS_KEY = 'uts-settings'
 
 function loadCalendars(): string[] {
   try {
@@ -33,8 +34,21 @@ function saveCalendars(urls: string[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(urls))
 }
 
+function loadSettings(): { keepPending: boolean } {
+  try {
+    const stored = localStorage.getItem(SETTINGS_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch { /* ignore */ }
+  return { keepPending: false }
+}
+
+function saveSettings(settings: { keepPending: boolean }) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+}
+
 export const useAppStore = defineStore('app', () => {
   const calendarUrls = ref<string[]>(loadCalendars())
+  const keepPending = ref(loadSettings().keepPending)
   const ethChains = ref<EthChainNode[]>([])
   const recentStamps = ref<DetachedTimestamp[]>([])
 
@@ -46,6 +60,10 @@ export const useAppStore = defineStore('app', () => {
     saveCalendars(urls)
     resetSDK({ calendars: urls.map((u) => new URL(u)) })
   }, { deep: true })
+
+  watch(keepPending, (val) => {
+    saveSettings({ keepPending: val })
+  })
 
   async function checkChains() {
     const sdk = getSDK()
@@ -92,6 +110,7 @@ export const useAppStore = defineStore('app', () => {
 
   return {
     calendarUrls,
+    keepPending,
     ethChains,
     recentStamps,
     onlineCount,
