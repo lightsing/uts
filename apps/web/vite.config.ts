@@ -10,5 +10,6 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+    conditions: ['uts-source', 'module', 'browser', 'development|production'],
   },
 })
