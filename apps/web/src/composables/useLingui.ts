@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { i18n } from '@/i18n'
+import { generateMessageId } from '@lingui/message-utils/generateMessageId'
 
 const _locale = ref(i18n.locale || 'en')
 
@@ -9,15 +10,22 @@ if (i18n.locale && i18n.locale !== _locale.value) {
 }
 
 export function useLingui() {
+  // Sync locale ref with i18n in case initLocale restored a saved locale
+  if (_locale.value !== i18n.locale) {
+    _locale.value = i18n.locale
+  }
+
   /**
-   * Translate a message. Accesses the reactive `_locale` ref
-   * so that Vue re-renders when the active locale changes.
+   * Translate a message. The message text is hashed to match
+   * Lingui's compiled catalog keys, and the reactive `_locale` ref
+   * ensures Vue re-renders when the active locale changes.
    */
   function t(id: string, values?: Record<string, unknown>): string {
     // Reading _locale.value ensures Vue tracks this as a dependency
     // so template expressions re-evaluate when locale changes.
     void _locale.value
-    return i18n._(id, values)
+    const hashedId = generateMessageId(id)
+    return i18n._({ id: hashedId, message: id }, values)
   }
 
   async function activate(locale: string) {

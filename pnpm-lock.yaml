@@ -38,6 +38,9 @@ importers:
       '@lingui/core':
         specifier: ^5.9.2
         version: 5.9.2(@lingui/babel-plugin-lingui-macro@5.9.2(typescript@5.9.3))
+      '@lingui/message-utils':
+        specifier: ^5.9.2
+        version: 5.9.2
       '@noble/hashes':
         specifier: ^2.0.1
         version: 2.0.1

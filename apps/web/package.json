@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@lingui/core": "^5.9.2",
+    "@lingui/message-utils": "^5.9.2",
     "@noble/hashes": "^2.0.1",
     "@uts/sdk": "workspace:*",
     "@vueuse/core": "^14.2.1",

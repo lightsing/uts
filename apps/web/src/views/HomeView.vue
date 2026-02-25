@@ -174,6 +174,12 @@ function handleWalletClick() {
     connectWallet()
   }
 }
+
+async function handleLocaleSwitch() {
+  const idx = SUPPORTED_LOCALES.findIndex((l) => l.code === locale.value)
+  const next = SUPPORTED_LOCALES[(idx + 1) % SUPPORTED_LOCALES.length]
+  await activate(next.code)
+}
 </script>
 
 <template>
@@ -396,14 +402,7 @@ function handleWalletClick() {
           <div class="relative">
             <button
               class="rounded-lg p-1.5 text-white/40 transition hover:bg-white/5 hover:text-white/60"
-              :title="t('Calendar settings')"
-              @click="
-                async () => {
-                  const idx = SUPPORTED_LOCALES.findIndex((l) => l.code === locale)
-                  const next = SUPPORTED_LOCALES[(idx + 1) % SUPPORTED_LOCALES.length]
-                  await activate(next.code)
-                }
-              "
+              @click="handleLocaleSwitch"
             >
               <Languages class="h-4 w-4" />
             </button>
