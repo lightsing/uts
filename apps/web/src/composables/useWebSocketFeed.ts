@@ -1,11 +1,23 @@
 import { ref, onUnmounted } from 'vue'
+import { SDK } from '@uts/sdk'
+import { getSDK } from './useTimestampSDK'
+
+const CHAIN_NAMES: Record<number, string> = {
+  1: 'Ethereum',
+  17000: 'Holesky',
+  11155111: 'Sepolia',
+  54352: 'Scroll',
+  54351: 'Scroll Sepolia',
+}
 
 export interface FeedEntry {
   id: string
   hash: string
-  type: 'bitcoin' | 'ethereum' | 'pending'
-  chain?: string
-  blockHeight?: number
+  type: 'ethereum'
+  chain: string
+  chainId: number
+  blockHeight: number
+  sender?: string
   timestamp: number
 }
 
@@ -13,51 +25,72 @@ export function useWebSocketFeed() {
   const entries = ref<FeedEntry[]>([])
   const isConnected = ref(false)
   let intervalId: ReturnType<typeof setInterval> | null = null
+  let lastBlock: Record<number, number> = {}
 
-  const MOCK_CHAINS = ['Bitcoin', 'Ethereum', 'Scroll', 'Sepolia']
-  const MOCK_TYPES: FeedEntry['type'][] = ['bitcoin', 'ethereum', 'pending']
+  async function fetchLatestEvents(sdk: SDK) {
+    const chainIds = Object.keys(sdk.ethRPCs).map(Number)
 
-  function randomHex(len: number): string {
-    const bytes = new Uint8Array(len)
-    crypto.getRandomValues(bytes)
-    return (
-      '0x' +
-      Array.from(bytes)
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('')
-    )
-  }
+    for (const chainId of chainIds) {
+      const provider = sdk.getEthProvider(chainId)
+      if (!provider) continue
 
-  function generateMockEntry(): FeedEntry {
-    const type = MOCK_TYPES[Math.floor(Math.random() * MOCK_TYPES.length)]!
-    return {
-      id: crypto.randomUUID(),
-      hash: randomHex(32),
-      type,
-      chain: type !== 'pending' ? MOCK_CHAINS[Math.floor(Math.random() * MOCK_CHAINS.length)] : undefined,
-      blockHeight:
-        type !== 'pending'
-          ? Math.floor(Math.random() * 1000000) + 19000000
-          : undefined,
-      timestamp: Date.now(),
-    }
-  }
+      try {
+        const currentBlock = await provider.getBlockNumber()
+        const fromBlock = lastBlock[chainId]
+          ? lastBlock[chainId] + 1
+          : currentBlock - 5
 
-  function connect() {
-    isConnected.value = true
+        if (fromBlock > currentBlock) continue
 
-    // Seed initial entries
-    for (let i = 0; i < 8; i++) {
-      entries.value.push(generateMockEntry())
-    }
+        const logs = await provider.getLogs({
+          fromBlock,
+          toBlock: currentBlock,
+          topics: [SDK.utsLogTopic],
+        })
 
-    // Simulate live feed
-    intervalId = setInterval(() => {
-      entries.value.unshift(generateMockEntry())
-      if (entries.value.length > 50) {
-        entries.value.pop()
+        for (const log of logs) {
+          const parsed = SDK.utsInterface.parseLog(log)
+          if (!parsed) continue
+
+          const root: string = parsed.args[0]
+          const sender: string = parsed.args[1]
+          const ts: bigint = parsed.args[2]
+
+          entries.value.unshift({
+            id: `${chainId}-${log.blockNumber}-${log.index}`,
+            hash: root,
+            type: 'ethereum',
+            chain: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
+            chainId,
+            blockHeight: log.blockNumber,
+            sender,
+            timestamp: Number(ts) * 1000,
+          })
+        }
+
+        lastBlock[chainId] = currentBlock
+
+        if (entries.value.length > 50) {
+          entries.value.length = 50
+        }
+      } catch (e) {
+        console.warn(`Feed: failed to poll chain ${chainId}:`, e)
       }
-    }, 3000 + Math.random() * 2000)
+    }
+  }
+
+  async function connect() {
+    const sdk = getSDK()
+    isConnected.value = true
+    lastBlock = {}
+
+    // Initial fetch
+    await fetchLatestEvents(sdk)
+
+    // Poll every 15s
+    intervalId = setInterval(() => {
+      fetchLatestEvents(sdk)
+    }, 15000)
   }
 
   function disconnect() {

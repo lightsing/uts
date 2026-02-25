@@ -21,8 +21,17 @@ export type StampPhase =
   | 'complete'
   | 'error'
 
+let _sdkInstance: SDK | null = null
+
+export function getSDK(): SDK {
+  if (!_sdkInstance) {
+    _sdkInstance = new SDK({ timeout: 15000 })
+  }
+  return _sdkInstance
+}
+
 export function useTimestampSDK() {
-  const sdk = new SDK({ timeout: 15000 })
+  const sdk = getSDK()
 
   const stampPhase = ref<StampPhase>('idle')
   const stampError = ref<string | null>(null)

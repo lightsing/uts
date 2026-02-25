@@ -1,37 +1,15 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { formatDistanceToNow } from 'date-fns'
-import { Activity, Bitcoin, Globe, Clock } from 'lucide-vue-next'
+import { Activity, Globe, Clock } from 'lucide-vue-next'
 import GlassCard from '@/components/base/GlassCard.vue'
-import { useWebSocketFeed, type FeedEntry } from '@/composables/useWebSocketFeed'
+import { useWebSocketFeed } from '@/composables/useWebSocketFeed'
 
 const { entries, isConnected, connect } = useWebSocketFeed()
 
 onMounted(() => {
   connect()
 })
-
-function getIcon(type: FeedEntry['type']) {
-  switch (type) {
-    case 'bitcoin':
-      return Bitcoin
-    case 'ethereum':
-      return Globe
-    default:
-      return Clock
-  }
-}
-
-function getTypeColor(type: FeedEntry['type']): string {
-  switch (type) {
-    case 'bitcoin':
-      return 'text-pending'
-    case 'ethereum':
-      return 'text-neon-purple'
-    default:
-      return 'text-white/40'
-  }
-}
 
 function truncate(hash: string): string {
   return `${hash.slice(0, 10)}...${hash.slice(-8)}`
@@ -51,7 +29,7 @@ function truncate(hash: string): string {
           :class="isConnected ? 'bg-valid animate-glow-pulse' : 'bg-invalid'"
         />
         <span class="font-mono text-[10px] text-white/40">
-          {{ isConnected ? 'CONNECTED' : 'DISCONNECTED' }}
+          {{ isConnected ? 'POLLING' : 'DISCONNECTED' }}
         </span>
       </div>
     </div>
@@ -63,18 +41,14 @@ function truncate(hash: string): string {
           :key="entry.id"
           class="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-white/5"
         >
-          <component
-            :is="getIcon(entry.type)"
-            class="h-4 w-4 shrink-0"
-            :class="getTypeColor(entry.type)"
-          />
+          <Globe class="h-4 w-4 shrink-0 text-neon-purple" />
           <div class="min-w-0 flex-1">
-            <div class="font-mono text-xs" :class="getTypeColor(entry.type)">
+            <div class="font-mono text-xs text-neon-purple">
               {{ truncate(entry.hash) }}
             </div>
             <div class="flex items-center gap-2 font-mono text-[10px] text-white/30">
-              <span v-if="entry.chain">{{ entry.chain }}</span>
-              <span v-if="entry.blockHeight">#{{ entry.blockHeight }}</span>
+              <span>{{ entry.chain }}</span>
+              <span>#{{ entry.blockHeight }}</span>
             </div>
           </div>
           <div class="shrink-0 font-mono text-[10px] text-white/20">
@@ -84,10 +58,17 @@ function truncate(hash: string): string {
       </TransitionGroup>
 
       <div
-        v-if="entries.length === 0"
+        v-if="entries.length === 0 && isConnected"
         class="py-8 text-center font-mono text-xs text-white/30"
       >
-        Waiting for attestation events...
+        <Clock class="mx-auto mb-2 h-5 w-5 text-white/20" />
+        Polling Ethereum RPCs for Attested events...
+      </div>
+      <div
+        v-else-if="entries.length === 0"
+        class="py-8 text-center font-mono text-xs text-white/30"
+      >
+        Waiting for connection...
       </div>
     </div>
   </GlassCard>

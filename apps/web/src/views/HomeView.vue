@@ -16,7 +16,7 @@ const activeTab = ref<'stamp' | 'verify'>('stamp')
 const showWorkflow = ref(false)
 
 onMounted(() => {
-  store.checkCalendars()
+  store.checkChains()
 })
 
 async function handleStampFromDigest(digest: FileDigestResult) {
@@ -66,23 +66,23 @@ function handleResetWorkflow() {
           </div>
         </div>
 
-        <!-- Calendar status -->
+        <!-- Ethereum chain status -->
         <div class="flex items-center gap-4">
           <div class="flex items-center gap-2">
             <span
-              v-for="cal in store.calendars"
-              :key="cal.url"
+              v-for="chain in store.ethChains"
+              :key="chain.chainId"
               class="group relative h-2 w-2 cursor-help rounded-full"
               :class="{
-                'bg-valid animate-glow-pulse': cal.status === 'online',
-                'bg-invalid': cal.status === 'offline',
-                'bg-pending animate-glow-pulse': cal.status === 'checking',
+                'bg-valid animate-glow-pulse': chain.status === 'online',
+                'bg-invalid': chain.status === 'offline',
+                'bg-pending animate-glow-pulse': chain.status === 'checking',
               }"
-              :title="`${cal.url} — ${cal.status}${cal.latency ? ` (${cal.latency}ms)` : ''}`"
+              :title="`${chain.name} (${chain.chainId}) — ${chain.status}${chain.latency ? ` (${chain.latency}ms)` : ''}`"
             />
           </div>
           <span class="font-mono text-[10px] text-white/30">
-            {{ store.onlineCount }}/{{ store.calendars.length }} nodes
+            {{ store.onlineCount }}/{{ store.ethChains.length }} chains
           </span>
         </div>
       </div>
@@ -96,7 +96,7 @@ function handleResetWorkflow() {
           Decentralized <span class="text-neon-cyan glow-text-cyan">Timestamping</span>
         </h2>
         <p class="mt-2 font-mono text-sm text-white/40">
-          Cryptographic proof of existence anchored to Bitcoin &amp; Ethereum
+          Cryptographic proof of existence anchored to Ethereum
         </p>
       </div>
 

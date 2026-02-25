@@ -1,44 +1,55 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { DEFAULT_CALENDARS } from '@uts/sdk'
 import type { DetachedTimestamp } from '@uts/sdk'
+import { getSDK } from '@/composables/useTimestampSDK'
 
-export interface CalendarNode {
-  url: string
+const CHAIN_NAMES: Record<number, string> = {
+  1: 'Ethereum',
+  17000: 'Holesky',
+  11155111: 'Sepolia',
+  54352: 'Scroll',
+  54351: 'Scroll Sepolia',
+}
+
+export interface EthChainNode {
+  chainId: number
+  name: string
   status: 'online' | 'offline' | 'checking'
   latency?: number
 }
 
 export const useAppStore = defineStore('app', () => {
-  const calendars = ref<CalendarNode[]>(
-    DEFAULT_CALENDARS.map((url) => ({
-      url: url.toString(),
-      status: 'checking' as const,
-    })),
-  )
-
+  const ethChains = ref<EthChainNode[]>([])
   const recentStamps = ref<DetachedTimestamp[]>([])
 
   const onlineCount = computed(
-    () => calendars.value.filter((c) => c.status === 'online').length,
+    () => ethChains.value.filter((c) => c.status === 'online').length,
   )
 
-  async function checkCalendars() {
-    for (const cal of calendars.value) {
-      cal.status = 'checking'
+  async function checkChains() {
+    const sdk = getSDK()
+    const chainIds = Object.keys(sdk.ethRPCs).map(Number)
+
+    ethChains.value = chainIds.map((chainId) => ({
+      chainId,
+      name: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
+      status: 'checking' as const,
+    }))
+
+    for (const chain of ethChains.value) {
+      const provider = sdk.getEthProvider(chain.chainId)
+      if (!provider) {
+        chain.status = 'offline'
+        continue
+      }
       const start = performance.now()
       try {
-        const response = await fetch(cal.url, {
-          method: 'HEAD',
-          mode: 'no-cors',
-          signal: AbortSignal.timeout(5000),
-        })
-        // no-cors returns opaque response; treat as online
-        cal.latency = Math.round(performance.now() - start)
-        cal.status = response.type === 'opaque' || response.ok ? 'online' : 'offline'
+        await provider.getBlockNumber()
+        chain.latency = Math.round(performance.now() - start)
+        chain.status = 'online'
       } catch {
-        cal.status = 'offline'
-        cal.latency = undefined
+        chain.status = 'offline'
+        chain.latency = undefined
       }
     }
   }
@@ -51,10 +62,10 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    calendars,
+    ethChains,
     recentStamps,
     onlineCount,
-    checkCalendars,
+    checkChains,
     addStamp,
   }
 })
