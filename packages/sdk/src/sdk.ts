@@ -39,7 +39,13 @@ export type StampEvent =
   | { phase: 'generating-nonce' }
   | { phase: 'building-merkle-tree' }
   | { phase: 'broadcasting'; totalCalendars: number }
-  | { phase: 'calendar-response'; calendarUrl: string; success: boolean; responsesReceived: number; totalCalendars: number }
+  | {
+      phase: 'calendar-response'
+      calendarUrl: string
+      success: boolean
+      responsesReceived: number
+      totalCalendars: number
+    }
   | { phase: 'building-proof' }
   | { phase: 'complete' }
 
@@ -59,7 +65,10 @@ export interface SDKOptions {
 /**
  * Well-known EVM chain IDs to hex for wallet_switchEthereumChain.
  */
-export const WELL_KNOWN_CHAINS: Record<number, { chainId: string; chainName: string }> = {
+export const WELL_KNOWN_CHAINS: Record<
+  number,
+  { chainId: string; chainName: string }
+> = {
   1: { chainId: '0x1', chainName: 'Ethereum Mainnet' },
   17000: { chainId: '0x4268', chainName: 'Holesky' },
   11155111: { chainId: '0xaa36a7', chainName: 'Sepolia' },
@@ -82,8 +91,8 @@ export const UTS_ABI = [
 
 export default class SDK {
   readonly calendars: URL[]
-  readonly btcRPC: BitcoinRPC
-  readonly ethRPCs: Record<number, AbstractProvider>
+  btcRPC: BitcoinRPC
+  ethRPCs: Record<number, AbstractProvider>
   web3Provider: Eip1193Provider | null = null
 
   /**
@@ -123,20 +132,6 @@ export default class SDK {
       calendars = DEFAULT_CALENDARS,
       btcRPC = new BitcoinRPC(),
       ethRPCs = {
-        1: new FallbackProvider([
-          new JsonRpcProvider('https://eth.drpc.org'),
-          new JsonRpcProvider('https://eth.llamarpc.com'),
-          new JsonRpcProvider('https://eth.llamarpc.com'),
-        ]),
-        17000: new FallbackProvider([
-          new JsonRpcProvider('https://holesky.drpc.org'),
-          new JsonRpcProvider('https://1rpc.io/holesky'),
-        ]),
-        11155111: new FallbackProvider([
-          new JsonRpcProvider('https://sepolia.drpc.org'),
-          new JsonRpcProvider('https://0xrpc.io/sep'),
-          new JsonRpcProvider('https://rpc.sepolia.org'),
-        ]),
         534352: new JsonRpcProvider('https://rpc.scroll.io'),
         534351: new JsonRpcProvider('https://sepolia-rpc.scroll.io'),
       },
@@ -197,7 +192,9 @@ export default class SDK {
    * If the wallet is on a different chain, attempts to switch to the target chain if it's well-known.
    * Returns null if no web3Provider or if switching fails.
    */
-  async getWeb3ProviderForChain(chainId: number): Promise<AbstractProvider | null> {
+  async getWeb3ProviderForChain(
+    chainId: number,
+  ): Promise<AbstractProvider | null> {
     if (!this.web3Provider) return null
 
     try {
@@ -231,7 +228,10 @@ export default class SDK {
    *
    * @param digests The digests to be stamped, each with its associated header information. Input digests can use different hash algorithms, but the internal Merkle tree will be constructed using the SDK's configured hash algorithm (default KECCAK256).
    */
-  async stamp(digests: DigestHeader[], onEvent?: StampEventCallback): Promise<DetachedTimestamp[]> {
+  async stamp(
+    digests: DigestHeader[],
+    onEvent?: StampEventCallback,
+  ): Promise<DetachedTimestamp[]> {
     const nonces: Uint8Array[] = []
     const nonceDigests: Uint8Array[] = []
 
@@ -264,11 +264,23 @@ export default class SDK {
         try {
           const result = await this.requestAttest(calendar, root)
           responsesReceived++
-          onEvent?.({ phase: 'calendar-response', calendarUrl: calendar.toString(), success: true, responsesReceived, totalCalendars: this.calendars.length })
+          onEvent?.({
+            phase: 'calendar-response',
+            calendarUrl: calendar.toString(),
+            success: true,
+            responsesReceived,
+            totalCalendars: this.calendars.length,
+          })
           return result
         } catch (error) {
           responsesReceived++
-          onEvent?.({ phase: 'calendar-response', calendarUrl: calendar.toString(), success: false, responsesReceived, totalCalendars: this.calendars.length })
+          onEvent?.({
+            phase: 'calendar-response',
+            calendarUrl: calendar.toString(),
+            success: false,
+            responsesReceived,
+            totalCalendars: this.calendars.length,
+          })
           throw error
         }
       }),
@@ -387,7 +399,10 @@ export default class SDK {
    * @param keepPending Whether to keep the original pending attestation alongside the upgraded one. Default is false (purge pending on success).
    * @returns The result of the upgrade operation, including the original and upgraded timestamps if applicable.
    */
-  async upgrade(detached: DetachedTimestamp, keepPending: boolean = false): Promise<UpgradeResult[]> {
+  async upgrade(
+    detached: DetachedTimestamp,
+    keepPending: boolean = false,
+  ): Promise<UpgradeResult[]> {
     return this.upgradeTimestamp(
       getBytes(detached.header.digest),
       detached.timestamp,
@@ -430,7 +445,9 @@ export default class SDK {
           // upgrade sub stamps
           const results = (
             await Promise.all(
-              step.steps.map((branch) => this.upgradeTimestamp(input, branch, keepPending)),
+              step.steps.map((branch) =>
+                this.upgradeTimestamp(input, branch, keepPending),
+              ),
             )
           ).flat()
           result.push(...results)
@@ -660,7 +677,9 @@ export default class SDK {
     attestation: EthereumUTSAttestation,
   ): Promise<AttestationStatus> {
     // Try web3Provider first (works in browser without CORS issues)
-    let provider: AbstractProvider | null = await this.getWeb3ProviderForChain(attestation.chain)
+    let provider: AbstractProvider | null = await this.getWeb3ProviderForChain(
+      attestation.chain,
+    )
 
     // Fallback to ethRPCs
     if (!provider) {
