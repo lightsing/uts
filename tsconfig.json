@@ -50,5 +50,5 @@
     // Completeness
     "skipLibCheck": true // skip all type checks for .d.ts files
   },
-  "references": [{ "path": "./packages/sdk" }, { "path": "./apps/web" }]
+  "references": [{ "path": "./packages/sdk" }, { "path": "./packages/sdk/test/" }, { "path": "./apps/web" }]
 }

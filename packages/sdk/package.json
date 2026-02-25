@@ -14,7 +14,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/.tsbuildinfo",
+    "!dist/test",
+    "src/**/*.ts"
   ],
   "scripts": {
     "test": "vitest",
