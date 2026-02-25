@@ -1,6 +1,6 @@
 import { hexlify as h } from 'ethers'
 
-export type * from './types'
+export type * from './types.ts'
 
 export type {
   Attestation,
@@ -8,18 +8,18 @@ export type {
   BitcoinAttestation,
   EthereumUTSAttestation,
   EthereumUTSAttestationExtraMetadata,
-} from './types'
+} from './types.ts'
 
-export { default as Encoder } from './codec/encode'
-export { default as Decoder } from './codec/decode'
+export { default as Encoder } from './codec/encode.ts'
+export { default as Decoder } from './codec/decode.ts'
 
-export * from './errors'
+export * from './errors.ts'
 
-export * from './codec/constants'
+export * from './codec/constants.ts'
 
-export * from './bmt'
+export * from './bmt.ts'
 
-export { default as BitcoinRPC } from './rpc/btc'
+export { default as BitcoinRPC } from './rpc/btc.ts'
 
 export const hexlify = (obj: any): any => {
   if (obj instanceof URL) {

@@ -1,4 +1,4 @@
-import { type DigestOp, type Op } from '../types'
+import { type DigestOp, type Op } from '../types.ts'
 
 export const OP_CODE_MAP: Record<Op, number> = {
   SHA1: 0x02,

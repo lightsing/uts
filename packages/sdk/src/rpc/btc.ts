@@ -1,4 +1,4 @@
-import { RemoteError } from '../errors'
+import { RemoteError } from '../errors.ts'
 
 export interface BitcoinRPCResponse {
   jsonrpc: string

@@ -3,6 +3,7 @@
 import tseslint from 'typescript-eslint'
 import UnicornPlugin from 'eslint-plugin-unicorn'
 import UnusedImportsPlugin from 'eslint-plugin-unused-imports'
+import ImportXPlugin from 'eslint-plugin-import-x'
 import { defineConfig } from 'eslint/config'
 
 // Prefer rules from @typescript-eslint > unicorn > other plugins
@@ -335,6 +336,15 @@ const moduleSystemRules = {
     },
   ],
   'no-useless-rename': 'error',
+
+  // import-x: Prevent issues with misspelling of file paths and import names
+  'import-x/no-unresolved': 'error',
+  'import-x/named': 'error',
+  'import-x/export': 'error',
+  'import-x/no-duplicates': 'warn',
+  'import-x/no-self-import': 'error',
+  'import-x/no-useless-path-segments': 'warn',
+  'import-x/extensions': ['error', 'always', { ignorePackages: true }],
 }
 
 /** @type {any} */
@@ -342,11 +352,20 @@ const plugins = {
   unicorn: UnicornPlugin,
   '@typescript-eslint': tseslint.plugin,
   'unused-imports': UnusedImportsPlugin,
+  'import-x': ImportXPlugin,
   // @ts-ignore
 }
 export default defineConfig(
   {
-    files: ['packages/**/*.ts', 'packages/**/*.tsx'],
+    ignores: ['**/dist/**', '**/.rollup.cache/**', '**/node_modules/**'],
+  },
+  {
+    files: [
+      'packages/**/*.ts',
+      'packages/**/*.tsx',
+      'apps/**/*.ts',
+      'apps/**/*.tsx',
+    ],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
@@ -359,6 +378,14 @@ export default defineConfig(
       },
     },
     plugins,
+    settings: {
+      'import-x/resolver': {
+        typescript: {
+          alwaysTryTypes: true,
+          project: ['./packages/*/tsconfig.json', './apps/*/tsconfig.json'],
+        },
+      },
+    },
     linterOptions: {
       reportUnusedDisableDirectives: true,
     },
@@ -369,7 +396,12 @@ export default defineConfig(
     }),
   },
   {
-    files: ['packages/**/tests/**/*.ts'],
+    files: [
+      'packages/**/tests/**/*.ts',
+      'packages/**/test/**/*.ts',
+      'apps/**/tests/**/*.ts',
+      'apps/**/test/**/*.ts',
+    ],
     rules: {
       'unicorn/consistent-function-scoping': 'off',
     },

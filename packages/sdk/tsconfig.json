@@ -4,6 +4,7 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "emitDeclarationOnly": true,
     "types": []
   },
   "include": ["src/**/*.ts"],

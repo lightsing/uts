@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import Encoder from '../src/codec/encode'
-import Decoder from '../src/codec/decode'
-import type { DetachedTimestamp } from '../src/types'
+import Encoder from '../src/codec/encode.ts'
+import Decoder from '../src/codec/decode.ts'
+import type { DetachedTimestamp } from '../src/types.ts'
 
 const __filename = import.meta.filename
 const __dirname = import.meta.dirname

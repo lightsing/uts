@@ -22,15 +22,15 @@ import {
   type SecureDigestOp,
   type Timestamp,
   type UpgradeResult,
-} from './types'
+} from './types.ts'
 import type { CHash } from '@noble/hashes/utils.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import { INNER_NODE_PREFIX, NodePosition, UnorderedMerkleTree } from './bmt'
-import Decoder from './codec/decode'
-import { EncodeError, ErrorCode, RemoteError, VerifyError } from './errors'
+import { INNER_NODE_PREFIX, NodePosition, UnorderedMerkleTree } from './bmt.ts'
+import Decoder from './codec/decode.ts'
+import { EncodeError, ErrorCode, RemoteError, VerifyError } from './errors.ts'
 import { ripemd160, sha1 } from '@noble/hashes/legacy.js'
-import BitcoinRPC from './rpc/btc'
+import BitcoinRPC from './rpc/btc.ts'
 import { FallbackProvider } from 'ethers'
 
 export interface SDKOptions {

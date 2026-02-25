@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { UtsSDK } from 'uts-sdk'
+import { Encoder } from '@uts/sdk'
 
 defineProps<{ msg: string }>()
 
 const count = ref(0)
 
-const sdk = new UtsSDK()
-await sdk.ensureInit()
-
-sdk.mergeTimestamps([[]])
+const encoder = new Encoder()
+console.log('SDK Encoder initialized:', encoder)
 </script>
 
 <template>

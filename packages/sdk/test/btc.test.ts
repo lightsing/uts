@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import BitcoinRPC from '../src/rpc/btc'
+import BitcoinRPC from '../src/rpc/btc.ts'
 
 describe('btc', () => {
   it('get block', async () => {
