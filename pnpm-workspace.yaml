@@ -1,8 +1,8 @@
 packages:
   - apps/*
   - packages/*
-  - crates/core-wasm/pkg
 
 onlyBuiltDependencies:
   - esbuild
+  - unrs-resolver
   - wasm-pack

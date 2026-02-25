@@ -1,18 +1,56 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    // Classification follows https://www.typescriptlang.org/tsconfig
+
+    // Type Checking
     "strict": true,
+    // exactOptionalPropertyTypes: false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    // noPropertyAccessFromIndexSignature: false,
+    // noUncheckedIndexedAccess: false,
+    "noUncheckedSideEffectImports": true,
+    // noUnusedLocals: false,
+    // noUnusedParameters: false,
+    "useUnknownInCatchVariables": true,
+
+    // Modules
+    "module": "preserve",
+    "moduleResolution": "bundler",
+
+    // Emit
     "declaration": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "resolveJsonModule": true,
-    "composite": true
+    "declarationMap": true,
+    "sourceMap": true,
+    "stripInternal": true, // skip type emit for @internal types
+
+    // JavaScript Support
+    "allowJs": false,
+    "checkJs": false,
+
+    // Interop Constraints
+    "forceConsistentCasingInFileNames": true,
+
+    // Language and Environment
+    "jsx": "react-jsx",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "ES2023",
+    "useDefineForClassFields": true,
+
+    // Projects
+    "composite": true,
+    "incremental": true,
+
+    // Completeness
+    "skipLibCheck": true // skip all type checks for .d.ts files
   },
   "references": [
-    { "path": "./packages/uts-sdk" },
+    { "path": "./packages/bmt" },
+    { "path": "./packages/sdk" },
     { "path": "./apps/web" }
   ]
 }

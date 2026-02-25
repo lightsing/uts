@@ -12,7 +12,7 @@ use bytes::BytesMut;
 use digest::Digest;
 use sha3::Keccak256;
 use std::{cell::RefCell, sync::Arc};
-use uts_bmt::UnorderdMerkleTree;
+use uts_bmt::UnorderedMerkleTree;
 use uts_core::{
     codec::{
         Encode,
@@ -154,7 +154,7 @@ pub async fn get_timestamp(
         .load_entry(root)
         .expect("DB error")
         .expect("bug: entry not found");
-    let trie: UnorderdMerkleTree<Keccak256> = entry.trie();
+    let trie: UnorderedMerkleTree<Keccak256> = entry.trie();
 
     let proof = trie
         .get_proof_iter(bytemuck::cast_ref(&*commitment))

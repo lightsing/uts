@@ -6,10 +6,10 @@ defineProps<{ msg: string }>()
 
 const count = ref(0)
 
-const sdk = new UtsSDK();
-await sdk.ensureInit();
+const sdk = new UtsSDK()
+await sdk.ensureInit()
 
-sdk.mergeTimestamps([[]]);
+sdk.mergeTimestamps([[]])
 </script>
 
 <template>
