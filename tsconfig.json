@@ -21,6 +21,8 @@
     // Modules
     "module": "preserve",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
 
     // Emit
     "declaration": true,

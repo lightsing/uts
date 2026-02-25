@@ -7,7 +7,7 @@ import {
   MAX_URI_LEN,
   SAFE_URL_REGEX,
   DIGEST_LENGTHS,
-} from './constants'
+} from './constants.ts'
 import type {
   DetachedTimestamp,
   Step,
@@ -20,9 +20,9 @@ import type {
   PendingAttestation,
   BitcoinAttestation,
   EthereumUTSAttestation,
-} from '../types'
+} from '../types.ts'
 import { getBytes, hexlify } from 'ethers/utils'
-import { EncodeError, ErrorCode } from '../errors'
+import { EncodeError, ErrorCode } from '../errors.ts'
 
 export default class Encoder {
   private buffer: Uint8Array

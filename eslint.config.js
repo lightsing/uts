@@ -3,6 +3,7 @@
 import tseslint from 'typescript-eslint'
 import UnicornPlugin from 'eslint-plugin-unicorn'
 import UnusedImportsPlugin from 'eslint-plugin-unused-imports'
+import ImportXPlugin from 'eslint-plugin-import-x'
 import { defineConfig } from 'eslint/config'
 
 // Prefer rules from @typescript-eslint > unicorn > other plugins
@@ -335,6 +336,15 @@ const moduleSystemRules = {
     },
   ],
   'no-useless-rename': 'error',
+
+  // import-x: Prevent issues with misspelling of file paths and import names
+  'import-x/no-unresolved': 'error',
+  'import-x/named': 'error',
+  'import-x/export': 'error',
+  'import-x/no-duplicates': 'warn',
+  'import-x/no-self-import': 'error',
+  'import-x/no-useless-path-segments': 'warn',
+  'import-x/extensions': ['error', 'always', { ignorePackages: true }],
 }
 
 /** @type {any} */
@@ -342,6 +352,7 @@ const plugins = {
   unicorn: UnicornPlugin,
   '@typescript-eslint': tseslint.plugin,
   'unused-imports': UnusedImportsPlugin,
+  'import-x': ImportXPlugin,
   // @ts-ignore
 }
 export default defineConfig(
@@ -367,6 +378,14 @@ export default defineConfig(
       },
     },
     plugins,
+    settings: {
+      'import-x/resolver': {
+        typescript: {
+          alwaysTryTypes: true,
+          project: ['./packages/*/tsconfig.json', './apps/*/tsconfig.json'],
+        },
+      },
+    },
     linterOptions: {
       reportUnusedDisableDirectives: true,
     },

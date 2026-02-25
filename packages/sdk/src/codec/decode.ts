@@ -1,5 +1,5 @@
 import { hexlify } from 'ethers/utils'
-import { DecodeError, ErrorCode } from '../errors'
+import { DecodeError, ErrorCode } from '../errors.ts'
 import {
   DIGEST_OPS,
   type AttestationStep,
@@ -14,7 +14,7 @@ import {
   type PendingAttestation,
   type Step,
   type Timestamp,
-} from '../types'
+} from '../types.ts'
 import {
   ATTESTATION_TAG_LENGTH,
   BITCOIN_ATTESTATION_TAG,
@@ -25,7 +25,7 @@ import {
   MAX_URI_LEN,
   PENDING_ATTESTATION_TAG,
   SAFE_URL_REGEX,
-} from './constants'
+} from './constants.ts'
 
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER)
 export default class Decoder {
