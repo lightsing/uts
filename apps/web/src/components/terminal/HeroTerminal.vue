@@ -8,7 +8,10 @@ import {
   useFileDigest,
   type FileDigestResult,
 } from '@/composables/useFileDigest'
+import { useLingui } from '@/composables/useLingui'
 import type { SecureDigestOp } from '@uts/sdk'
+
+const { t } = useLingui()
 
 const emit = defineEmits<{
   submit: [digests: FileDigestResult[]]
@@ -40,6 +43,9 @@ const selectedFiles = ref<File[]>([])
 const isStamping = ref(false)
 
 const hasFiles = computed(() => selectedFiles.value.length > 0)
+const filesSelectedLabel = computed(() =>
+  t('{count, plural, one {# file} other {# files}} selected', { count: selectedFiles.value.length }),
+)
 const hasResult = computed(() => digestResult.value !== null)
 const canSubmit = computed(
   () => (hasFiles.value || manualHash.value.trim()) && !isStamping.value,
@@ -172,10 +178,7 @@ function totalSize(): number {
         <div class="flex items-center justify-center gap-2">
           <FileText class="h-5 w-5 text-neon-cyan" />
           <span class="font-heading text-sm font-semibold text-neon-cyan">
-            {{ selectedFiles.length }} file{{
-              selectedFiles.length > 1 ? 's' : ''
-            }}
-            selected
+            {{ filesSelectedLabel }}
           </span>
           <button
             class="ml-2 rounded p-1 text-white/30 transition hover:bg-white/10 hover:text-white"
@@ -197,7 +200,7 @@ function totalSize(): number {
             v-if="selectedFiles.length > 5"
             class="font-mono text-xs text-white/30"
           >
-            ... and {{ selectedFiles.length - 5 }} more
+            {{ t('... and {count} more', { count: selectedFiles.length - 5 }) }}
           </div>
         </div>
         <div class="font-mono text-[10px] text-white/30">
@@ -211,18 +214,18 @@ function totalSize(): number {
         <Upload class="mx-auto h-10 w-10 text-white/20" />
         <div class="space-y-1">
           <p class="font-heading text-sm font-medium text-white/60">
-            Drop files here
+            {{ t('Drop files here') }}
           </p>
-          <p class="font-mono text-xs text-white/30">or</p>
+          <p class="font-mono text-xs text-white/30">{{ t('or') }}</p>
         </div>
         <div class="flex items-center justify-center gap-2">
           <BaseButton variant="secondary" @click="openFilePicker">
             <FileText class="h-4 w-4" />
-            Choose File
+            {{ t('Choose File') }}
           </BaseButton>
           <BaseButton variant="secondary" @click="openDirPicker">
             <FolderOpen class="h-4 w-4" />
-            Choose Directory
+            {{ t('Choose Directory') }}
           </BaseButton>
         </div>
       </div>
@@ -256,7 +259,7 @@ function totalSize(): number {
     <div class="mt-4 space-y-2">
       <div class="flex items-center gap-2 font-mono text-xs text-white/40">
         <span class="text-neon-cyan">&gt;</span>
-        <span>Or paste a hash directly:</span>
+        <span>{{ t('Or paste a hash directly:') }}</span>
       </div>
       <div class="flex gap-2">
         <input
@@ -273,7 +276,7 @@ function totalSize(): number {
           @click="handleSubmit"
         >
           <Hash class="h-4 w-4" />
-          Stamp
+          {{ t('Stamp') }}
         </BaseButton>
       </div>
     </div>

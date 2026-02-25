@@ -10,7 +10,10 @@ import {
   AlertTriangle,
 } from 'lucide-vue-next'
 import { WELL_KNOWN_CHAINS } from '@uts/sdk'
+import { useLingui } from '@/composables/useLingui'
 import ScrollLogo from '@/assets/Scroll_Logomark.svg'
+
+const { t } = useLingui()
 
 const SCROLL_CHAIN_IDS = new Set([534352, 534351])
 
@@ -80,8 +83,8 @@ function isTestnetOrUnknown(chainId: number): boolean {
 function getNetworkWarning(chainId: number): string | null {
   if (MAINNET_CHAIN_IDS.has(chainId)) return null
   if (ETHERSCAN_URLS[chainId])
-    return 'Testnet attestation — not suitable for production use'
-  return 'Unknown network — cannot verify on-chain'
+    return t('Testnet attestation — not suitable for production use')
+  return t('Unknown network — cannot verify on-chain')
 }
 
 function formatOp(step: Step): string {
@@ -101,7 +104,7 @@ function formatOp(step: Step): string {
     case 'ATTESTATION':
       return formatAttestation(step.attestation)
     case 'FORK':
-      return `FORK (${step.steps.length} branches)`
+      return t('FORK ({count} branches)', { count: step.steps.length })
     default:
       return 'UNKNOWN'
   }
@@ -110,13 +113,13 @@ function formatOp(step: Step): string {
 function formatAttestation(a: Attestation): string {
   switch (a.kind) {
     case 'bitcoin':
-      return `Bitcoin @ block ${a.height}`
+      return t('Bitcoin @ block {height}', { height: a.height })
     case 'ethereum-uts':
-      return `${getChainName(a.chain)} @ block ${a.height}`
+      return t('{chain} @ block {height}', { chain: getChainName(a.chain), height: a.height })
     case 'pending':
-      return `Pending → ${a.url}`
+      return t('Pending → {url}', { url: a.url })
     default:
-      return 'Unknown attestation'
+      return t('Unknown attestation')
   }
 }
 
@@ -185,11 +188,11 @@ const currentDepth = props.depth ?? 0
             <template v-if="step.attestation.kind === 'bitcoin'">
               <div class="space-y-1 font-mono text-[10px]">
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Type</span>
-                  <span class="text-pending">Bitcoin</span>
+                  <span class="text-white/30">{{ t('Type') }}</span>
+                  <span class="text-pending">{{ t('Bitcoin') }}</span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Block Height</span>
+                  <span class="text-white/30">{{ t('Block Height') }}</span>
                   <span class="text-white/70">{{
                     step.attestation.height
                   }}</span>
@@ -201,7 +204,7 @@ const currentDepth = props.depth ?? 0
             <template v-else-if="step.attestation.kind === 'ethereum-uts'">
               <div class="space-y-1 font-mono text-[10px]">
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Type</span>
+                  <span class="text-white/30">{{ t('Type') }}</span>
                   <span class="flex items-center gap-1 text-neon-purple">
                     <img
                       v-if="SCROLL_CHAIN_IDS.has(step.attestation.chain)"
@@ -209,11 +212,11 @@ const currentDepth = props.depth ?? 0
                       alt="Scroll"
                       class="h-3 w-3"
                     />
-                    Ethereum UTS
+                    {{ t('Ethereum UTS') }}
                   </span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Chain</span>
+                  <span class="text-white/30">{{ t('Chain') }}</span>
                   <span class="text-white/70"
                     >{{ getChainName(step.attestation.chain) }} ({{
                       step.attestation.chain
@@ -221,7 +224,7 @@ const currentDepth = props.depth ?? 0
                   >
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Block Height</span>
+                  <span class="text-white/30">{{ t('Block Height') }}</span>
                   <span class="flex items-center gap-1">
                     <span class="text-white/70">{{
                       step.attestation.height
@@ -252,7 +255,7 @@ const currentDepth = props.depth ?? 0
                     v-if="step.attestation.metadata.contract"
                     class="flex items-center justify-between"
                   >
-                    <span class="text-white/30">Contract</span>
+                    <span class="text-white/30">{{ t('Contract') }}</span>
                     <span class="flex items-center gap-1">
                       <span class="text-white/50">{{
                         truncateHex(
@@ -290,7 +293,7 @@ const currentDepth = props.depth ?? 0
                     v-if="step.attestation.metadata.txHash"
                     class="flex items-center justify-between"
                   >
-                    <span class="text-white/30">Tx Hash</span>
+                    <span class="text-white/30">{{ t('Tx Hash') }}</span>
                     <span class="flex items-center gap-1">
                       <span class="text-white/50">{{
                         truncateHex(
@@ -340,11 +343,11 @@ const currentDepth = props.depth ?? 0
             <template v-else-if="step.attestation.kind === 'pending'">
               <div class="space-y-1 font-mono text-[10px]">
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Type</span>
-                  <span class="text-pending">Pending</span>
+                  <span class="text-white/30">{{ t('Type') }}</span>
+                  <span class="text-pending">{{ t('Pending') }}</span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Calendar</span>
+                  <span class="text-white/30">{{ t('Calendar') }}</span>
                   <span class="text-white/50">{{ step.attestation.url }}</span>
                 </div>
               </div>
@@ -368,7 +371,7 @@ const currentDepth = props.depth ?? 0
           class="flex items-center gap-2 px-2 py-1 font-mono text-xs text-neon-orange"
         >
           <GitBranch class="h-3 w-3" />
-          <span>FORK ({{ step.steps.length }} branches)</span>
+          <span>{{ t('FORK ({count} branches)', { count: step.steps.length }) }}</span>
         </div>
         <div
           v-for="(branch, bi) in step.steps"
@@ -376,7 +379,7 @@ const currentDepth = props.depth ?? 0
           class="ml-2 mt-1 border-l border-glass-border pl-2"
         >
           <div class="mb-1 font-mono text-[10px] text-white/20">
-            branch[{{ bi }}]
+            {{ t('branch[{index}]', { index: bi }) }}
           </div>
           <MerkleTreeViz :steps="branch" :depth="currentDepth + 1" />
         </div>

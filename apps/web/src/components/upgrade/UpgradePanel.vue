@@ -12,9 +12,12 @@ import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import AttestationDetail from '@/components/verify/AttestationDetail.vue'
 import { useTimestampSDK, downloadOtsFile } from '@/composables/useTimestampSDK'
+import { useLingui } from '@/composables/useLingui'
 import { UpgradeStatus } from '@uts/sdk'
 import type { DetachedTimestamp, UpgradeResult } from '@uts/sdk'
 import { useAppStore } from '@/stores/app'
+
+const { t } = useLingui()
 
 const store = useAppStore()
 const { upgrade, decodeOtsFile, verify, verifyAttestations } = useTimestampSDK()
@@ -88,19 +91,18 @@ function handleReset() {
     <div class="mb-4 flex items-center gap-2">
       <RefreshCw class="h-4 w-4 text-neon-purple" />
       <h3 class="font-heading text-sm font-semibold text-white/80">
-        Manual Upgrade
+        {{ t('Manual Upgrade') }}
       </h3>
     </div>
 
     <!-- Upload .ots file -->
     <div v-if="!loadedTimestamp" class="space-y-4">
       <p class="font-mono text-xs text-white/40">
-        &gt; Upload a pending <span class="text-neon-purple">.ots</span> file to
-        upgrade it with on-chain attestations
+        &gt; {{ t('Upload a pending .ots file to upgrade it with on-chain attestations') }}
       </p>
       <BaseButton variant="secondary" @click="otsFileRef?.click()">
         <FileUp class="h-4 w-4" />
-        Upload .ots
+        {{ t('Upload .ots') }}
       </BaseButton>
       <input
         ref="otsFileRef"
@@ -118,7 +120,7 @@ function handleReset() {
         <div
           class="font-mono text-[10px] uppercase tracking-widest text-white/30"
         >
-          Digest ({{ loadedTimestamp.header.kind }})
+          {{ t('Digest ({algo})', { algo: loadedTimestamp.header.kind }) }}
         </div>
         <div class="break-all font-mono text-xs text-neon-cyan">
           {{ hexlify(loadedTimestamp.header.digest as Uint8Array) }}
@@ -130,7 +132,7 @@ function handleReset() {
         <div
           class="font-mono text-[10px] uppercase tracking-widest text-white/30"
         >
-          Current Attestations ({{ verifyAttestations.length }})
+          {{ t('Current Attestations ({count})', { count: verifyAttestations.length }) }}
         </div>
         <AttestationDetail
           v-for="(att, i) in verifyAttestations"
@@ -144,7 +146,7 @@ function handleReset() {
         <div
           class="font-mono text-[10px] uppercase tracking-widest text-white/30"
         >
-          Upgrade Results
+          {{ t('Upgrade Results') }}
         </div>
         <div
           v-for="(result, i) in upgradeResults"
@@ -174,7 +176,7 @@ function handleReset() {
           @click="handleUpgrade"
         >
           <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isUpgrading }" />
-          {{ isUpgrading ? 'Upgrading...' : 'Upgrade Now' }}
+          {{ isUpgrading ? t('Upgrading...') : t('Upgrade Now') }}
         </BaseButton>
 
         <BaseButton
@@ -183,11 +185,11 @@ function handleReset() {
           @click="handleDownload"
         >
           <Download class="h-4 w-4" />
-          Download Upgraded .ots
+          {{ t('Download Upgraded .ots') }}
         </BaseButton>
 
         <BaseButton variant="secondary" @click="handleReset">
-          Reset
+          {{ t('Reset') }}
         </BaseButton>
       </div>
 

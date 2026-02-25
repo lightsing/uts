@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { useLingui } from '@/composables/useLingui'
+
 defineProps<{
   status: 'valid' | 'invalid' | 'pending' | 'partial' | 'unknown'
   size?: 'sm' | 'md' | 'lg'
 }>()
 
-const labels: Record<string, string> = {
+const { t } = useLingui()
+
+const labelKeys: Record<string, string> = {
   valid: 'VERIFIED ON CHAIN',
   invalid: 'INVALID',
   pending: 'PENDING',
@@ -44,6 +48,6 @@ const labels: Record<string, string> = {
         'bg-white/30': status === 'unknown',
       }"
     />
-    {{ labels[status] }}
+    {{ t(labelKeys[status]) }}
   </span>
 </template>

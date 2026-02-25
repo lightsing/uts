@@ -1,0 +1,358 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2025-01-01 00:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+
+#. App title
+msgid "UTS"
+msgstr ""
+
+msgid "Universal Timestamps"
+msgstr ""
+
+#. Header
+msgid "{online}/{total} chains"
+msgstr ""
+
+msgid "Ethereum Chains"
+msgstr ""
+
+msgid "Refresh"
+msgstr ""
+
+msgid "Chain ID: {chainId}"
+msgstr ""
+
+msgid "Edit RPC endpoint"
+msgstr ""
+
+msgid "Remove chain"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Add chain by ID"
+msgstr ""
+
+msgid "Add"
+msgstr ""
+
+msgid "Reset defaults"
+msgstr ""
+
+msgid "Connecting..."
+msgstr ""
+
+msgid "No Wallet"
+msgstr ""
+
+msgid "Connect Wallet"
+msgstr ""
+
+msgid "Calendar settings"
+msgstr ""
+
+#. Settings panel
+msgid "Calendar Nodes"
+msgstr ""
+
+msgid "Reset to defaults"
+msgstr ""
+
+msgid "Keep pending attestations after upgrade"
+msgstr ""
+
+msgid "When enabled, the original pending attestation is preserved alongside the upgraded one"
+msgstr ""
+
+msgid "Internal hash algorithm"
+msgstr ""
+
+msgid "Used for Merkle tree construction"
+msgstr ""
+
+#. Main content
+msgid "Decentralized"
+msgstr ""
+
+msgid "Timestamping"
+msgstr ""
+
+msgid "Cryptographic proof of existence anchored to Ethereum"
+msgstr ""
+
+msgid "Stamp"
+msgstr ""
+
+msgid "Verify"
+msgstr ""
+
+msgid "Upgrade"
+msgstr ""
+
+msgid "UTS Protocol — Powered by Universal Timestamps"
+msgstr ""
+
+#. HeroTerminal
+msgid "Drop files here"
+msgstr ""
+
+msgid "or"
+msgstr ""
+
+msgid "Choose File"
+msgstr ""
+
+msgid "Choose Directory"
+msgstr ""
+
+msgid "{count, plural, one {# file} other {# files}} selected"
+msgstr ""
+
+msgid "... and {count} more"
+msgstr ""
+
+msgid "Or paste a hash directly:"
+msgstr ""
+
+#. StampingWorkflow
+msgid "Stamping Pipeline"
+msgstr ""
+
+msgid "Generating Nonce"
+msgstr ""
+
+msgid "Creating random nonce for privacy"
+msgstr ""
+
+msgid "Building Merkle Tree"
+msgstr ""
+
+msgid "Constructing proof tree from leaves"
+msgstr ""
+
+msgid "Broadcasting"
+msgstr ""
+
+msgid "Submitting to calendar nodes"
+msgstr ""
+
+msgid "Building Proof"
+msgstr ""
+
+msgid "Constructing Merkle proof paths"
+msgstr ""
+
+msgid "Complete"
+msgstr ""
+
+msgid "Timestamp recorded (pending attestation)"
+msgstr ""
+
+msgid "Polling for Upgrade"
+msgstr ""
+
+msgid "Waiting for on-chain attestation..."
+msgstr ""
+
+msgid "Upgraded"
+msgstr ""
+
+msgid "Attestation confirmed on-chain"
+msgstr ""
+
+msgid "Calendar responses: {progress}"
+msgstr ""
+
+msgid "Download pending .ots"
+msgstr ""
+
+#. VerificationResult
+msgid "Verification Dashboard"
+msgstr ""
+
+msgid "Upload a .ots file to verify a timestamp proof"
+msgstr ""
+
+msgid "Upload .ots"
+msgstr ""
+
+msgid "Verifying proof chain..."
+msgstr ""
+
+msgid "Original Digest ({algo})"
+msgstr ""
+
+msgid "Verify Original File (Optional)"
+msgstr ""
+
+msgid "Upload the original file to verify it matches the .ots header digest"
+msgstr ""
+
+msgid "Digesting..."
+msgstr ""
+
+msgid "Upload Original"
+msgstr ""
+
+msgid "File digest matches — this is the original file"
+msgstr ""
+
+msgid "File digest does NOT match the .ots header"
+msgstr ""
+
+msgid "Attestations ({count})"
+msgstr ""
+
+msgid "Show Proof Path"
+msgstr ""
+
+msgid "Hide Proof Path"
+msgstr ""
+
+msgid "Reset"
+msgstr ""
+
+#. UpgradePanel
+msgid "Manual Upgrade"
+msgstr ""
+
+msgid "Upload a pending .ots file to upgrade it with on-chain attestations"
+msgstr ""
+
+msgid "Digest ({algo})"
+msgstr ""
+
+msgid "Current Attestations ({count})"
+msgstr ""
+
+msgid "Upgrade Results"
+msgstr ""
+
+msgid "Upgrading..."
+msgstr ""
+
+msgid "Upgrade Now"
+msgstr ""
+
+msgid "Download Upgraded .ots"
+msgstr ""
+
+#. LiveFeed
+msgid "Live Feed"
+msgstr ""
+
+msgid "POLLING"
+msgstr ""
+
+msgid "DISCONNECTED"
+msgstr ""
+
+msgid "Root"
+msgstr ""
+
+msgid "Chain"
+msgstr ""
+
+msgid "Block"
+msgstr ""
+
+msgid "Sender"
+msgstr ""
+
+msgid "Tx Hash"
+msgstr ""
+
+msgid "Testnet attestation — not suitable for production use"
+msgstr ""
+
+msgid "Unknown network — cannot verify on-chain"
+msgstr ""
+
+msgid "Polling for Attested events..."
+msgstr ""
+
+msgid "Waiting for connection..."
+msgstr ""
+
+msgid "Testnet"
+msgstr ""
+
+msgid "Unknown network"
+msgstr ""
+
+msgid "Testnet attestation"
+msgstr ""
+
+#. StatusBadge
+msgid "VERIFIED ON CHAIN"
+msgstr ""
+
+msgid "INVALID"
+msgstr ""
+
+msgid "PENDING"
+msgstr ""
+
+msgid "PARTIALLY VERIFIED"
+msgstr ""
+
+msgid "UNKNOWN"
+msgstr ""
+
+#. AttestationDetail
+msgid "Type"
+msgstr ""
+
+msgid "Bitcoin"
+msgstr ""
+
+msgid "Ethereum UTS"
+msgstr ""
+
+msgid "Pending"
+msgstr ""
+
+msgid "Block Height"
+msgstr ""
+
+msgid "Merkle Root"
+msgstr ""
+
+msgid "Timestamp"
+msgstr ""
+
+msgid "Contract"
+msgstr ""
+
+msgid "Calendar"
+msgstr ""
+
+msgid "Unknown attestation"
+msgstr ""
+
+msgid "Bitcoin block #{height}"
+msgstr ""
+
+msgid "{chain} block #{height}"
+msgstr ""
+
+msgid "Pending → {url}"
+msgstr ""
+
+#. MerkleTreeViz
+msgid "FORK ({count} branches)"
+msgstr ""
+
+msgid "Bitcoin @ block {height}"
+msgstr ""
+
+msgid "{chain} @ block {height}"
+msgstr ""
+
+msgid "branch[{index}]"
+msgstr ""

@@ -14,6 +14,9 @@ import {
 import type { StampPhase } from '@/composables/useTimestampSDK'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import { useLingui } from '@/composables/useLingui'
+
+const { t } = useLingui()
 
 const props = defineProps<{
   phase: StampPhase
@@ -27,52 +30,52 @@ const emit = defineEmits<{
 
 interface WorkflowStep {
   id: StampPhase
-  label: string
-  description: string
+  labelKey: string
+  descriptionKey: string
   icon: typeof KeyRound
 }
 
 const steps: WorkflowStep[] = [
   {
     id: 'generating-nonce',
-    label: 'Generating Nonce',
-    description: 'Creating random nonce for privacy',
+    labelKey: 'Generating Nonce',
+    descriptionKey: 'Creating random nonce for privacy',
     icon: KeyRound,
   },
   {
     id: 'building-merkle-tree',
-    label: 'Building Merkle Tree',
-    description: 'Constructing proof tree from leaves',
+    labelKey: 'Building Merkle Tree',
+    descriptionKey: 'Constructing proof tree from leaves',
     icon: GitBranch,
   },
   {
     id: 'broadcasting',
-    label: 'Broadcasting',
-    description: 'Submitting to calendar nodes',
+    labelKey: 'Broadcasting',
+    descriptionKey: 'Submitting to calendar nodes',
     icon: Radio,
   },
   {
     id: 'building-proof',
-    label: 'Building Proof',
-    description: 'Constructing Merkle proof paths',
+    labelKey: 'Building Proof',
+    descriptionKey: 'Constructing Merkle proof paths',
     icon: Blocks,
   },
   {
     id: 'complete',
-    label: 'Complete',
-    description: 'Timestamp recorded (pending attestation)',
+    labelKey: 'Complete',
+    descriptionKey: 'Timestamp recorded (pending attestation)',
     icon: CheckCircle2,
   },
   {
     id: 'upgrading',
-    label: 'Polling for Upgrade',
-    description: 'Waiting for on-chain attestation...',
+    labelKey: 'Polling for Upgrade',
+    descriptionKey: 'Waiting for on-chain attestation...',
     icon: RefreshCw,
   },
   {
     id: 'upgraded',
-    label: 'Upgraded',
-    description: 'Attestation confirmed on-chain',
+    labelKey: 'Upgraded',
+    descriptionKey: 'Attestation confirmed on-chain',
     icon: ShieldCheck,
   },
 ]
@@ -104,9 +107,9 @@ function getStepDescription(step: WorkflowStep): string {
     props.broadcastProgress &&
     getStepStatus(step.id) === 'active'
   ) {
-    return `Calendar responses: ${props.broadcastProgress}`
+    return t('Calendar responses: {progress}', { progress: props.broadcastProgress })
   }
-  return step.description
+  return t(step.descriptionKey)
 }
 </script>
 
@@ -115,7 +118,7 @@ function getStepDescription(step: WorkflowStep): string {
     <div class="mb-4 flex items-center gap-2">
       <GitBranch class="h-4 w-4 text-neon-purple" />
       <h3 class="font-heading text-sm font-semibold text-white/80">
-        Stamping Pipeline
+        {{ t('Stamping Pipeline') }}
       </h3>
     </div>
 
@@ -187,7 +190,7 @@ function getStepDescription(step: WorkflowStep): string {
               'text-invalid': getStepStatus(step.id) === 'error',
             }"
           >
-            {{ step.label }}
+            {{ t(step.labelKey) }}
           </div>
           <div class="font-mono text-[11px] text-white/30">
             {{ getStepDescription(step) }}
@@ -203,7 +206,7 @@ function getStepDescription(step: WorkflowStep): string {
           >
             <BaseButton variant="secondary" @click="emit('download')">
               <Download class="h-3.5 w-3.5" />
-              Download pending .ots
+              {{ t('Download pending .ots') }}
             </BaseButton>
           </div>
         </div>

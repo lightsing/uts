@@ -12,7 +12,10 @@ import {
 } from 'lucide-vue-next'
 import GlassCard from '@/components/base/GlassCard.vue'
 import { useWebSocketFeed } from '@/composables/useWebSocketFeed'
+import { useLingui } from '@/composables/useLingui'
 import ScrollLogo from '@/assets/Scroll_Logomark.svg'
+
+const { t } = useLingui()
 
 const SCROLL_CHAIN_IDS = new Set([534352, 534351])
 
@@ -75,7 +78,7 @@ function getTxUrl(chainId: number, txHash: string): string | null {
       <div class="flex items-center gap-2">
         <Activity class="h-4 w-4 text-neon-cyan" />
         <h3 class="font-heading text-sm font-semibold text-white/80">
-          Live Feed
+          {{ t('Live Feed') }}
         </h3>
       </div>
       <div class="flex items-center gap-2">
@@ -84,7 +87,7 @@ function getTxUrl(chainId: number, txHash: string): string | null {
           :class="isConnected ? 'bg-valid animate-glow-pulse' : 'bg-invalid'"
         />
         <span class="font-mono text-[10px] text-white/40">
-          {{ isConnected ? 'POLLING' : 'DISCONNECTED' }}
+          {{ isConnected ? t('POLLING') : t('DISCONNECTED') }}
         </span>
       </div>
     </div>
@@ -122,8 +125,8 @@ function getTxUrl(chainId: number, txHash: string): string | null {
                   class="h-3 w-3 text-pending"
                   :title="
                     ETHERSCAN_URLS[entry.chainId]
-                      ? 'Testnet attestation'
-                      : 'Unknown network'
+                      ? t('Testnet attestation')
+                      : t('Unknown network')
                   "
                 />
               </div>
@@ -147,11 +150,11 @@ function getTxUrl(chainId: number, txHash: string): string | null {
             >
               <div class="space-y-1 font-mono text-[10px]">
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Root</span>
+                  <span class="text-white/30">{{ t('Root') }}</span>
                   <span class="text-white/50">{{ truncate(entry.hash) }}</span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Chain</span>
+                  <span class="text-white/30">{{ t('Chain') }}</span>
                   <span class="flex items-center gap-1">
                     <span class="text-white/50"
                       >{{ entry.chain }} ({{ entry.chainId }})</span
@@ -161,14 +164,14 @@ function getTxUrl(chainId: number, txHash: string): string | null {
                       class="h-2.5 w-2.5 text-pending"
                       :title="
                         ETHERSCAN_URLS[entry.chainId]
-                          ? 'Testnet'
-                          : 'Unknown network'
+                          ? t('Testnet')
+                          : t('Unknown network')
                       "
                     />
                   </span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-white/30">Block</span>
+                  <span class="text-white/30">{{ t('Block') }}</span>
                   <span class="flex items-center gap-1">
                     <span class="text-white/50">{{ entry.blockHeight }}</span>
                     <a
@@ -186,7 +189,7 @@ function getTxUrl(chainId: number, txHash: string): string | null {
                   v-if="entry.sender"
                   class="flex items-center justify-between"
                 >
-                  <span class="text-white/30">Sender</span>
+                  <span class="text-white/30">{{ t('Sender') }}</span>
                   <span class="flex items-center gap-1">
                     <span class="text-white/50">{{
                       truncate(entry.sender)
@@ -206,7 +209,7 @@ function getTxUrl(chainId: number, txHash: string): string | null {
                   v-if="entry.txHash"
                   class="flex items-center justify-between"
                 >
-                  <span class="text-white/30">Tx Hash</span>
+                  <span class="text-white/30">{{ t('Tx Hash') }}</span>
                   <span class="flex items-center gap-1">
                     <span class="text-white/50">{{
                       truncate(entry.txHash)
@@ -230,8 +233,8 @@ function getTxUrl(chainId: number, txHash: string): string | null {
                   <AlertTriangle class="h-3 w-3 shrink-0" />
                   <span>{{
                     ETHERSCAN_URLS[entry.chainId]
-                      ? 'Testnet attestation — not suitable for production use'
-                      : 'Unknown network — cannot verify on-chain'
+                      ? t('Testnet attestation — not suitable for production use')
+                      : t('Unknown network — cannot verify on-chain')
                   }}</span>
                 </div>
               </div>
@@ -245,13 +248,13 @@ function getTxUrl(chainId: number, txHash: string): string | null {
         class="py-8 text-center font-mono text-xs text-white/30"
       >
         <Clock class="mx-auto mb-2 h-5 w-5 text-white/20" />
-        Polling for Attested events...
+        {{ t('Polling for Attested events...') }}
       </div>
       <div
         v-else-if="entries.length === 0"
         class="py-8 text-center font-mono text-xs text-white/30"
       >
-        Waiting for connection...
+        {{ t('Waiting for connection...') }}
       </div>
     </div>
   </GlassCard>

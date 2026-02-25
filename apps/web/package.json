@@ -11,6 +11,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@lingui/core": "^5.9.2",
     "@noble/hashes": "^2.0.1",
     "@uts/sdk": "workspace:*",
     "@vueuse/core": "^14.2.1",
@@ -22,6 +23,9 @@
     "vue": "^3.5.24"
   },
   "devDependencies": {
+    "@lingui/cli": "^5.9.2",
+    "@lingui/format-po": "^5.9.2",
+    "@lingui/vite-plugin": "^5.9.2",
     "@tailwindcss/vite": "^4.2.1",
     "@types/jszip": "^3.4.1",
     "@types/node": "^24.10.1",

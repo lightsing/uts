@@ -7,10 +7,13 @@ import {
   AlertTriangle,
 } from 'lucide-vue-next'
 import StatusBadge from '@/components/base/StatusBadge.vue'
+import { useLingui } from '@/composables/useLingui'
 import type { AttestationStatus } from '@uts/sdk'
 import { WELL_KNOWN_CHAINS } from '@uts/sdk'
 import { hexlify } from 'ethers/utils'
 import ScrollLogo from '@/assets/Scroll_Logomark.svg'
+
+const { t } = useLingui()
 
 const SCROLL_CHAIN_IDS = new Set([534352, 534351])
 
@@ -30,8 +33,8 @@ function isTestnetOrUnknown(chainId: number): boolean {
 function getNetworkWarning(chainId: number): string | null {
   if (MAINNET_CHAIN_IDS.has(chainId)) return null
   if (ETHERSCAN_URLS[chainId])
-    return 'Testnet attestation — not suitable for production use'
-  return 'Unknown network — cannot verify on-chain'
+    return t('Testnet attestation — not suitable for production use')
+  return t('Unknown network — cannot verify on-chain')
 }
 
 const ETHERSCAN_URLS: Record<number, string> = {
@@ -117,7 +120,7 @@ function formatTimestamp(ts: bigint | number): string {
       <StatusBadge :status="statusLabel(attestation.status)" size="sm" />
       <span class="flex-1 font-mono text-xs text-white/60">
         <template v-if="attestation.attestation.kind === 'bitcoin'">
-          Bitcoin block #{{ attestation.attestation.height }}
+          {{ t('Bitcoin block #{height}', { height: attestation.attestation.height }) }}
         </template>
         <template v-else-if="attestation.attestation.kind === 'ethereum-uts'">
           <span class="inline-flex items-center gap-1">
@@ -127,15 +130,13 @@ function formatTimestamp(ts: bigint | number): string {
               alt="Scroll"
               class="inline h-3.5 w-3.5"
             />
-            {{ getChainName(attestation.attestation.chain) }} block #{{
-              attestation.attestation.height
-            }}
+            {{ t('{chain} block #{height}', { chain: getChainName(attestation.attestation.chain), height: attestation.attestation.height }) }}
           </span>
         </template>
         <template v-else-if="attestation.attestation.kind === 'pending'">
-          Pending → {{ attestation.attestation.url }}
+          {{ t('Pending → {url}', { url: attestation.attestation.url }) }}
         </template>
-        <template v-else>Unknown attestation</template>
+        <template v-else>{{ t('Unknown attestation') }}</template>
       </span>
       <AlertTriangle
         v-if="
@@ -158,11 +159,11 @@ function formatTimestamp(ts: bigint | number): string {
         <template v-if="attestation.attestation.kind === 'bitcoin'">
           <div class="space-y-1.5 font-mono text-[11px]">
             <div class="flex items-center justify-between">
-              <span class="text-white/30">Type</span>
-              <span class="text-pending">Bitcoin</span>
+              <span class="text-white/30">{{ t('Type') }}</span>
+              <span class="text-pending">{{ t('Bitcoin') }}</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-white/30">Block Height</span>
+              <span class="text-white/30">{{ t('Block Height') }}</span>
               <span class="text-white/70">{{
                 attestation.attestation.height
               }}</span>
@@ -174,7 +175,7 @@ function formatTimestamp(ts: bigint | number): string {
               "
             >
               <div class="flex items-center justify-between">
-                <span class="text-white/30">Merkle Root</span>
+                <span class="text-white/30">{{ t('Merkle Root') }}</span>
                 <span class="text-white/50">{{
                   truncateHex(attestation.additionalInfo.header.merkleroot)
                 }}</span>
@@ -187,7 +188,7 @@ function formatTimestamp(ts: bigint | number): string {
         <template v-else-if="attestation.attestation.kind === 'ethereum-uts'">
           <div class="space-y-1.5 font-mono text-[11px]">
             <div class="flex items-center justify-between">
-              <span class="text-white/30">Type</span>
+              <span class="text-white/30">{{ t('Type') }}</span>
               <span class="flex items-center gap-1 text-neon-purple">
                 <img
                   v-if="SCROLL_CHAIN_IDS.has(attestation.attestation.chain)"
@@ -195,11 +196,11 @@ function formatTimestamp(ts: bigint | number): string {
                   alt="Scroll"
                   class="h-3.5 w-3.5"
                 />
-                Ethereum UTS
+                {{ t('Ethereum UTS') }}
               </span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-white/30">Chain</span>
+              <span class="text-white/30">{{ t('Chain') }}</span>
               <span class="text-white/70"
                 >{{ getChainName(attestation.attestation.chain) }} ({{
                   attestation.attestation.chain
@@ -207,7 +208,7 @@ function formatTimestamp(ts: bigint | number): string {
               >
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-white/30">Block Height</span>
+              <span class="text-white/30">{{ t('Block Height') }}</span>
               <span class="flex items-center gap-1">
                 <span class="text-white/70">{{
                   attestation.attestation.height
@@ -242,7 +243,7 @@ function formatTimestamp(ts: bigint | number): string {
                 v-if="attestation.additionalInfo.sender"
                 class="flex items-center justify-between"
               >
-                <span class="text-white/30">Sender</span>
+                <span class="text-white/30">{{ t('Sender') }}</span>
                 <span class="flex items-center gap-1">
                   <span class="text-white/50">{{
                     truncateHex(attestation.additionalInfo.sender)
@@ -272,7 +273,7 @@ function formatTimestamp(ts: bigint | number): string {
                 v-if="attestation.additionalInfo.timestamp"
                 class="flex items-center justify-between"
               >
-                <span class="text-white/30">Timestamp</span>
+                <span class="text-white/30">{{ t('Timestamp') }}</span>
                 <span class="text-white/50">{{
                   formatTimestamp(attestation.additionalInfo.timestamp)
                 }}</span>
@@ -281,7 +282,7 @@ function formatTimestamp(ts: bigint | number): string {
                 v-if="attestation.additionalInfo.root"
                 class="flex items-center justify-between"
               >
-                <span class="text-white/30">Root</span>
+                <span class="text-white/30">{{ t('Root') }}</span>
                 <span class="text-white/50">{{
                   truncateHex(attestation.additionalInfo.root)
                 }}</span>
@@ -292,7 +293,7 @@ function formatTimestamp(ts: bigint | number): string {
                 v-if="attestation.attestation.metadata.contract"
                 class="flex items-center justify-between"
               >
-                <span class="text-white/30">Contract</span>
+                <span class="text-white/30">{{ t('Contract') }}</span>
                 <span class="flex items-center gap-1">
                   <span class="text-white/50">{{
                     truncateHex(
@@ -332,7 +333,7 @@ function formatTimestamp(ts: bigint | number): string {
                 v-if="attestation.attestation.metadata.txHash"
                 class="flex items-center justify-between"
               >
-                <span class="text-white/30">Tx Hash</span>
+                <span class="text-white/30">{{ t('Tx Hash') }}</span>
                 <span class="flex items-center gap-1">
                   <span class="text-white/50">{{
                     truncateHex(
@@ -384,11 +385,11 @@ function formatTimestamp(ts: bigint | number): string {
         <template v-else-if="attestation.attestation.kind === 'pending'">
           <div class="space-y-1.5 font-mono text-[11px]">
             <div class="flex items-center justify-between">
-              <span class="text-white/30">Type</span>
-              <span class="text-pending">Pending</span>
+              <span class="text-white/30">{{ t('Type') }}</span>
+              <span class="text-pending">{{ t('Pending') }}</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-white/30">Calendar</span>
+              <span class="text-white/30">{{ t('Calendar') }}</span>
               <span class="text-white/50">{{
                 attestation.attestation.url
               }}</span>

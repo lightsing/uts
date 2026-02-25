@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Pencil,
   Check,
+  Languages,
 } from 'lucide-vue-next'
 import HeroTerminal from '@/components/terminal/HeroTerminal.vue'
 import StampingWorkflow from '@/components/stamp/StampingWorkflow.vue'
@@ -26,11 +27,19 @@ import {
   getSDK,
 } from '@/composables/useTimestampSDK'
 import { useWallet } from '@/composables/useWallet'
+import { useLingui } from '@/composables/useLingui'
 import type { FileDigestResult } from '@/composables/useFileDigest'
 import { useAppStore } from '@/stores/app'
 import ScrollLogo from '@/assets/Scroll_Logomark.svg'
 
+const { t, locale, activate } = useLingui()
+
 const SCROLL_CHAIN_IDS = new Set([534352, 534351])
+
+const SUPPORTED_LOCALES: { code: string; label: string }[] = [
+  { code: 'en', label: 'English' },
+  { code: 'zh', label: '中文' },
+]
 
 const store = useAppStore()
 const {
@@ -189,7 +198,7 @@ function handleWalletClick() {
               UTS
             </h1>
             <p class="font-mono text-[10px] text-white/30">
-              Universal Timestamps
+              {{ t('Universal Timestamps') }}
             </p>
           </div>
         </div>
@@ -216,10 +225,7 @@ function handleWalletClick() {
                 />
               </span>
               <span
-                >{{ store.onlineCount }}/{{
-                  store.ethChains.length
-                }}
-                chains</span
+                >{{ t('{online}/{total} chains', { online: store.onlineCount, total: store.ethChains.length }) }}</span
               >
               <ChevronDown class="h-3 w-3" />
             </button>
@@ -232,11 +238,11 @@ function handleWalletClick() {
               >
                 <div class="mb-3 flex items-center justify-between">
                   <h4 class="font-heading text-xs font-semibold text-white/80">
-                    Ethereum Chains
+                    {{ t('Ethereum Chains') }}
                   </h4>
                   <BaseButton variant="secondary" @click="store.checkChains()">
                     <RefreshCw class="h-3 w-3" />
-                    Refresh
+                    {{ t('Refresh') }}
                   </BaseButton>
                 </div>
 
@@ -263,7 +269,7 @@ function handleWalletClick() {
                           {{ chain.name }}
                         </div>
                         <div class="font-mono text-[10px] text-white/30">
-                          Chain ID: {{ chain.chainId }}
+                          {{ t('Chain ID: {chainId}', { chainId: chain.chainId }) }}
                         </div>
                       </div>
                       <div class="text-right">
@@ -286,14 +292,14 @@ function handleWalletClick() {
                       </div>
                       <button
                         class="rounded p-0.5 text-white/20 transition hover:bg-neon-cyan/10 hover:text-neon-cyan"
-                        title="Edit RPC endpoint"
+                        :title="t('Edit RPC endpoint')"
                         @click="startEditRpc(chain.chainId, chain.rpcUrl)"
                       >
                         <Pencil class="h-3 w-3" />
                       </button>
                       <button
                         class="rounded p-0.5 text-white/20 transition hover:bg-invalid/10 hover:text-invalid"
-                        title="Remove chain"
+                        :title="t('Remove chain')"
                         @click="store.removeChain(chain.chainId)"
                       >
                         <Trash2 class="h-3 w-3" />
@@ -313,7 +319,7 @@ function handleWalletClick() {
                       />
                       <button
                         class="rounded bg-neon-cyan/10 px-1.5 py-1 text-neon-cyan transition hover:bg-neon-cyan/20"
-                        title="Save"
+                        :title="t('Save')"
                         @click="saveEditRpc(chain.chainId)"
                       >
                         <Check class="h-3 w-3" />
@@ -331,7 +337,7 @@ function handleWalletClick() {
                 <!-- Add custom chain -->
                 <div class="mt-3 border-t border-glass-border pt-3">
                   <div class="font-mono text-[10px] text-white/30 mb-1.5">
-                    Add chain by ID
+                    {{ t('Add chain by ID') }}
                   </div>
                   <div class="flex gap-2">
                     <input
@@ -343,7 +349,7 @@ function handleWalletClick() {
                     />
                     <BaseButton variant="secondary" @click="handleAddChain">
                       <Plus class="h-3 w-3" />
-                      Add
+                      {{ t('Add') }}
                     </BaseButton>
                   </div>
                   <div class="mt-2 flex justify-end">
@@ -357,7 +363,7 @@ function handleWalletClick() {
                       "
                     >
                       <RotateCcw class="h-3 w-3" />
-                      Reset defaults
+                      {{ t('Reset defaults') }}
                     </BaseButton>
                   </div>
                 </div>
@@ -376,21 +382,37 @@ function handleWalletClick() {
             @click="handleWalletClick"
           >
             <Wallet class="h-3.5 w-3.5" />
-            <span v-if="walletConnecting">Connecting...</span>
+            <span v-if="walletConnecting">{{ t('Connecting...') }}</span>
             <span v-else-if="walletConnected && walletAddress">
               {{ truncateAddress(walletAddress) }}
               <span v-if="walletChainName" class="text-white/30">
                 · {{ walletChainName }}</span
               >
             </span>
-            <span v-else-if="!hasWallet">No Wallet</span>
-            <span v-else>Connect Wallet</span>
+            <span v-else-if="!hasWallet">{{ t('No Wallet') }}</span>
+            <span v-else>{{ t('Connect Wallet') }}</span>
           </button>
+          <!-- Language switcher -->
+          <div class="relative">
+            <button
+              class="rounded-lg p-1.5 text-white/40 transition hover:bg-white/5 hover:text-white/60"
+              :title="t('Calendar settings')"
+              @click="
+                async () => {
+                  const idx = SUPPORTED_LOCALES.findIndex((l) => l.code === locale)
+                  const next = SUPPORTED_LOCALES[(idx + 1) % SUPPORTED_LOCALES.length]
+                  await activate(next.code)
+                }
+              "
+            >
+              <Languages class="h-4 w-4" />
+            </button>
+          </div>
           <!-- Settings button -->
           <button
             class="rounded-lg p-1.5 text-white/40 transition hover:bg-white/5 hover:text-white/60"
             :class="{ 'bg-neon-cyan/10 text-neon-cyan': showSettings }"
-            title="Calendar settings"
+            :title="t('Calendar settings')"
             @click="showSettings = !showSettings"
           >
             <Settings class="h-4 w-4" />
@@ -409,11 +431,11 @@ function handleWalletClick() {
           <GlassCard>
             <div class="mb-3 flex items-center justify-between">
               <h3 class="font-heading text-sm font-semibold text-white/80">
-                Calendar Nodes
+                {{ t('Calendar Nodes') }}
               </h3>
               <BaseButton variant="secondary" @click="store.resetCalendars()">
                 <RotateCcw class="h-3 w-3" />
-                Reset to defaults
+                {{ t('Reset to defaults') }}
               </BaseButton>
             </div>
             <div class="space-y-2">
@@ -444,7 +466,7 @@ function handleWalletClick() {
                 />
                 <BaseButton variant="secondary" @click="addCalendar">
                   <Plus class="h-3 w-3" />
-                  Add
+                  {{ t('Add') }}
                 </BaseButton>
               </div>
             </div>
@@ -459,11 +481,10 @@ function handleWalletClick() {
                 />
                 <div>
                   <div class="font-heading text-xs font-medium text-white/70">
-                    Keep pending attestations after upgrade
+                    {{ t('Keep pending attestations after upgrade') }}
                   </div>
                   <div class="font-mono text-[10px] text-white/30">
-                    When enabled, the original pending attestation is preserved
-                    alongside the upgraded one
+                    {{ t('When enabled, the original pending attestation is preserved alongside the upgraded one') }}
                   </div>
                 </div>
               </label>
@@ -471,7 +492,7 @@ function handleWalletClick() {
               <!-- Internal hash algorithm -->
               <div class="flex items-center gap-3">
                 <label class="font-heading text-xs font-medium text-white/70"
-                  >Internal hash algorithm</label
+                  >{{ t('Internal hash algorithm') }}</label
                 >
                 <select
                   v-model="store.internalHashAlgo"
@@ -481,7 +502,7 @@ function handleWalletClick() {
                   <option value="SHA256">SHA-256</option>
                 </select>
                 <span class="font-mono text-[10px] text-white/30"
-                  >Used for Merkle tree construction</span
+                  >{{ t('Used for Merkle tree construction') }}</span
                 >
               </div>
             </div>
@@ -495,11 +516,11 @@ function handleWalletClick() {
       <!-- Title -->
       <div class="mb-10 text-center">
         <h2 class="font-heading text-3xl font-bold tracking-tight text-white">
-          Decentralized
-          <span class="text-neon-cyan glow-text-cyan">Timestamping</span>
+          {{ t('Decentralized') }}
+          <span class="text-neon-cyan glow-text-cyan">{{ t('Timestamping') }}</span>
         </h2>
         <p class="mt-2 font-mono text-sm text-white/40">
-          Cryptographic proof of existence anchored to Ethereum
+          {{ t('Cryptographic proof of existence anchored to Ethereum') }}
         </p>
       </div>
 
@@ -515,7 +536,7 @@ function handleWalletClick() {
           @click="activeTab = 'stamp'"
         >
           <Zap class="h-4 w-4" />
-          Stamp
+          {{ t('Stamp') }}
         </button>
         <button
           class="flex items-center gap-2 rounded-lg px-6 py-2.5 font-heading text-sm font-medium transition-all"
@@ -527,7 +548,7 @@ function handleWalletClick() {
           @click="activeTab = 'verify'"
         >
           <Shield class="h-4 w-4" />
-          Verify
+          {{ t('Verify') }}
         </button>
         <button
           class="flex items-center gap-2 rounded-lg px-6 py-2.5 font-heading text-sm font-medium transition-all"
@@ -539,7 +560,7 @@ function handleWalletClick() {
           @click="activeTab = 'upgrade'"
         >
           <RefreshCw class="h-4 w-4" />
-          Upgrade
+          {{ t('Upgrade') }}
         </button>
       </div>
 
@@ -584,7 +605,7 @@ function handleWalletClick() {
     <!-- Footer -->
     <footer class="border-t border-glass-border py-6 text-center">
       <p class="font-mono text-[10px] text-white/20">
-        UTS Protocol — Powered by Universal Timestamps
+        {{ t('UTS Protocol — Powered by Universal Timestamps') }}
       </p>
     </footer>
   </div>

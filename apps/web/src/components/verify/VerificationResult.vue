@@ -17,8 +17,11 @@ import MerkleTreeViz from '@/components/verify/MerkleTreeViz.vue'
 import AttestationDetail from '@/components/verify/AttestationDetail.vue'
 import { useTimestampSDK } from '@/composables/useTimestampSDK'
 import { useFileDigest } from '@/composables/useFileDigest'
+import { useLingui } from '@/composables/useLingui'
 import { VerifyStatus } from '@uts/sdk'
 import type { DetachedTimestamp, SecureDigestOp } from '@uts/sdk'
+
+const { t } = useLingui()
 
 const {
   verifyStatus,
@@ -111,20 +114,19 @@ function handleReset() {
     <div class="mb-4 flex items-center gap-2">
       <ShieldCheck class="h-4 w-4 text-neon-cyan" />
       <h3 class="font-heading text-sm font-semibold text-white/80">
-        Verification Dashboard
+        {{ t('Verification Dashboard') }}
       </h3>
     </div>
 
     <!-- Upload .ots file -->
     <div v-if="!loadedTimestamp" class="space-y-4">
       <p class="font-mono text-xs text-white/40">
-        &gt; Upload a <span class="text-neon-cyan">.ots</span> file to verify a
-        timestamp proof
+        &gt; {{ t('Upload a .ots file to verify a timestamp proof') }}
       </p>
       <div class="flex gap-2">
         <BaseButton variant="secondary" @click="otsFileRef?.click()">
           <FileUp class="h-4 w-4" />
-          Upload .ots
+          {{ t('Upload .ots') }}
         </BaseButton>
       </div>
       <input
@@ -148,7 +150,7 @@ function handleReset() {
         <div v-if="isVerifying" class="flex items-center gap-2">
           <Search class="h-4 w-4 animate-spin text-neon-cyan" />
           <span class="font-mono text-xs text-neon-cyan"
-            >Verifying proof chain...</span
+            >{{ t('Verifying proof chain...') }}</span
           >
         </div>
       </div>
@@ -158,7 +160,7 @@ function handleReset() {
         <div
           class="font-mono text-[10px] uppercase tracking-widest text-white/30"
         >
-          Original Digest ({{ loadedTimestamp.header.kind }})
+          {{ t('Original Digest ({algo})', { algo: loadedTimestamp.header.kind }) }}
         </div>
         <div class="break-all font-mono text-xs text-neon-cyan">
           {{ hexlify(loadedTimestamp.header.digest as Uint8Array) }}
@@ -172,10 +174,10 @@ function handleReset() {
         <div
           class="font-mono text-[10px] uppercase tracking-widest text-white/30"
         >
-          Verify Original File (Optional)
+          {{ t('Verify Original File (Optional)') }}
         </div>
         <p class="font-mono text-[10px] text-white/25">
-          Upload the original file to verify it matches the .ots header digest
+          {{ t('Upload the original file to verify it matches the .ots header digest') }}
         </p>
         <div class="flex items-center gap-3">
           <BaseButton
@@ -184,7 +186,7 @@ function handleReset() {
             :disabled="isDigestingOriginal"
           >
             <FileUp class="h-3.5 w-3.5" />
-            {{ isDigestingOriginal ? 'Digesting...' : 'Upload Original' }}
+            {{ isDigestingOriginal ? t('Digesting...') : t('Upload Original') }}
           </BaseButton>
           <span
             v-if="originalFileName"
@@ -216,7 +218,7 @@ function handleReset() {
         >
           <FileCheck class="h-4 w-4 text-valid" />
           <span class="font-mono text-xs text-valid"
-            >File digest matches — this is the original file</span
+            >{{ t('File digest matches — this is the original file') }}</span
           >
         </div>
         <div
@@ -225,7 +227,7 @@ function handleReset() {
         >
           <FileX class="h-4 w-4 text-invalid" />
           <span class="font-mono text-xs text-invalid"
-            >File digest does NOT match the .ots header</span
+            >{{ t('File digest does NOT match the .ots header') }}</span
           >
         </div>
       </div>
@@ -235,7 +237,7 @@ function handleReset() {
         <div
           class="font-mono text-[10px] uppercase tracking-widest text-white/30"
         >
-          Attestations ({{ verifyAttestations.length }})
+          {{ t('Attestations ({count})', { count: verifyAttestations.length }) }}
         </div>
         <AttestationDetail
           v-for="(att, i) in verifyAttestations"
@@ -253,7 +255,7 @@ function handleReset() {
           :is="showProofPath ? ChevronUp : ChevronDown"
           class="h-4 w-4"
         />
-        {{ showProofPath ? 'Hide' : 'Show' }} Proof Path
+        {{ showProofPath ? t('Hide Proof Path') : t('Show Proof Path') }}
       </button>
 
       <Transition name="fade">
@@ -271,7 +273,7 @@ function handleReset() {
       </div>
 
       <!-- Reset -->
-      <BaseButton variant="secondary" @click="handleReset"> Reset </BaseButton>
+      <BaseButton variant="secondary" @click="handleReset"> {{ t('Reset') }} </BaseButton>
     </div>
   </GlassCard>
 </template>
