@@ -169,7 +169,6 @@ export default class SDK {
    * Stamp the provided digests by submitting them to the configured calendars.
    *
    * @param digests The digests to be stamped, each with its associated header information. Input digests can use different hash algorithms, but the internal Merkle tree will be constructed using the SDK's configured hash algorithm (default KECCAK256).
-   * @param timeout The maximum time to wait for calendar responses.
    */
   async stamp(digests: DigestHeader[]): Promise<DetachedTimestamp[]> {
     const nonces: Uint8Array[] = []
