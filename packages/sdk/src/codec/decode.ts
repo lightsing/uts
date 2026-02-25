@@ -24,7 +24,7 @@ import {
   MAGIC_BYTES,
   MAX_URI_LEN,
   PENDING_ATTESTATION_TAG,
-  URI_SAFE_CHAR_REGEX,
+  SAFE_URL_REGEX,
 } from './constants'
 
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER)
@@ -223,7 +223,7 @@ export default class Decoder {
       )
     }
 
-    if (!URI_SAFE_CHAR_REGEX.test(urlStr)) {
+    if (!SAFE_URL_REGEX.test(urlStr)) {
       throw new DecodeError(
         ErrorCode.INVALID_URI,
         `Invalid URL in pending attestation: ${urlStr}`,
@@ -234,7 +234,7 @@ export default class Decoder {
     try {
       const url = new URL(urlStr)
       return { kind: 'pending', url }
-    } catch (e) {
+    } catch (error) {
       throw new DecodeError(
         ErrorCode.INVALID_URI,
         `Malformed URL in pending attestation: ${urlStr}`,
@@ -242,7 +242,7 @@ export default class Decoder {
           offset: this.offset,
           context: {
             url: urlStr,
-            error: e instanceof Error ? e.message : String(e),
+            error: error instanceof Error ? error.message : String(error),
           },
         },
       )
@@ -361,7 +361,7 @@ export default class Decoder {
     while (this.remaining > 0) {
       const step = this.readStep(strict)
       steps.push(step)
-      if (step.op == 'FORK' || step.op == 'ATTESTATION') break
+      if (step.op === 'FORK' || step.op === 'ATTESTATION') break
     }
     return steps
   }

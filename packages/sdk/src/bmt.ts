@@ -5,9 +5,9 @@ const prefixBuffer = new Uint8Array([INNER_NODE_PREFIX])
 
 export enum NodePosition {
   /** The sibling is a right child, `APPEND` its hash when computing the parent */
-  Left,
+  Left = 'LEFT',
   /** The sibling is a left child, `PREPEND` its hash when computing the parent */
-  Right,
+  Right = 'RIGHT',
 }
 
 export class UnhashedFlatMerkleTree<T extends CHash> {

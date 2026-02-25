@@ -1,14 +1,13 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import Decoder from '../src/codec/decode'
 import type { DetachedTimestamp } from '../src/types'
 import SDK from '../src/sdk'
 import { getBytes } from 'ethers'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const __filename = import.meta.filename
+const __dirname = import.meta.dirname
 
 const OTS_FILE_PATH = path.join(__dirname, '../fixtures/test.ots')
 

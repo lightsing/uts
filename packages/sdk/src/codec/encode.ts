@@ -5,7 +5,7 @@ import {
   BITCOIN_ATTESTATION_TAG,
   ETHEREUM_UTS_ATTESTATION_TAG,
   MAX_URI_LEN,
-  URI_SAFE_CHAR_REGEX,
+  SAFE_URL_REGEX,
   DIGEST_LENGTHS,
 } from './constants'
 import type {
@@ -47,20 +47,20 @@ export default class Encoder {
     }
   }
 
-  writeByte(byte: number): Encoder {
+  writeByte(byte: number): this {
     this.ensureCapacity(1)
     this.buffer[this.offset++] = byte
     return this
   }
 
-  writeBytes(data: Uint8Array): Encoder {
+  writeBytes(data: Uint8Array): this {
     this.ensureCapacity(data.length)
     this.buffer.set(data, this.offset)
     this.offset += data.length
     return this
   }
 
-  writeU32(value: number): Encoder {
+  writeU32(value: number): this {
     if (value < 0 || !Number.isInteger(value)) {
       throw new EncodeError(
         ErrorCode.NEGATIVE_LEB128_INPUT,
@@ -93,7 +93,7 @@ export default class Encoder {
     return this
   }
 
-  writeBigUint(value: bigint): Encoder {
+  writeBigUint(value: bigint): this {
     if (value < 0n) {
       throw new EncodeError(
         ErrorCode.NEGATIVE_LEB128_INPUT,
@@ -119,14 +119,14 @@ export default class Encoder {
     return this
   }
 
-  writeLengthPrefixedBytes(data: Uint8Array): Encoder {
+  writeLengthPrefixedBytes(data: Uint8Array): this {
     const len = data.length
     this.writeU32(len)
     this.writeBytes(data)
     return this
   }
 
-  writeOp(op: Op): Encoder {
+  writeOp(op: Op): this {
     const opCode = OP_CODE_MAP[op]
     if (opCode === undefined) {
       throw new EncodeError(ErrorCode.UNKNOWN_OP, `Unknown operation: ${op}`, {
@@ -137,16 +137,16 @@ export default class Encoder {
     return this.writeByte(opCode)
   }
 
-  writeVersionedMagic(version: number): Encoder {
+  writeVersionedMagic(version: number): this {
     this.writeBytes(MAGIC_BYTES)
     this.writeByte(version)
     return this
   }
 
-  writeHeader(header: DigestHeader): Encoder {
+  writeHeader(header: DigestHeader): this {
     this.writeOp(header.kind)
     const digestBytes = getBytes(header.digest)
-    if (digestBytes.length != DIGEST_LENGTHS[header.kind]) {
+    if (digestBytes.length !== DIGEST_LENGTHS[header.kind]) {
       throw new EncodeError(
         ErrorCode.LENGTH_MISMATCH,
         `Digest length mismatch for ${header.kind}: expected ${DIGEST_LENGTHS[header.kind]}, got ${digestBytes.length}`,
@@ -157,7 +157,7 @@ export default class Encoder {
     return this
   }
 
-  writeExecutionStep(step: ExecutionStep): Encoder {
+  writeExecutionStep(step: ExecutionStep): this {
     this.writeOp(step.op)
     switch (step.op) {
       case 'APPEND':
@@ -168,7 +168,7 @@ export default class Encoder {
     return this
   }
 
-  writeForkStep(step: ForkStep): Encoder {
+  writeForkStep(step: ForkStep): this {
     if (step.steps.length < 2) {
       throw new EncodeError(
         ErrorCode.INVALID_STRUCTURE,
@@ -180,11 +180,11 @@ export default class Encoder {
       this.writeOp(step.op)
       this.writeTimestamp(branch)
     }
-    this.writeTimestamp(step.steps[step.steps.length - 1])
+    this.writeTimestamp(step.steps.at(-1)!)
     return this
   }
 
-  writePendingAttestation(attestation: PendingAttestation): Encoder {
+  writePendingAttestation(attestation: PendingAttestation): this {
     let urlStr = attestation.url.toString()
     // trim url ends with slash
     if (urlStr.endsWith('/')) {
@@ -198,7 +198,7 @@ export default class Encoder {
         { offset: this.offset, context: { url: urlStr } },
       )
     }
-    if (!URI_SAFE_CHAR_REGEX.test(urlStr)) {
+    if (!SAFE_URL_REGEX.test(urlStr)) {
       throw new EncodeError(
         ErrorCode.INVALID_URI,
         `Invalid URL in pending attestation: ${urlStr}`,
@@ -211,12 +211,12 @@ export default class Encoder {
     return this
   }
 
-  writeBitcoinAttestation(attestation: BitcoinAttestation): Encoder {
+  writeBitcoinAttestation(attestation: BitcoinAttestation): this {
     this.writeU32(attestation.height)
     return this
   }
 
-  writeEthereumUTSAttestation(attestation: EthereumUTSAttestation): Encoder {
+  writeEthereumUTSAttestation(attestation: EthereumUTSAttestation): this {
     this.writeU32(attestation.chain)
     this.writeU32(attestation.height)
     if (attestation.metadata) {
@@ -254,7 +254,7 @@ export default class Encoder {
     return this
   }
 
-  writeAttestationStep(step: AttestationStep): Encoder {
+  writeAttestationStep(step: AttestationStep): this {
     this.writeOp('ATTESTATION')
     const encoder = new Encoder()
     switch (step.attestation.kind) {
@@ -287,7 +287,7 @@ export default class Encoder {
     return this
   }
 
-  writeStep(step: Step): Encoder {
+  writeStep(step: Step): this {
     switch (step.op) {
       case 'FORK':
         return this.writeForkStep(step as ForkStep)
@@ -298,7 +298,7 @@ export default class Encoder {
     }
   }
 
-  writeTimestamp(timestamp: Timestamp): Encoder {
+  writeTimestamp(timestamp: Timestamp): this {
     for (const step of timestamp) {
       this.writeStep(step)
     }

@@ -1,9 +1,17 @@
 {
   "name": "uts-monorepo",
   "private": true,
-  "scripts": {},
+  "type": "module",
+  "scripts": {
+    "lint": "eslint packages --cache --fix"
+  },
   "devDependencies": {
+    "eslint": "^10.0.2",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-unicorn": "^63.0.0",
+    "eslint-plugin-unused-imports": "^4.4.1",
     "pnpm": "^10.26.2",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "typescript-eslint": "^8.56.1"
   }
 }

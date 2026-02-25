@@ -33,6 +33,7 @@ broadcast
 node_modules
 dist
 *.tsbuildinfo
+.eslintcache
 
 # Project files
 .db

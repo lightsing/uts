@@ -1,5 +1,5 @@
 import {
-  AbstractProvider,
+  type AbstractProvider,
   getBytes,
   hexlify,
   id,
@@ -159,7 +159,7 @@ export default class SDK {
   }
 
   getEthProvider(chainId: number): AbstractProvider | null {
-    if (this.ethRPCs.hasOwnProperty(chainId)) {
+    if (Object.hasOwn(this.ethRPCs, chainId)) {
       return this.ethRPCs[chainId]!
     }
     return null
@@ -172,8 +172,8 @@ export default class SDK {
    * @param timeout The maximum time to wait for calendar responses.
    */
   async stamp(digests: DigestHeader[]): Promise<DetachedTimestamp[]> {
-    let nonces: Uint8Array[] = []
-    let nonceDigests: Uint8Array[] = []
+    const nonces: Uint8Array[] = []
+    const nonceDigests: Uint8Array[] = []
 
     for (const digest of digests) {
       const hasher = this.hasher.create()
@@ -198,7 +198,7 @@ export default class SDK {
 
     const successfulResponses = calendarResponses.filter(
       (res) => res.status === 'fulfilled',
-    ) as PromiseFulfilledResult<Timestamp>[]
+    ) as Array<PromiseFulfilledResult<Timestamp>>
     if (successfulResponses.length < this.quorum) {
       throw new RemoteError(
         `Only received ${successfulResponses.length} valid responses from calendars, which does not meet the quorum of ${this.quorum}`,
@@ -216,7 +216,7 @@ export default class SDK {
           ]
 
     return digests.map((digest, i) => {
-      let timestamp: Timestamp = [
+      const timestamp: Timestamp = [
         { op: 'APPEND', data: nonces[i] },
         { op: this.hashAlg },
       ]
@@ -231,19 +231,23 @@ export default class SDK {
 
       for (const step of proofIter) {
         if (step.position === NodePosition.Left) {
-          timestamp.push({
-            op: 'PREPEND',
-            data: new Uint8Array([INNER_NODE_PREFIX]),
-          })
-          timestamp.push({ op: 'APPEND', data: step.sibling })
-          timestamp.push({ op: this.hashAlg })
+          timestamp.push(
+            {
+              op: 'PREPEND',
+              data: new Uint8Array([INNER_NODE_PREFIX]),
+            },
+            { op: 'APPEND', data: step.sibling },
+            { op: this.hashAlg },
+          )
         } else {
-          timestamp.push({ op: 'PREPEND', data: step.sibling })
-          timestamp.push({
-            op: 'PREPEND',
-            data: new Uint8Array([INNER_NODE_PREFIX]),
-          })
-          timestamp.push({ op: this.hashAlg })
+          timestamp.push(
+            { op: 'PREPEND', data: step.sibling },
+            {
+              op: 'PREPEND',
+              data: new Uint8Array([INNER_NODE_PREFIX]),
+            },
+            { op: this.hashAlg },
+          )
         }
       }
       timestamp.push(...mergedTimestamp)
@@ -274,9 +278,9 @@ export default class SDK {
         headers: { Accept: 'application/vnd.opentimestamps.v1' },
         signal: AbortSignal.timeout(this.timeout),
       })
-    } catch (e) {
+    } catch (error) {
       throw new RemoteError(`Failed to submit to calendar ${calendar}`, {
-        context: { source: e },
+        context: { source: error },
       })
     }
 
@@ -318,7 +322,7 @@ export default class SDK {
   ): Promise<UpgradeResult[]> {
     let current = input
 
-    let result: UpgradeResult[] = []
+    const result: UpgradeResult[] = []
 
     for (let i = 0; i < timestamp.length; i++) {
       const step = timestamp[i]
@@ -369,12 +373,12 @@ export default class SDK {
               original: step.attestation,
               upgraded,
             })
-          } catch (e) {
-            console.error(`Error upgrading attestation: ${e}`)
+          } catch (error) {
+            console.error(`Error upgrading attestation: ${error}`)
             result.push({
               status: UpgradeStatus.Failed,
               original: step.attestation,
-              error: e instanceof Error ? e : new Error(String(e)),
+              error: error instanceof Error ? error : new Error(String(error)),
             })
           }
           break
@@ -402,11 +406,11 @@ export default class SDK {
         headers: { Accept: 'application/vnd.opentimestamps.v1' },
         signal: AbortSignal.timeout(this.timeout),
       })
-    } catch (e) {
+    } catch (error) {
       throw new RemoteError(
         `Failed to fetch from calendar ${attestation.url}`,
         {
-          context: { source: e },
+          context: { source: error },
         },
       )
     }
@@ -452,7 +456,7 @@ export default class SDK {
     input: Uint8Array,
     timestamp: Timestamp,
   ): Promise<AttestationStatus[]> {
-    let attestations: AttestationStatus[] = []
+    const attestations: AttestationStatus[] = []
 
     let current = input
     for (const step of timestamp) {
@@ -501,9 +505,9 @@ export default class SDK {
           status: AttestationStatusKind.PENDING,
         }
       case 'bitcoin':
-        return await this.verifyBitcoinAttestation(input, attestation)
+        return this.verifyBitcoinAttestation(input, attestation)
       case 'ethereum-uts':
-        return await this.verifyEthereumUTSAttestation(input, attestation)
+        return this.verifyEthereumUTSAttestation(input, attestation)
       case 'unknown':
         return {
           attestation,
@@ -544,15 +548,15 @@ export default class SDK {
         status: AttestationStatusKind.VALID,
         additionalInfo: { header },
       }
-    } catch (e) {
-      console.error(`Error verifying Bitcoin attestation: ${e}`)
+    } catch (error) {
+      console.error(`Error verifying Bitcoin attestation: ${error}`)
       return {
         attestation,
         status: AttestationStatusKind.UNKNOWN,
         error: new VerifyError(
           ErrorCode.REMOTE_ERROR,
           `Failed to verify Bitcoin attestation for height ${attestation.height}`,
-          { context: { source: e } },
+          { context: { source: error } },
         ),
       }
     }
@@ -562,7 +566,7 @@ export default class SDK {
     input: Uint8Array,
     attestation: EthereumUTSAttestation,
   ): Promise<AttestationStatus> {
-    if (!this.ethRPCs.hasOwnProperty(attestation.chain)) {
+    if (!Object.hasOwn(this.ethRPCs, attestation.chain)) {
       return {
         attestation,
         status: AttestationStatusKind.UNKNOWN,
@@ -621,15 +625,15 @@ export default class SDK {
         status: AttestationStatusKind.VALID,
         additionalInfo: { root, sender, timestamp },
       }
-    } catch (e) {
-      console.error(`Error verifying Ethereum attestation: ${e}`)
+    } catch (error) {
+      console.error(`Error verifying Ethereum attestation: ${error}`)
       return {
         attestation,
         status: AttestationStatusKind.UNKNOWN,
         error: new VerifyError(
           ErrorCode.REMOTE_ERROR,
           `Failed to verify Ethereum attestation for block ${attestation.height} on chain ${attestation.chain}`,
-          { context: { source: e } },
+          { context: { source: error } },
         ),
       }
     }
@@ -647,7 +651,7 @@ export default class SDK {
    * @param attestations
    */
   transformResult(attestations: AttestationStatus[]): VerifyStatus {
-    let counts = {
+    const counts = {
       [AttestationStatusKind.VALID]: 0,
       [AttestationStatusKind.INVALID]: 0,
       [AttestationStatusKind.PENDING]: 0,
@@ -695,7 +699,7 @@ export default class SDK {
       case 'REVERSE':
         return new Uint8Array(input).reverse()
       case 'HEXLIFY':
-        const str = hexlify(input).substring(2) // remove 0x prefix
+        const str = hexlify(input).slice(2) // remove 0x prefix
         return SDK.encoder.encode(str)
 
       case 'SHA1':
