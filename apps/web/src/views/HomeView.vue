@@ -350,8 +350,10 @@ function handleWalletClick() {
                     <BaseButton
                       variant="secondary"
                       @click="
-                        store.resetChains()
-                        store.checkChains()
+                        () => {
+                          store.resetChains()
+                          store.checkChains()
+                        }
                       "
                     >
                       <RotateCcw class="h-3 w-3" />
