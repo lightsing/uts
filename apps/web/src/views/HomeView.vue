@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Zap, Shield } from 'lucide-vue-next'
+import { Zap, Shield, Settings, Plus, Trash2, RotateCcw } from 'lucide-vue-next'
 import HeroTerminal from '@/components/terminal/HeroTerminal.vue'
 import StampingWorkflow from '@/components/stamp/StampingWorkflow.vue'
 import VerificationResult from '@/components/verify/VerificationResult.vue'
 import LiveFeed from '@/components/feed/LiveFeed.vue'
+import GlassCard from '@/components/base/GlassCard.vue'
+import BaseButton from '@/components/base/BaseButton.vue'
 import { useTimestampSDK } from '@/composables/useTimestampSDK'
 import type { FileDigestResult } from '@/composables/useFileDigest'
 import { useAppStore } from '@/stores/app'
 
 const store = useAppStore()
-const { stampPhase, stampError, stamp, resetStamp } = useTimestampSDK()
+const { stampPhase, stampError, broadcastProgress, stamp, resetStamp } = useTimestampSDK()
 
 const activeTab = ref<'stamp' | 'verify'>('stamp')
 const showWorkflow = ref(false)
+const showSettings = ref(false)
+const newCalendarUrl = ref('')
 
 onMounted(() => {
   store.checkChains()
@@ -22,7 +26,7 @@ onMounted(() => {
 async function handleStampFromDigest(digest: FileDigestResult) {
   showWorkflow.value = true
   try {
-    const results = await stamp([digest.header])
+    const results = await stamp([digest.header], digest.fileName)
     for (const r of results) store.addStamp(r)
   } catch {
     // error is tracked in stampError
@@ -47,6 +51,26 @@ function handleResetWorkflow() {
   resetStamp()
   showWorkflow.value = false
 }
+
+function addCalendar() {
+  const url = newCalendarUrl.value.trim()
+  if (!url) return
+  try {
+    new URL(url)
+    if (!store.calendarUrls.includes(url)) {
+      store.setCalendars([...store.calendarUrls, url])
+    }
+    newCalendarUrl.value = ''
+  } catch {
+    // invalid URL, ignore
+  }
+}
+
+function removeCalendar(index: number) {
+  const urls = [...store.calendarUrls]
+  urls.splice(index, 1)
+  store.setCalendars(urls)
+}
 </script>
 
 <template>
@@ -66,8 +90,8 @@ function handleResetWorkflow() {
           </div>
         </div>
 
-        <!-- Ethereum chain status -->
         <div class="flex items-center gap-4">
+          <!-- Ethereum chain status -->
           <div class="flex items-center gap-2">
             <span
               v-for="chain in store.ethChains"
@@ -84,9 +108,65 @@ function handleResetWorkflow() {
           <span class="font-mono text-[10px] text-white/30">
             {{ store.onlineCount }}/{{ store.ethChains.length }} chains
           </span>
+          <!-- Settings button -->
+          <button
+            class="rounded-lg p-1.5 text-white/40 transition hover:bg-white/5 hover:text-white/60"
+            :class="{ 'bg-neon-cyan/10 text-neon-cyan': showSettings }"
+            title="Calendar settings"
+            @click="showSettings = !showSettings"
+          >
+            <Settings class="h-4 w-4" />
+          </button>
         </div>
       </div>
     </header>
+
+    <!-- Calendar settings panel -->
+    <Transition name="fade">
+      <div v-if="showSettings" class="border-b border-glass-border bg-midnight/60 backdrop-blur-md">
+        <div class="mx-auto max-w-6xl px-6 py-4">
+          <GlassCard>
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="font-heading text-sm font-semibold text-white/80">Calendar Nodes</h3>
+              <BaseButton variant="secondary" @click="store.resetCalendars()">
+                <RotateCcw class="h-3 w-3" />
+                Reset to defaults
+              </BaseButton>
+            </div>
+            <div class="space-y-2">
+              <div
+                v-for="(url, i) in store.calendarUrls"
+                :key="i"
+                class="flex items-center gap-2"
+              >
+                <span class="flex-1 truncate rounded border border-glass-border bg-surface px-3 py-1.5 font-mono text-xs text-white/60">
+                  {{ url }}
+                </span>
+                <button
+                  class="rounded p-1 text-white/30 transition hover:bg-invalid/10 hover:text-invalid"
+                  @click="removeCalendar(i)"
+                >
+                  <Trash2 class="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div class="flex gap-2">
+                <input
+                  v-model="newCalendarUrl"
+                  type="text"
+                  placeholder="https://calendar.example.com/"
+                  class="flex-1 rounded-lg border border-glass-border bg-surface px-3 py-1.5 font-mono text-xs text-white/80 outline-none placeholder:text-white/20 focus:border-neon-cyan/40"
+                  @keyup.enter="addCalendar"
+                />
+                <BaseButton variant="secondary" @click="addCalendar">
+                  <Plus class="h-3 w-3" />
+                  Add
+                </BaseButton>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Main content -->
     <main class="mx-auto max-w-6xl px-6 py-8">
@@ -145,6 +225,7 @@ function handleResetWorkflow() {
                   v-if="showWorkflow"
                   :phase="stampPhase"
                   :error="stampError"
+                  :broadcast-progress="broadcastProgress"
                 />
               </Transition>
             </div>

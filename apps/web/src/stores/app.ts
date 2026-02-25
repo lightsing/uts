@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { DEFAULT_CALENDARS } from '@uts/sdk'
 import type { DetachedTimestamp } from '@uts/sdk'
-import { getSDK } from '@/composables/useTimestampSDK'
+import { getSDK, resetSDK } from '@/composables/useTimestampSDK'
 
 const CHAIN_NAMES: Record<number, string> = {
   1: 'Ethereum',
@@ -18,13 +19,33 @@ export interface EthChainNode {
   latency?: number
 }
 
+const STORAGE_KEY = 'uts-calendars'
+
+function loadCalendars(): string[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch { /* ignore */ }
+  return DEFAULT_CALENDARS.map((u) => u.toString())
+}
+
+function saveCalendars(urls: string[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(urls))
+}
+
 export const useAppStore = defineStore('app', () => {
+  const calendarUrls = ref<string[]>(loadCalendars())
   const ethChains = ref<EthChainNode[]>([])
   const recentStamps = ref<DetachedTimestamp[]>([])
 
   const onlineCount = computed(
     () => ethChains.value.filter((c) => c.status === 'online').length,
   )
+
+  watch(calendarUrls, (urls) => {
+    saveCalendars(urls)
+    resetSDK(urls.map((u) => new URL(u)))
+  }, { deep: true })
 
   async function checkChains() {
     const sdk = getSDK()
@@ -61,11 +82,22 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  function setCalendars(urls: string[]) {
+    calendarUrls.value = urls
+  }
+
+  function resetCalendars() {
+    calendarUrls.value = DEFAULT_CALENDARS.map((u) => u.toString())
+  }
+
   return {
+    calendarUrls,
     ethChains,
     recentStamps,
     onlineCount,
     checkChains,
     addStamp,
+    setCalendars,
+    resetCalendars,
   }
 })

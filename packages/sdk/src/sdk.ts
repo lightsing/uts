@@ -33,6 +33,16 @@ import { ripemd160, sha1 } from '@noble/hashes/legacy.js'
 import BitcoinRPC from './rpc/btc.ts'
 import { FallbackProvider } from 'ethers'
 
+export type StampEvent =
+  | { phase: 'generating-nonce' }
+  | { phase: 'building-merkle-tree' }
+  | { phase: 'broadcasting'; totalCalendars: number }
+  | { phase: 'calendar-response'; calendarUrl: string; success: boolean; responsesReceived: number; totalCalendars: number }
+  | { phase: 'building-proof' }
+  | { phase: 'complete' }
+
+export type StampEventCallback = (event: StampEvent) => void
+
 export interface SDKOptions {
   calendars?: URL[]
   btcRPC?: BitcoinRPC
@@ -170,9 +180,11 @@ export default class SDK {
    *
    * @param digests The digests to be stamped, each with its associated header information. Input digests can use different hash algorithms, but the internal Merkle tree will be constructed using the SDK's configured hash algorithm (default KECCAK256).
    */
-  async stamp(digests: DigestHeader[]): Promise<DetachedTimestamp[]> {
+  async stamp(digests: DigestHeader[], onEvent?: StampEventCallback): Promise<DetachedTimestamp[]> {
     const nonces: Uint8Array[] = []
     const nonceDigests: Uint8Array[] = []
+
+    onEvent?.({ phase: 'generating-nonce' })
 
     for (const digest of digests) {
       const hasher = this.hasher.create()
@@ -184,6 +196,8 @@ export default class SDK {
       nonceDigests.push(nonceDigest)
     }
 
+    onEvent?.({ phase: 'building-merkle-tree' })
+
     const internalMerkleTree = UnorderedMerkleTree.new(
       nonceDigests,
       this.hasher,
@@ -191,8 +205,22 @@ export default class SDK {
     const root = internalMerkleTree.root()
     console.debug(`Internal Merkle root: ${hexlify(root)}`)
 
+    onEvent?.({ phase: 'broadcasting', totalCalendars: this.calendars.length })
+
+    let responsesReceived = 0
     const calendarResponses = await Promise.allSettled(
-      this.calendars.map((calendar) => this.requestAttest(calendar, root)),
+      this.calendars.map(async (calendar) => {
+        try {
+          const result = await this.requestAttest(calendar, root)
+          responsesReceived++
+          onEvent?.({ phase: 'calendar-response', calendarUrl: calendar.toString(), success: true, responsesReceived, totalCalendars: this.calendars.length })
+          return result
+        } catch (error) {
+          responsesReceived++
+          onEvent?.({ phase: 'calendar-response', calendarUrl: calendar.toString(), success: false, responsesReceived, totalCalendars: this.calendars.length })
+          throw error
+        }
+      }),
     )
 
     const successfulResponses = calendarResponses.filter(
@@ -214,7 +242,9 @@ export default class SDK {
             } as ForkStep,
           ]
 
-    return digests.map((digest, i) => {
+    onEvent?.({ phase: 'building-proof' })
+
+    const results = digests.map((digest, i) => {
       const timestamp: Timestamp = [
         { op: 'APPEND', data: nonces[i] },
         { op: this.hashAlg },
@@ -256,6 +286,10 @@ export default class SDK {
         timestamp,
       }
     })
+
+    onEvent?.({ phase: 'complete' })
+
+    return results
   }
 
   /**

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
-  Hash,
   KeyRound,
   GitBranch,
   Radio,
-  Clock,
+  Blocks,
   CheckCircle2,
   AlertCircle,
+  RefreshCw,
+  ShieldCheck,
 } from 'lucide-vue-next'
 import type { StampPhase } from '@/composables/useTimestampSDK'
 import GlassCard from '@/components/base/GlassCard.vue'
@@ -15,32 +16,35 @@ import GlassCard from '@/components/base/GlassCard.vue'
 const props = defineProps<{
   phase: StampPhase
   error?: string | null
+  broadcastProgress?: string
 }>()
 
 interface WorkflowStep {
   id: StampPhase
   label: string
   description: string
-  icon: typeof Hash
+  icon: typeof KeyRound
 }
 
 const steps: WorkflowStep[] = [
-  { id: 'hashing', label: 'Hashing', description: 'Computing digest of input data', icon: Hash },
   { id: 'generating-nonce', label: 'Generating Nonce', description: 'Creating random nonce for privacy', icon: KeyRound },
   { id: 'building-merkle-tree', label: 'Building Merkle Tree', description: 'Constructing proof tree from leaves', icon: GitBranch },
   { id: 'broadcasting', label: 'Broadcasting', description: 'Submitting to calendar nodes', icon: Radio },
-  { id: 'waiting-attestation', label: 'Awaiting Attestation', description: 'Waiting for on-chain confirmation', icon: Clock },
-  { id: 'complete', label: 'Complete', description: 'Timestamp recorded', icon: CheckCircle2 },
+  { id: 'building-proof', label: 'Building Proof', description: 'Constructing Merkle proof paths', icon: Blocks },
+  { id: 'complete', label: 'Complete', description: 'Timestamp recorded & downloaded', icon: CheckCircle2 },
+  { id: 'upgrading', label: 'Polling for Upgrade', description: 'Waiting for on-chain attestation...', icon: RefreshCw },
+  { id: 'upgraded', label: 'Upgraded', description: 'Attestation confirmed on-chain', icon: ShieldCheck },
 ]
 
 const phaseOrder: StampPhase[] = [
   'idle',
-  'hashing',
   'generating-nonce',
   'building-merkle-tree',
   'broadcasting',
-  'waiting-attestation',
+  'building-proof',
   'complete',
+  'upgrading',
+  'upgraded',
 ]
 
 const currentIndex = computed(() => phaseOrder.indexOf(props.phase))
@@ -51,6 +55,13 @@ function getStepStatus(stepId: StampPhase) {
   if (stepIndex < currentIndex.value) return 'done'
   if (stepIndex === currentIndex.value) return 'active'
   return 'pending'
+}
+
+function getStepDescription(step: WorkflowStep): string {
+  if (step.id === 'broadcasting' && props.broadcastProgress && getStepStatus(step.id) === 'active') {
+    return `Calendar responses: ${props.broadcastProgress}`
+  }
+  return step.description
 }
 </script>
 
@@ -88,7 +99,7 @@ function getStepStatus(stepId: StampPhase) {
               :is="step.icon"
               v-else
               class="h-3.5 w-3.5"
-              :class="{ 'animate-spin': getStepStatus(step.id) === 'active' && step.id === 'hashing' }"
+              :class="{ 'animate-spin': getStepStatus(step.id) === 'active' && (step.id === 'upgrading') }"
             />
           </div>
           <!-- Connecting line -->
@@ -116,7 +127,7 @@ function getStepStatus(stepId: StampPhase) {
           >
             {{ step.label }}
           </div>
-          <div class="font-mono text-[11px] text-white/30">{{ step.description }}</div>
+          <div class="font-mono text-[11px] text-white/30">{{ getStepDescription(step) }}</div>
         </div>
 
         <!-- Active indicator -->

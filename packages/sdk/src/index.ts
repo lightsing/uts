@@ -29,7 +29,7 @@ export * from './bmt.ts'
 export { default as BitcoinRPC } from './rpc/btc.ts'
 
 export { default as SDK, DEFAULT_CALENDARS, UTS_ABI } from './sdk.ts'
-export type { SDKOptions } from './sdk.ts'
+export type { SDKOptions, StampEvent, StampEventCallback } from './sdk.ts'
 
 export const hexlify = (obj: any): any => {
   if (obj instanceof URL) {
