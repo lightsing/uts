@@ -6,12 +6,14 @@ use alloy_signer_local::{LocalSigner, MnemonicBuilder};
 use axum::{
     Router,
     extract::DefaultBodyLimit,
+    http::Method,
     routing::{get, post},
 };
 use digest::{OutputSizeUser, typenum::Unsigned};
 use rocksdb::DB;
 use sha3::Keccak256;
 use std::{env, sync::Arc};
+use tower_http::{cors, cors::CorsLayer};
 use tracing::info;
 use uts_calendar::{AppState, routes, shutdown_signal, time};
 use uts_contracts::uts::UniversalTimestamps;
@@ -78,7 +80,12 @@ async fn main() -> eyre::Result<()> {
             signer,
             journal,
             db,
-        }));
+        }))
+        .layer(
+            CorsLayer::new()
+                .allow_methods([Method::GET, Method::POST])
+                .allow_origin(cors::Any),
+        );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
 
