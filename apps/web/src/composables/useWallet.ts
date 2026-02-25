@@ -9,7 +9,9 @@ const isConnecting = ref(false)
 const walletError = ref<string | null>(null)
 
 const isConnected = computed(() => walletAddress.value !== null)
-const hasWallet = computed(() => typeof window !== 'undefined' && !!(window as any).ethereum)
+const hasWallet = computed(
+  () => typeof window !== 'undefined' && !!(window as any).ethereum,
+)
 
 const CHAIN_NAMES: Record<number, string> = {
   1: 'Ethereum',
@@ -37,7 +39,8 @@ export function useWallet() {
   async function connect() {
     const ethereum = getEip1193Provider()
     if (!ethereum) {
-      walletError.value = 'No wallet detected. Install MetaMask or another EIP-1193 wallet.'
+      walletError.value =
+        'No wallet detected. Install MetaMask or another EIP-1193 wallet.'
       return
     }
 
@@ -60,7 +63,8 @@ export function useWallet() {
       ;(ethereum as any).on?.('accountsChanged', handleAccountsChanged)
       ;(ethereum as any).on?.('chainChanged', handleChainChanged)
     } catch (e) {
-      walletError.value = e instanceof Error ? e.message : 'Failed to connect wallet'
+      walletError.value =
+        e instanceof Error ? e.message : 'Failed to connect wallet'
     } finally {
       isConnecting.value = false
     }
@@ -69,8 +73,11 @@ export function useWallet() {
   function disconnect() {
     const ethereum = getEip1193Provider()
     if (ethereum) {
-    ;(ethereum as any).removeListener?.('accountsChanged', handleAccountsChanged)
-    ;(ethereum as any).removeListener?.('chainChanged', handleChainChanged)
+      ;(ethereum as any).removeListener?.(
+        'accountsChanged',
+        handleAccountsChanged,
+      )
+      ;(ethereum as any).removeListener?.('chainChanged', handleChainChanged)
     }
     walletAddress.value = null
     walletChainId.value = null

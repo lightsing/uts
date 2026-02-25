@@ -1,11 +1,5 @@
 import { ref, shallowRef } from 'vue'
-import {
-  SDK,
-  VerifyStatus,
-  UpgradeStatus,
-  Decoder,
-  Encoder,
-} from '@uts/sdk'
+import { SDK, VerifyStatus, UpgradeStatus, Decoder, Encoder } from '@uts/sdk'
 import type {
   DetachedTimestamp,
   AttestationStatus,
@@ -37,7 +31,10 @@ export function getSDK(): SDK {
   return _sdkInstance
 }
 
-export function resetSDK(options?: { calendars?: URL[]; web3Provider?: Eip1193Provider | null }) {
+export function resetSDK(options?: {
+  calendars?: URL[]
+  web3Provider?: Eip1193Provider | null
+}) {
   _sdkInstance = new SDK({
     timeout: 15000,
     calendars: options?.calendars,
@@ -63,11 +60,16 @@ function triggerDownload(blob: Blob, fileName: string) {
 
 export function downloadOtsFile(stamp: DetachedTimestamp, fileName?: string) {
   const encoded = Encoder.encodeDetachedTimestamp(stamp)
-  const blob = new Blob([encoded as BlobPart], { type: 'application/octet-stream' })
+  const blob = new Blob([encoded as BlobPart], {
+    type: 'application/octet-stream',
+  })
   triggerDownload(blob, fileName ? `${fileName}.ots` : 'timestamp.ots')
 }
 
-async function downloadStampsAsZip(stamps: DetachedTimestamp[], names: string[]) {
+async function downloadStampsAsZip(
+  stamps: DetachedTimestamp[],
+  names: string[],
+) {
   const zip = new JSZip()
   for (let i = 0; i < stamps.length; i++) {
     const fileName = names[i] ?? `file-${i}`
@@ -96,7 +98,10 @@ export function useTimestampSDK() {
 
   let upgradeTimer: ReturnType<typeof setInterval> | null = null
 
-  async function stamp(digests: DigestHeader[], fileNames?: string[]): Promise<DetachedTimestamp[]> {
+  async function stamp(
+    digests: DigestHeader[],
+    fileNames?: string[],
+  ): Promise<DetachedTimestamp[]> {
     stampPhase.value = 'generating-nonce'
     stampError.value = null
     stampResult.value = null
@@ -157,7 +162,10 @@ export function useTimestampSDK() {
     }
   }
 
-  function startUpgradePolling(stamps: DetachedTimestamp[], keepPending?: boolean) {
+  function startUpgradePolling(
+    stamps: DetachedTimestamp[],
+    keepPending?: boolean,
+  ) {
     stopUpgradePolling()
     stampPhase.value = 'upgrading'
 
@@ -174,7 +182,9 @@ export function useTimestampSDK() {
         }
         upgradeResults.value = allResults
 
-        const hasUpgraded = allResults.some((r) => r.status === UpgradeStatus.Upgraded)
+        const hasUpgraded = allResults.some(
+          (r) => r.status === UpgradeStatus.Upgraded,
+        )
         if (hasUpgraded) {
           stampPhase.value = 'upgraded'
           // Auto-download upgraded timestamps with correct per-file names

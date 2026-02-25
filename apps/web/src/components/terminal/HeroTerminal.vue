@@ -4,7 +4,10 @@ import { useDropZone } from '@vueuse/core'
 import { Upload, Hash, FileText, FolderOpen, X } from 'lucide-vue-next'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import { useFileDigest, type FileDigestResult } from '@/composables/useFileDigest'
+import {
+  useFileDigest,
+  type FileDigestResult,
+} from '@/composables/useFileDigest'
 import type { SecureDigestOp } from '@uts/sdk'
 
 const emit = defineEmits<{
@@ -18,7 +21,14 @@ const dirInputRef = ref<HTMLInputElement>()
 const manualHash = ref('')
 const selectedAlgorithm = ref<SecureDigestOp>('KECCAK256')
 
-const { isDigesting, progress, error: digestError, result: digestResult, digestFile, reset: resetDigest } = useFileDigest()
+const {
+  isDigesting,
+  progress,
+  error: digestError,
+  result: digestResult,
+  digestFile,
+  reset: resetDigest,
+} = useFileDigest()
 
 const { isOverDropZone } = useDropZone(dropZoneRef, {
   onDrop: handleDrop,
@@ -31,7 +41,9 @@ const isStamping = ref(false)
 
 const hasFiles = computed(() => selectedFiles.value.length > 0)
 const hasResult = computed(() => digestResult.value !== null)
-const canSubmit = computed(() => (hasFiles.value || manualHash.value.trim()) && !isStamping.value)
+const canSubmit = computed(
+  () => (hasFiles.value || manualHash.value.trim()) && !isStamping.value,
+)
 
 function handleDrop(files: File[] | null) {
   if (files && files.length > 0) {
@@ -133,7 +145,8 @@ function totalSize(): number {
       class="relative rounded-lg border-2 border-dashed p-8 text-center transition-all duration-300"
       :class="{
         'border-neon-cyan/50 bg-neon-cyan/5': isOverDropZone,
-        'border-glass-border hover:border-white/20': !isOverDropZone && !hasFiles && !isDigesting && !hasResult,
+        'border-glass-border hover:border-white/20':
+          !isOverDropZone && !hasFiles && !isDigesting && !hasResult,
         'border-valid/30 bg-valid/5': hasFiles || hasResult,
       }"
     >
@@ -149,7 +162,9 @@ function totalSize(): number {
             :style="{ width: `${progress}%` }"
           />
         </div>
-        <div class="font-mono text-xs text-white/40">{{ progress.toFixed(0) }}%</div>
+        <div class="font-mono text-xs text-white/40">
+          {{ progress.toFixed(0) }}%
+        </div>
       </div>
 
       <!-- Files selected (not yet hashed) -->
@@ -157,7 +172,10 @@ function totalSize(): number {
         <div class="flex items-center justify-center gap-2">
           <FileText class="h-5 w-5 text-neon-cyan" />
           <span class="font-heading text-sm font-semibold text-neon-cyan">
-            {{ selectedFiles.length }} file{{ selectedFiles.length > 1 ? 's' : '' }} selected
+            {{ selectedFiles.length }} file{{
+              selectedFiles.length > 1 ? 's' : ''
+            }}
+            selected
           </span>
           <button
             class="ml-2 rounded p-1 text-white/30 transition hover:bg-white/10 hover:text-white"
@@ -172,14 +190,19 @@ function totalSize(): number {
             :key="i"
             class="font-mono text-xs text-white/50"
           >
-            {{ file.name }} <span class="text-white/30">({{ formatSize(file.size) }})</span>
+            {{ file.name }}
+            <span class="text-white/30">({{ formatSize(file.size) }})</span>
           </div>
-          <div v-if="selectedFiles.length > 5" class="font-mono text-xs text-white/30">
+          <div
+            v-if="selectedFiles.length > 5"
+            class="font-mono text-xs text-white/30"
+          >
             ... and {{ selectedFiles.length - 5 }} more
           </div>
         </div>
         <div class="font-mono text-[10px] text-white/30">
-          Total: {{ formatSize(totalSize()) }} · Hash on stamp with {{ selectedAlgorithm }}
+          Total: {{ formatSize(totalSize()) }} · Hash on stamp with
+          {{ selectedAlgorithm }}
         </div>
       </div>
 
@@ -222,7 +245,10 @@ function totalSize(): number {
     </div>
 
     <!-- Error display -->
-    <div v-if="digestError" class="mt-3 rounded bg-invalid/10 px-3 py-2 font-mono text-xs text-invalid">
+    <div
+      v-if="digestError"
+      class="mt-3 rounded bg-invalid/10 px-3 py-2 font-mono text-xs text-invalid"
+    >
       &gt; Error: {{ digestError }}
     </div>
 

@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Zap, Shield, Settings, Plus, Trash2, RotateCcw, Wallet, RefreshCw, ChevronDown, Pencil, Check } from 'lucide-vue-next'
+import {
+  Zap,
+  Shield,
+  Settings,
+  Plus,
+  Trash2,
+  RotateCcw,
+  Wallet,
+  RefreshCw,
+  ChevronDown,
+  Pencil,
+  Check,
+} from 'lucide-vue-next'
 import HeroTerminal from '@/components/terminal/HeroTerminal.vue'
 import StampingWorkflow from '@/components/stamp/StampingWorkflow.vue'
 import VerificationResult from '@/components/verify/VerificationResult.vue'
@@ -8,7 +20,11 @@ import UpgradePanel from '@/components/upgrade/UpgradePanel.vue'
 import LiveFeed from '@/components/feed/LiveFeed.vue'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import { useTimestampSDK, setWeb3Provider, getSDK } from '@/composables/useTimestampSDK'
+import {
+  useTimestampSDK,
+  setWeb3Provider,
+  getSDK,
+} from '@/composables/useTimestampSDK'
 import { useWallet } from '@/composables/useWallet'
 import type { FileDigestResult } from '@/composables/useFileDigest'
 import { useAppStore } from '@/stores/app'
@@ -17,7 +33,13 @@ import ScrollLogo from '@/assets/Scroll_Logomark.svg'
 const SCROLL_CHAIN_IDS = new Set([534352, 534351])
 
 const store = useAppStore()
-const { stampPhase, stampError, broadcastProgress, stamp, downloadPendingStamp } = useTimestampSDK()
+const {
+  stampPhase,
+  stampError,
+  broadcastProgress,
+  stamp,
+  downloadPendingStamp,
+} = useTimestampSDK()
 const {
   walletAddress,
   walletChainName,
@@ -33,7 +55,9 @@ const {
 type TabId = 'stamp' | 'verify' | 'upgrade'
 const savedTab = localStorage.getItem('uts-active-tab') as TabId | null
 const validTabs: TabId[] = ['stamp', 'verify', 'upgrade']
-const activeTab = ref<TabId>(savedTab && validTabs.includes(savedTab) ? savedTab : 'stamp')
+const activeTab = ref<TabId>(
+  savedTab && validTabs.includes(savedTab) ? savedTab : 'stamp',
+)
 const showWorkflow = ref(false)
 const showSettings = ref(false)
 const showChainPanel = ref(false)
@@ -146,17 +170,27 @@ function handleWalletClick() {
 <template>
   <div class="scanlines min-h-screen bg-deep-black">
     <!-- Header -->
-    <header class="relative z-50 border-b border-glass-border bg-midnight/80 backdrop-blur-md">
-      <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <header
+      class="relative z-50 border-b border-glass-border bg-midnight/80 backdrop-blur-md"
+    >
+      <div
+        class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4"
+      >
         <div class="flex items-center gap-3">
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-neon-cyan/10">
+          <div
+            class="flex h-8 w-8 items-center justify-center rounded-lg bg-neon-cyan/10"
+          >
             <Zap class="h-5 w-5 text-neon-cyan" />
           </div>
           <div>
-            <h1 class="font-heading text-lg font-bold tracking-tight text-white">
+            <h1
+              class="font-heading text-lg font-bold tracking-tight text-white"
+            >
               UTS
             </h1>
-            <p class="font-mono text-[10px] text-white/30">Universal Timestamps</p>
+            <p class="font-mono text-[10px] text-white/30">
+              Universal Timestamps
+            </p>
           </div>
         </div>
 
@@ -181,7 +215,12 @@ function handleWalletClick() {
                   }"
                 />
               </span>
-              <span>{{ store.onlineCount }}/{{ store.ethChains.length }} chains</span>
+              <span
+                >{{ store.onlineCount }}/{{
+                  store.ethChains.length
+                }}
+                chains</span
+              >
               <ChevronDown class="h-3 w-3" />
             </button>
 
@@ -192,7 +231,9 @@ function handleWalletClick() {
                 class="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-glass-border bg-midnight/95 p-4 shadow-xl backdrop-blur-lg"
               >
                 <div class="mb-3 flex items-center justify-between">
-                  <h4 class="font-heading text-xs font-semibold text-white/80">Ethereum Chains</h4>
+                  <h4 class="font-heading text-xs font-semibold text-white/80">
+                    Ethereum Chains
+                  </h4>
                   <BaseButton variant="secondary" @click="store.checkChains()">
                     <RefreshCw class="h-3 w-3" />
                     Refresh
@@ -211,22 +252,35 @@ function handleWalletClick() {
                         :class="{
                           'bg-valid': chain.status === 'online',
                           'bg-invalid': chain.status === 'offline',
-                          'bg-pending animate-glow-pulse': chain.status === 'checking',
+                          'bg-pending animate-glow-pulse':
+                            chain.status === 'checking',
                         }"
                       />
                       <div class="min-w-0 flex-1">
-                        <div class="font-heading text-xs font-medium text-white/70">{{ chain.name }}</div>
-                        <div class="font-mono text-[10px] text-white/30">Chain ID: {{ chain.chainId }}</div>
+                        <div
+                          class="font-heading text-xs font-medium text-white/70"
+                        >
+                          {{ chain.name }}
+                        </div>
+                        <div class="font-mono text-[10px] text-white/30">
+                          Chain ID: {{ chain.chainId }}
+                        </div>
                       </div>
                       <div class="text-right">
-                        <div class="font-mono text-[10px]" :class="{
-                          'text-valid': chain.status === 'online',
-                          'text-invalid': chain.status === 'offline',
-                          'text-pending': chain.status === 'checking',
-                        }">
+                        <div
+                          class="font-mono text-[10px]"
+                          :class="{
+                            'text-valid': chain.status === 'online',
+                            'text-invalid': chain.status === 'offline',
+                            'text-pending': chain.status === 'checking',
+                          }"
+                        >
                           {{ chain.status }}
                         </div>
-                        <div v-if="chain.latency" class="font-mono text-[10px] text-white/20">
+                        <div
+                          v-if="chain.latency"
+                          class="font-mono text-[10px] text-white/20"
+                        >
                           {{ chain.latency }}ms
                         </div>
                       </div>
@@ -246,7 +300,10 @@ function handleWalletClick() {
                       </button>
                     </div>
                     <!-- RPC editing row -->
-                    <div v-if="editingChainRpc === chain.chainId" class="mt-1.5 flex gap-1.5">
+                    <div
+                      v-if="editingChainRpc === chain.chainId"
+                      class="mt-1.5 flex gap-1.5"
+                    >
                       <input
                         v-model="editRpcValue"
                         type="text"
@@ -262,7 +319,10 @@ function handleWalletClick() {
                         <Check class="h-3 w-3" />
                       </button>
                     </div>
-                    <div v-else-if="chain.rpcUrl" class="mt-0.5 truncate font-mono text-[10px] text-white/20 pl-4">
+                    <div
+                      v-else-if="chain.rpcUrl"
+                      class="mt-0.5 truncate font-mono text-[10px] text-white/20 pl-4"
+                    >
                       {{ chain.rpcUrl }}
                     </div>
                   </div>
@@ -270,7 +330,9 @@ function handleWalletClick() {
 
                 <!-- Add custom chain -->
                 <div class="mt-3 border-t border-glass-border pt-3">
-                  <div class="font-mono text-[10px] text-white/30 mb-1.5">Add chain by ID</div>
+                  <div class="font-mono text-[10px] text-white/30 mb-1.5">
+                    Add chain by ID
+                  </div>
                   <div class="flex gap-2">
                     <input
                       v-model="newChainId"
@@ -285,7 +347,13 @@ function handleWalletClick() {
                     </BaseButton>
                   </div>
                   <div class="mt-2 flex justify-end">
-                    <BaseButton variant="secondary" @click="store.resetChains(); store.checkChains()">
+                    <BaseButton
+                      variant="secondary"
+                      @click="
+                        store.resetChains()
+                        store.checkChains()
+                      "
+                    >
                       <RotateCcw class="h-3 w-3" />
                       Reset defaults
                     </BaseButton>
@@ -297,9 +365,10 @@ function handleWalletClick() {
           <!-- Connect Wallet button -->
           <button
             class="flex items-center gap-2 rounded-lg border px-3 py-1.5 font-mono text-xs transition-all"
-            :class="walletConnected
-              ? 'border-valid/30 bg-valid/5 text-valid hover:bg-valid/10'
-              : 'border-neon-purple/30 bg-neon-purple/5 text-neon-purple hover:bg-neon-purple/10'
+            :class="
+              walletConnected
+                ? 'border-valid/30 bg-valid/5 text-valid hover:bg-valid/10'
+                : 'border-neon-purple/30 bg-neon-purple/5 text-neon-purple hover:bg-neon-purple/10'
             "
             :disabled="walletConnecting"
             @click="handleWalletClick"
@@ -308,7 +377,9 @@ function handleWalletClick() {
             <span v-if="walletConnecting">Connecting...</span>
             <span v-else-if="walletConnected && walletAddress">
               {{ truncateAddress(walletAddress) }}
-              <span v-if="walletChainName" class="text-white/30"> · {{ walletChainName }}</span>
+              <span v-if="walletChainName" class="text-white/30">
+                · {{ walletChainName }}</span
+              >
             </span>
             <span v-else-if="!hasWallet">No Wallet</span>
             <span v-else>Connect Wallet</span>
@@ -328,11 +399,16 @@ function handleWalletClick() {
 
     <!-- Calendar settings panel -->
     <Transition name="fade">
-      <div v-if="showSettings" class="border-b border-glass-border bg-midnight/60 backdrop-blur-md">
+      <div
+        v-if="showSettings"
+        class="border-b border-glass-border bg-midnight/60 backdrop-blur-md"
+      >
         <div class="mx-auto max-w-6xl px-6 py-4">
           <GlassCard>
             <div class="mb-3 flex items-center justify-between">
-              <h3 class="font-heading text-sm font-semibold text-white/80">Calendar Nodes</h3>
+              <h3 class="font-heading text-sm font-semibold text-white/80">
+                Calendar Nodes
+              </h3>
               <BaseButton variant="secondary" @click="store.resetCalendars()">
                 <RotateCcw class="h-3 w-3" />
                 Reset to defaults
@@ -344,7 +420,9 @@ function handleWalletClick() {
                 :key="i"
                 class="flex items-center gap-2"
               >
-                <span class="flex-1 truncate rounded border border-glass-border bg-surface px-3 py-1.5 font-mono text-xs text-white/60">
+                <span
+                  class="flex-1 truncate rounded border border-glass-border bg-surface px-3 py-1.5 font-mono text-xs text-white/60"
+                >
                   {{ url }}
                 </span>
                 <button
@@ -378,14 +456,21 @@ function handleWalletClick() {
                   class="h-4 w-4 rounded border-glass-border bg-surface accent-neon-cyan"
                 />
                 <div>
-                  <div class="font-heading text-xs font-medium text-white/70">Keep pending attestations after upgrade</div>
-                  <div class="font-mono text-[10px] text-white/30">When enabled, the original pending attestation is preserved alongside the upgraded one</div>
+                  <div class="font-heading text-xs font-medium text-white/70">
+                    Keep pending attestations after upgrade
+                  </div>
+                  <div class="font-mono text-[10px] text-white/30">
+                    When enabled, the original pending attestation is preserved
+                    alongside the upgraded one
+                  </div>
                 </div>
               </label>
 
               <!-- Internal hash algorithm -->
               <div class="flex items-center gap-3">
-                <label class="font-heading text-xs font-medium text-white/70">Internal hash algorithm</label>
+                <label class="font-heading text-xs font-medium text-white/70"
+                  >Internal hash algorithm</label
+                >
                 <select
                   v-model="store.internalHashAlgo"
                   class="rounded border border-glass-border bg-surface px-2 py-1 font-mono text-xs text-neon-cyan outline-none focus:border-neon-cyan/40"
@@ -393,7 +478,9 @@ function handleWalletClick() {
                   <option value="KECCAK256">Keccak-256</option>
                   <option value="SHA256">SHA-256</option>
                 </select>
-                <span class="font-mono text-[10px] text-white/30">Used for Merkle tree construction</span>
+                <span class="font-mono text-[10px] text-white/30"
+                  >Used for Merkle tree construction</span
+                >
               </div>
             </div>
           </GlassCard>
@@ -406,7 +493,8 @@ function handleWalletClick() {
       <!-- Title -->
       <div class="mb-10 text-center">
         <h2 class="font-heading text-3xl font-bold tracking-tight text-white">
-          Decentralized <span class="text-neon-cyan glow-text-cyan">Timestamping</span>
+          Decentralized
+          <span class="text-neon-cyan glow-text-cyan">Timestamping</span>
         </h2>
         <p class="mt-2 font-mono text-sm text-white/40">
           Cryptographic proof of existence anchored to Ethereum

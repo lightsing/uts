@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { hexlify } from 'ethers/utils'
-import { FileUp, RefreshCw, Download, CheckCircle2, AlertTriangle } from 'lucide-vue-next'
+import {
+  FileUp,
+  RefreshCw,
+  Download,
+  CheckCircle2,
+  AlertTriangle,
+} from 'lucide-vue-next'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import AttestationDetail from '@/components/verify/AttestationDetail.vue'
@@ -37,7 +43,8 @@ async function handleOtsUpload(event: Event) {
     loadedTimestamp.value = decoded
     await verify(decoded)
   } catch (e) {
-    upgradeError.value = e instanceof Error ? e.message : 'Failed to decode .ots file'
+    upgradeError.value =
+      e instanceof Error ? e.message : 'Failed to decode .ots file'
   }
 }
 
@@ -80,13 +87,16 @@ function handleReset() {
   <GlassCard glow="purple">
     <div class="mb-4 flex items-center gap-2">
       <RefreshCw class="h-4 w-4 text-neon-purple" />
-      <h3 class="font-heading text-sm font-semibold text-white/80">Manual Upgrade</h3>
+      <h3 class="font-heading text-sm font-semibold text-white/80">
+        Manual Upgrade
+      </h3>
     </div>
 
     <!-- Upload .ots file -->
     <div v-if="!loadedTimestamp" class="space-y-4">
       <p class="font-mono text-xs text-white/40">
-        &gt; Upload a pending <span class="text-neon-purple">.ots</span> file to upgrade it with on-chain attestations
+        &gt; Upload a pending <span class="text-neon-purple">.ots</span> file to
+        upgrade it with on-chain attestations
       </p>
       <BaseButton variant="secondary" @click="otsFileRef?.click()">
         <FileUp class="h-4 w-4" />
@@ -105,7 +115,9 @@ function handleReset() {
     <div v-else class="space-y-5">
       <!-- Digest info -->
       <div class="space-y-2 rounded-lg bg-surface/60 p-4">
-        <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
+        <div
+          class="font-mono text-[10px] uppercase tracking-widest text-white/30"
+        >
           Digest ({{ loadedTimestamp.header.kind }})
         </div>
         <div class="break-all font-mono text-xs text-neon-cyan">
@@ -115,7 +127,9 @@ function handleReset() {
 
       <!-- Current attestations -->
       <div v-if="verifyAttestations.length > 0" class="space-y-2">
-        <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
+        <div
+          class="font-mono text-[10px] uppercase tracking-widest text-white/30"
+        >
           Current Attestations ({{ verifyAttestations.length }})
         </div>
         <AttestationDetail
@@ -127,7 +141,9 @@ function handleReset() {
 
       <!-- Upgrade results -->
       <div v-if="upgradeResults" class="space-y-2">
-        <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
+        <div
+          class="font-mono text-[10px] uppercase tracking-widest text-white/30"
+        >
           Upgrade Results
         </div>
         <div
@@ -152,12 +168,20 @@ function handleReset() {
 
       <!-- Actions -->
       <div class="flex flex-wrap gap-2">
-        <BaseButton variant="primary" :disabled="isUpgrading" @click="handleUpgrade">
+        <BaseButton
+          variant="primary"
+          :disabled="isUpgrading"
+          @click="handleUpgrade"
+        >
           <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isUpgrading }" />
           {{ isUpgrading ? 'Upgrading...' : 'Upgrade Now' }}
         </BaseButton>
 
-        <BaseButton v-if="hasUpgraded" variant="secondary" @click="handleDownload">
+        <BaseButton
+          v-if="hasUpgraded"
+          variant="secondary"
+          @click="handleDownload"
+        >
           <Download class="h-4 w-4" />
           Download Upgraded .ots
         </BaseButton>

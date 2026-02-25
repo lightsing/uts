@@ -35,7 +35,9 @@ function loadCalendars(): string[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return DEFAULT_CALENDARS.map((u) => u.toString())
 }
 
@@ -43,7 +45,10 @@ function saveCalendars(urls: string[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(urls))
 }
 
-function loadSettings(): { keepPending: boolean; internalHashAlgo: SecureDigestOp } {
+function loadSettings(): {
+  keepPending: boolean
+  internalHashAlgo: SecureDigestOp
+} {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY)
     if (stored) {
@@ -53,11 +58,16 @@ function loadSettings(): { keepPending: boolean; internalHashAlgo: SecureDigestO
         internalHashAlgo: parsed.internalHashAlgo ?? 'KECCAK256',
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return { keepPending: false, internalHashAlgo: 'KECCAK256' }
 }
 
-function saveSettings(settings: { keepPending: boolean; internalHashAlgo: SecureDigestOp }) {
+function saveSettings(settings: {
+  keepPending: boolean
+  internalHashAlgo: SecureDigestOp
+}) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
 }
 
@@ -65,7 +75,9 @@ function loadCustomChains(): number[] | null {
   try {
     const stored = localStorage.getItem(CHAINS_KEY)
     if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return null
 }
 
@@ -77,7 +89,9 @@ function loadChainRpcs(): Record<number, string> {
   try {
     const stored = localStorage.getItem(CHAIN_RPCS_KEY)
     if (stored) return JSON.parse(stored)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return {}
 }
 
@@ -106,7 +120,9 @@ export const useAppStore = defineStore('app', () => {
   const recentStamps = ref<DetachedTimestamp[]>([])
 
   // Chain IDs to monitor (persisted or default from SDK)
-  const customChainIds = ref<number[]>(loadCustomChains() ?? getDefaultChainIds())
+  const customChainIds = ref<number[]>(
+    loadCustomChains() ?? getDefaultChainIds(),
+  )
 
   // Custom RPC endpoints per chain (persisted)
   const customRpcs = ref<Record<number, string>>(loadChainRpcs())
@@ -115,10 +131,14 @@ export const useAppStore = defineStore('app', () => {
     () => ethChains.value.filter((c) => c.status === 'online').length,
   )
 
-  watch(calendarUrls, (urls) => {
-    saveCalendars(urls)
-    resetSDK({ calendars: urls.map((u) => new URL(u)) })
-  }, { deep: true })
+  watch(
+    calendarUrls,
+    (urls) => {
+      saveCalendars(urls)
+      resetSDK({ calendars: urls.map((u) => new URL(u)) })
+    },
+    { deep: true },
+  )
 
   watch(keepPending, (val) => {
     saveSettings({ keepPending: val, internalHashAlgo: internalHashAlgo.value })
@@ -149,7 +169,9 @@ export const useAppStore = defineStore('app', () => {
       if (rpc) {
         try {
           provider = new JsonRpcProvider(rpc)
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
       if (!provider) {
         provider = sdk.getEthProvider(chain.chainId)
@@ -157,7 +179,9 @@ export const useAppStore = defineStore('app', () => {
       if (!provider && PUBLIC_RPCS[chain.chainId]) {
         try {
           provider = new JsonRpcProvider(PUBLIC_RPCS[chain.chainId])
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
 
       if (!provider) {

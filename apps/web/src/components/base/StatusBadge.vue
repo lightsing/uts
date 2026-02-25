@@ -19,9 +19,12 @@ const labels: Record<string, string> = {
     :class="[
       {
         'bg-valid/10 text-valid border border-valid/30': status === 'valid',
-        'bg-invalid/10 text-invalid border border-invalid/30': status === 'invalid',
-        'bg-pending/10 text-pending border border-pending/30': status === 'pending',
-        'bg-neon-purple/10 text-neon-purple border border-neon-purple/30': status === 'partial',
+        'bg-invalid/10 text-invalid border border-invalid/30':
+          status === 'invalid',
+        'bg-pending/10 text-pending border border-pending/30':
+          status === 'pending',
+        'bg-neon-purple/10 text-neon-purple border border-neon-purple/30':
+          status === 'partial',
         'bg-white/5 text-white/50 border border-white/10': status === 'unknown',
       },
       {

@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { hexlify } from 'ethers/utils'
-import { FileUp, Search, ShieldCheck, ChevronDown, ChevronUp, FileCheck, FileX } from 'lucide-vue-next'
+import {
+  FileUp,
+  Search,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp,
+  FileCheck,
+  FileX,
+} from 'lucide-vue-next'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import StatusBadge from '@/components/base/StatusBadge.vue'
@@ -22,7 +30,11 @@ const {
   resetVerify,
 } = useTimestampSDK()
 
-const { digestFile, isDigesting: isDigestingOriginal, progress: digestProgress } = useFileDigest()
+const {
+  digestFile,
+  isDigesting: isDigestingOriginal,
+  progress: digestProgress,
+} = useFileDigest()
 
 const otsFileRef = ref<HTMLInputElement>()
 const originalFileRef = ref<HTMLInputElement>()
@@ -31,14 +43,21 @@ const showProofPath = ref(false)
 const originalFileMatch = ref<'match' | 'mismatch' | null>(null)
 const originalFileName = ref<string | null>(null)
 
-function mapVerifyStatus(status: VerifyStatus | null): 'valid' | 'invalid' | 'pending' | 'partial' | 'unknown' {
+function mapVerifyStatus(
+  status: VerifyStatus | null,
+): 'valid' | 'invalid' | 'pending' | 'partial' | 'unknown' {
   if (!status) return 'unknown'
   switch (status) {
-    case VerifyStatus.VALID: return 'valid'
-    case VerifyStatus.INVALID: return 'invalid'
-    case VerifyStatus.PENDING: return 'pending'
-    case VerifyStatus.PARTIAL_VALID: return 'partial'
-    default: return 'unknown'
+    case VerifyStatus.VALID:
+      return 'valid'
+    case VerifyStatus.INVALID:
+      return 'invalid'
+    case VerifyStatus.PENDING:
+      return 'pending'
+    case VerifyStatus.PARTIAL_VALID:
+      return 'partial'
+    default:
+      return 'unknown'
   }
 }
 
@@ -91,13 +110,16 @@ function handleReset() {
   <GlassCard glow="cyan">
     <div class="mb-4 flex items-center gap-2">
       <ShieldCheck class="h-4 w-4 text-neon-cyan" />
-      <h3 class="font-heading text-sm font-semibold text-white/80">Verification Dashboard</h3>
+      <h3 class="font-heading text-sm font-semibold text-white/80">
+        Verification Dashboard
+      </h3>
     </div>
 
     <!-- Upload .ots file -->
     <div v-if="!loadedTimestamp" class="space-y-4">
       <p class="font-mono text-xs text-white/40">
-        &gt; Upload a <span class="text-neon-cyan">.ots</span> file to verify a timestamp proof
+        &gt; Upload a <span class="text-neon-cyan">.ots</span> file to verify a
+        timestamp proof
       </p>
       <div class="flex gap-2">
         <BaseButton variant="secondary" @click="otsFileRef?.click()">
@@ -125,13 +147,17 @@ function handleReset() {
         />
         <div v-if="isVerifying" class="flex items-center gap-2">
           <Search class="h-4 w-4 animate-spin text-neon-cyan" />
-          <span class="font-mono text-xs text-neon-cyan">Verifying proof chain...</span>
+          <span class="font-mono text-xs text-neon-cyan"
+            >Verifying proof chain...</span
+          >
         </div>
       </div>
 
       <!-- Digest info -->
       <div class="space-y-2 rounded-lg bg-surface/60 p-4">
-        <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
+        <div
+          class="font-mono text-[10px] uppercase tracking-widest text-white/30"
+        >
           Original Digest ({{ loadedTimestamp.header.kind }})
         </div>
         <div class="break-all font-mono text-xs text-neon-cyan">
@@ -140,19 +166,30 @@ function handleReset() {
       </div>
 
       <!-- Optional: verify original file matches the header digest -->
-      <div class="space-y-2 rounded-lg border border-glass-border bg-surface/30 p-4">
-        <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
+      <div
+        class="space-y-2 rounded-lg border border-glass-border bg-surface/30 p-4"
+      >
+        <div
+          class="font-mono text-[10px] uppercase tracking-widest text-white/30"
+        >
           Verify Original File (Optional)
         </div>
         <p class="font-mono text-[10px] text-white/25">
           Upload the original file to verify it matches the .ots header digest
         </p>
         <div class="flex items-center gap-3">
-          <BaseButton variant="secondary" @click="originalFileRef?.click()" :disabled="isDigestingOriginal">
+          <BaseButton
+            variant="secondary"
+            @click="originalFileRef?.click()"
+            :disabled="isDigestingOriginal"
+          >
             <FileUp class="h-3.5 w-3.5" />
             {{ isDigestingOriginal ? 'Digesting...' : 'Upload Original' }}
           </BaseButton>
-          <span v-if="originalFileName" class="font-mono text-[10px] text-white/40">
+          <span
+            v-if="originalFileName"
+            class="font-mono text-[10px] text-white/40"
+          >
             {{ originalFileName }}
           </span>
         </div>
@@ -163,23 +200,41 @@ function handleReset() {
           @change="handleOriginalFileUpload"
         />
         <!-- Progress bar -->
-        <div v-if="isDigestingOriginal" class="h-1 w-full overflow-hidden rounded-full bg-surface">
-          <div class="h-full rounded-full bg-neon-cyan transition-all duration-150" :style="{ width: `${digestProgress}%` }" />
+        <div
+          v-if="isDigestingOriginal"
+          class="h-1 w-full overflow-hidden rounded-full bg-surface"
+        >
+          <div
+            class="h-full rounded-full bg-neon-cyan transition-all duration-150"
+            :style="{ width: `${digestProgress}%` }"
+          />
         </div>
         <!-- Match result -->
-        <div v-if="originalFileMatch === 'match'" class="flex items-center gap-2 rounded-lg bg-valid/10 px-3 py-2">
+        <div
+          v-if="originalFileMatch === 'match'"
+          class="flex items-center gap-2 rounded-lg bg-valid/10 px-3 py-2"
+        >
           <FileCheck class="h-4 w-4 text-valid" />
-          <span class="font-mono text-xs text-valid">File digest matches — this is the original file</span>
+          <span class="font-mono text-xs text-valid"
+            >File digest matches — this is the original file</span
+          >
         </div>
-        <div v-else-if="originalFileMatch === 'mismatch'" class="flex items-center gap-2 rounded-lg bg-invalid/10 px-3 py-2">
+        <div
+          v-else-if="originalFileMatch === 'mismatch'"
+          class="flex items-center gap-2 rounded-lg bg-invalid/10 px-3 py-2"
+        >
           <FileX class="h-4 w-4 text-invalid" />
-          <span class="font-mono text-xs text-invalid">File digest does NOT match the .ots header</span>
+          <span class="font-mono text-xs text-invalid"
+            >File digest does NOT match the .ots header</span
+          >
         </div>
       </div>
 
       <!-- Attestation details (collapsible) -->
       <div v-if="verifyAttestations.length > 0" class="space-y-2">
-        <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
+        <div
+          class="font-mono text-[10px] uppercase tracking-widest text-white/30"
+        >
           Attestations ({{ verifyAttestations.length }})
         </div>
         <AttestationDetail
@@ -194,7 +249,10 @@ function handleReset() {
         class="flex w-full items-center gap-2 rounded-lg border border-glass-border px-4 py-2.5 text-left font-mono text-xs text-white/50 transition hover:border-white/20 hover:text-white/70"
         @click="showProofPath = !showProofPath"
       >
-        <component :is="showProofPath ? ChevronUp : ChevronDown" class="h-4 w-4" />
+        <component
+          :is="showProofPath ? ChevronUp : ChevronDown"
+          class="h-4 w-4"
+        />
         {{ showProofPath ? 'Hide' : 'Show' }} Proof Path
       </button>
 
@@ -213,9 +271,7 @@ function handleReset() {
       </div>
 
       <!-- Reset -->
-      <BaseButton variant="secondary" @click="handleReset">
-        Reset
-      </BaseButton>
+      <BaseButton variant="secondary" @click="handleReset"> Reset </BaseButton>
     </div>
   </GlassCard>
 </template>

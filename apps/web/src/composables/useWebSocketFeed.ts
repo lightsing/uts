@@ -43,7 +43,9 @@ export function useWebSocketFeed() {
   }
 
   /** Poll web3Provider. Returns the wallet's chainId on success, or null. */
-  async function fetchEventsFromWeb3(web3Provider: Eip1193Provider): Promise<number | null> {
+  async function fetchEventsFromWeb3(
+    web3Provider: Eip1193Provider,
+  ): Promise<number | null> {
     try {
       const provider = new BrowserProvider(web3Provider)
       const network = await provider.getNetwork()
@@ -88,7 +90,10 @@ export function useWebSocketFeed() {
   }
 
   /** Poll ethRPCs, skipping chains already covered by web3Provider. */
-  async function fetchEventsFromRPCs(sdk: SDK, skipChainIds: Set<number> = new Set()) {
+  async function fetchEventsFromRPCs(
+    sdk: SDK,
+    skipChainIds: Set<number> = new Set(),
+  ) {
     const chainIds = Object.keys(sdk.ethRPCs).map(Number)
 
     for (const chainId of chainIds) {

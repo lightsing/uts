@@ -30,7 +30,10 @@ export function useFileDigest() {
     progress.value = 0
     const estimatedMs = Math.max(
       MIN_DURATION_MS,
-      Math.min(((totalBytes * fileCount) / ESTIMATED_THROUGHPUT) * 1000, MAX_DURATION_MS),
+      Math.min(
+        ((totalBytes * fileCount) / ESTIMATED_THROUGHPUT) * 1000,
+        MAX_DURATION_MS,
+      ),
     )
     const intervalMs = 50
     const steps = estimatedMs / intervalMs

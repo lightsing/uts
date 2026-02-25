@@ -33,13 +33,48 @@ interface WorkflowStep {
 }
 
 const steps: WorkflowStep[] = [
-  { id: 'generating-nonce', label: 'Generating Nonce', description: 'Creating random nonce for privacy', icon: KeyRound },
-  { id: 'building-merkle-tree', label: 'Building Merkle Tree', description: 'Constructing proof tree from leaves', icon: GitBranch },
-  { id: 'broadcasting', label: 'Broadcasting', description: 'Submitting to calendar nodes', icon: Radio },
-  { id: 'building-proof', label: 'Building Proof', description: 'Constructing Merkle proof paths', icon: Blocks },
-  { id: 'complete', label: 'Complete', description: 'Timestamp recorded (pending attestation)', icon: CheckCircle2 },
-  { id: 'upgrading', label: 'Polling for Upgrade', description: 'Waiting for on-chain attestation...', icon: RefreshCw },
-  { id: 'upgraded', label: 'Upgraded', description: 'Attestation confirmed on-chain', icon: ShieldCheck },
+  {
+    id: 'generating-nonce',
+    label: 'Generating Nonce',
+    description: 'Creating random nonce for privacy',
+    icon: KeyRound,
+  },
+  {
+    id: 'building-merkle-tree',
+    label: 'Building Merkle Tree',
+    description: 'Constructing proof tree from leaves',
+    icon: GitBranch,
+  },
+  {
+    id: 'broadcasting',
+    label: 'Broadcasting',
+    description: 'Submitting to calendar nodes',
+    icon: Radio,
+  },
+  {
+    id: 'building-proof',
+    label: 'Building Proof',
+    description: 'Constructing Merkle proof paths',
+    icon: Blocks,
+  },
+  {
+    id: 'complete',
+    label: 'Complete',
+    description: 'Timestamp recorded (pending attestation)',
+    icon: CheckCircle2,
+  },
+  {
+    id: 'upgrading',
+    label: 'Polling for Upgrade',
+    description: 'Waiting for on-chain attestation...',
+    icon: RefreshCw,
+  },
+  {
+    id: 'upgraded',
+    label: 'Upgraded',
+    description: 'Attestation confirmed on-chain',
+    icon: ShieldCheck,
+  },
 ]
 
 const phaseOrder: StampPhase[] = [
@@ -64,7 +99,11 @@ function getStepStatus(stepId: StampPhase) {
 }
 
 function getStepDescription(step: WorkflowStep): string {
-  if (step.id === 'broadcasting' && props.broadcastProgress && getStepStatus(step.id) === 'active') {
+  if (
+    step.id === 'broadcasting' &&
+    props.broadcastProgress &&
+    getStepStatus(step.id) === 'active'
+  ) {
     return `Calendar responses: ${props.broadcastProgress}`
   }
   return step.description
@@ -75,7 +114,9 @@ function getStepDescription(step: WorkflowStep): string {
   <GlassCard glow="purple">
     <div class="mb-4 flex items-center gap-2">
       <GitBranch class="h-4 w-4 text-neon-purple" />
-      <h3 class="font-heading text-sm font-semibold text-white/80">Stamping Pipeline</h3>
+      <h3 class="font-heading text-sm font-semibold text-white/80">
+        Stamping Pipeline
+      </h3>
     </div>
 
     <div class="space-y-1">
@@ -93,19 +134,33 @@ function getStepDescription(step: WorkflowStep): string {
           <div
             class="flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-300"
             :class="{
-              'border-neon-cyan/50 bg-neon-cyan/10 text-neon-cyan': getStepStatus(step.id) === 'active',
-              'border-valid/50 bg-valid/10 text-valid': getStepStatus(step.id) === 'done',
-              'border-glass-border text-white/20': getStepStatus(step.id) === 'pending',
-              'border-invalid/50 bg-invalid/10 text-invalid': getStepStatus(step.id) === 'error',
+              'border-neon-cyan/50 bg-neon-cyan/10 text-neon-cyan':
+                getStepStatus(step.id) === 'active',
+              'border-valid/50 bg-valid/10 text-valid':
+                getStepStatus(step.id) === 'done',
+              'border-glass-border text-white/20':
+                getStepStatus(step.id) === 'pending',
+              'border-invalid/50 bg-invalid/10 text-invalid':
+                getStepStatus(step.id) === 'error',
             }"
           >
-            <CheckCircle2 v-if="getStepStatus(step.id) === 'done'" class="h-4 w-4" />
-            <AlertCircle v-else-if="getStepStatus(step.id) === 'error'" class="h-4 w-4" />
+            <CheckCircle2
+              v-if="getStepStatus(step.id) === 'done'"
+              class="h-4 w-4"
+            />
+            <AlertCircle
+              v-else-if="getStepStatus(step.id) === 'error'"
+              class="h-4 w-4"
+            />
             <component
               :is="step.icon"
               v-else
               class="h-3.5 w-3.5"
-              :class="{ 'animate-spin': getStepStatus(step.id) === 'active' && (step.id === 'upgrading') }"
+              :class="{
+                'animate-spin':
+                  getStepStatus(step.id) === 'active' &&
+                  step.id === 'upgrading',
+              }"
             />
           </div>
           <!-- Connecting line -->
@@ -125,7 +180,8 @@ function getStepDescription(step: WorkflowStep): string {
           <div
             class="font-heading text-sm font-medium transition-colors duration-300"
             :class="{
-              'text-neon-cyan glow-text-cyan': getStepStatus(step.id) === 'active',
+              'text-neon-cyan glow-text-cyan':
+                getStepStatus(step.id) === 'active',
               'text-valid': getStepStatus(step.id) === 'done',
               'text-white/30': getStepStatus(step.id) === 'pending',
               'text-invalid': getStepStatus(step.id) === 'error',
@@ -133,10 +189,18 @@ function getStepDescription(step: WorkflowStep): string {
           >
             {{ step.label }}
           </div>
-          <div class="font-mono text-[11px] text-white/30">{{ getStepDescription(step) }}</div>
+          <div class="font-mono text-[11px] text-white/30">
+            {{ getStepDescription(step) }}
+          </div>
 
           <!-- Download button inside the Complete step — visible while pending (complete or upgrading), hidden once upgraded -->
-          <div v-if="step.id === 'complete' && (phase === 'complete' || phase === 'upgrading')" class="mt-2">
+          <div
+            v-if="
+              step.id === 'complete' &&
+              (phase === 'complete' || phase === 'upgrading')
+            "
+            class="mt-2"
+          >
             <BaseButton variant="secondary" @click="emit('download')">
               <Download class="h-3.5 w-3.5" />
               Download pending .ots
