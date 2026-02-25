@@ -544,9 +544,9 @@ function handleWalletClick() {
       </div>
 
       <!-- Content -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-7">
         <!-- Main panel (3/5) -->
-        <div class="space-y-6 lg:col-span-3">
+        <div class="space-y-6 lg:col-span-4">
           <!-- Stamp tab (preserved with v-show) -->
           <div v-show="activeTab === 'stamp'" class="space-y-6">
             <HeroTerminal
@@ -575,7 +575,7 @@ function handleWalletClick() {
         </div>
 
         <!-- Sidebar (2/5) -->
-        <div class="space-y-6 lg:col-span-2">
+        <div class="space-y-6 lg:col-span-3">
           <LiveFeed />
         </div>
       </div>
