@@ -13,6 +13,7 @@ import type {
   DigestHeader,
   StampEventCallback,
 } from '@uts/sdk'
+import type { Eip1193Provider } from 'ethers'
 
 export type StampPhase =
   | 'idle'
@@ -35,8 +36,17 @@ export function getSDK(): SDK {
   return _sdkInstance
 }
 
-export function resetSDK(calendars?: URL[]) {
-  _sdkInstance = new SDK({ timeout: 15000, calendars })
+export function resetSDK(options?: { calendars?: URL[]; web3Provider?: Eip1193Provider | null }) {
+  _sdkInstance = new SDK({
+    timeout: 15000,
+    calendars: options?.calendars,
+    web3Provider: options?.web3Provider,
+  })
+}
+
+export function setWeb3Provider(provider: Eip1193Provider | null) {
+  const sdk = getSDK()
+  sdk.web3Provider = provider
 }
 
 function downloadOtsFile(stamp: DetachedTimestamp, fileName?: string) {

@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Zap, Shield, Settings, Plus, Trash2, RotateCcw } from 'lucide-vue-next'
+import { ref, onMounted, watch } from 'vue'
+import { Zap, Shield, Settings, Plus, Trash2, RotateCcw, Wallet } from 'lucide-vue-next'
 import HeroTerminal from '@/components/terminal/HeroTerminal.vue'
 import StampingWorkflow from '@/components/stamp/StampingWorkflow.vue'
 import VerificationResult from '@/components/verify/VerificationResult.vue'
 import LiveFeed from '@/components/feed/LiveFeed.vue'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import { useTimestampSDK } from '@/composables/useTimestampSDK'
+import { useTimestampSDK, setWeb3Provider } from '@/composables/useTimestampSDK'
+import { useWallet } from '@/composables/useWallet'
 import type { FileDigestResult } from '@/composables/useFileDigest'
 import { useAppStore } from '@/stores/app'
 
 const store = useAppStore()
 const { stampPhase, stampError, broadcastProgress, stamp, resetStamp } = useTimestampSDK()
+const {
+  walletAddress,
+  walletChainName,
+  isConnected: walletConnected,
+  isConnecting: walletConnecting,
+  hasWallet,
+  connect: connectWallet,
+  disconnect: disconnectWallet,
+  getEip1193Provider,
+  truncateAddress,
+} = useWallet()
 
 const activeTab = ref<'stamp' | 'verify'>('stamp')
 const showWorkflow = ref(false)
@@ -21,6 +33,15 @@ const newCalendarUrl = ref('')
 
 onMounted(() => {
   store.checkChains()
+})
+
+// Sync wallet provider to SDK when wallet connects/disconnects
+watch(walletConnected, (connected) => {
+  if (connected) {
+    setWeb3Provider(getEip1193Provider())
+  } else {
+    setWeb3Provider(null)
+  }
 })
 
 async function handleStampFromDigest(digest: FileDigestResult) {
@@ -71,6 +92,14 @@ function removeCalendar(index: number) {
   urls.splice(index, 1)
   store.setCalendars(urls)
 }
+
+function handleWalletClick() {
+  if (walletConnected.value) {
+    disconnectWallet()
+  } else {
+    connectWallet()
+  }
+}
 </script>
 
 <template>
@@ -108,6 +137,25 @@ function removeCalendar(index: number) {
           <span class="font-mono text-[10px] text-white/30">
             {{ store.onlineCount }}/{{ store.ethChains.length }} chains
           </span>
+          <!-- Connect Wallet button -->
+          <button
+            class="flex items-center gap-2 rounded-lg border px-3 py-1.5 font-mono text-xs transition-all"
+            :class="walletConnected
+              ? 'border-valid/30 bg-valid/5 text-valid hover:bg-valid/10'
+              : 'border-neon-purple/30 bg-neon-purple/5 text-neon-purple hover:bg-neon-purple/10'
+            "
+            :disabled="walletConnecting"
+            @click="handleWalletClick"
+          >
+            <Wallet class="h-3.5 w-3.5" />
+            <span v-if="walletConnecting">Connecting...</span>
+            <span v-else-if="walletConnected && walletAddress">
+              {{ truncateAddress(walletAddress) }}
+              <span v-if="walletChainName" class="text-white/30"> · {{ walletChainName }}</span>
+            </span>
+            <span v-else-if="!hasWallet">No Wallet</span>
+            <span v-else>Connect Wallet</span>
+          </button>
           <!-- Settings button -->
           <button
             class="rounded-lg p-1.5 text-white/40 transition hover:bg-white/5 hover:text-white/60"

@@ -1,5 +1,7 @@
 import {
   type AbstractProvider,
+  type Eip1193Provider,
+  BrowserProvider,
   getBytes,
   hexlify,
   id,
@@ -47,10 +49,22 @@ export interface SDKOptions {
   calendars?: URL[]
   btcRPC?: BitcoinRPC
   ethRPCs?: Record<number, AbstractProvider>
+  web3Provider?: Eip1193Provider | null
   timeout?: number
   quorum?: number
   nonceSize?: number
   hashAlgorithm?: SecureDigestOp
+}
+
+/**
+ * Well-known EVM chain IDs to hex for wallet_switchEthereumChain.
+ */
+export const WELL_KNOWN_CHAINS: Record<number, { chainId: string; chainName: string }> = {
+  1: { chainId: '0x1', chainName: 'Ethereum Mainnet' },
+  17000: { chainId: '0x4268', chainName: 'Holesky' },
+  11155111: { chainId: '0xaa36a7', chainName: 'Sepolia' },
+  54352: { chainId: '0xd460', chainName: 'Scroll' },
+  54351: { chainId: '0xd45f', chainName: 'Scroll Sepolia' },
 }
 
 export const DEFAULT_CALENDARS = [
@@ -70,6 +84,7 @@ export default class SDK {
   readonly calendars: URL[]
   readonly btcRPC: BitcoinRPC
   readonly ethRPCs: Record<number, AbstractProvider>
+  web3Provider: Eip1193Provider | null = null
 
   /**
    * Maximum time to wait for calendar responses in milliseconds.
@@ -125,6 +140,7 @@ export default class SDK {
         54352: new JsonRpcProvider('https://rpc.scroll.io'),
         54351: new JsonRpcProvider('https://sepolia-rpc.scroll.io'),
       },
+      web3Provider = null,
       timeout = 10000,
       nonceSize = 32,
       hashAlgorithm = 'KECCAK256',
@@ -134,6 +150,7 @@ export default class SDK {
     this.calendars = calendars
     this.btcRPC = btcRPC
     this.ethRPCs = ethRPCs
+    this.web3Provider = web3Provider
 
     this.timeout = timeout
     this.nonceSize = nonceSize
@@ -171,6 +188,40 @@ export default class SDK {
   getEthProvider(chainId: number): AbstractProvider | null {
     if (Object.hasOwn(this.ethRPCs, chainId)) {
       return this.ethRPCs[chainId]!
+    }
+    return null
+  }
+
+  /**
+   * Try to get a provider for the given chain from the web3 wallet.
+   * If the wallet is on a different chain, attempts to switch to the target chain if it's well-known.
+   * Returns null if no web3Provider or if switching fails.
+   */
+  async getWeb3ProviderForChain(chainId: number): Promise<AbstractProvider | null> {
+    if (!this.web3Provider) return null
+
+    try {
+      const browser = new BrowserProvider(this.web3Provider)
+      const network = await browser.getNetwork()
+      if (Number(network.chainId) === chainId) {
+        return browser
+      }
+
+      // Try switching to the target chain if it's well-known
+      const knownChain = WELL_KNOWN_CHAINS[chainId]
+      if (knownChain) {
+        try {
+          await this.web3Provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: knownChain.chainId }],
+          })
+          return new BrowserProvider(this.web3Provider)
+        } catch {
+          // Switch failed, fall through
+        }
+      }
+    } catch {
+      // web3Provider not usable
     }
     return null
   }
@@ -599,17 +650,23 @@ export default class SDK {
     input: Uint8Array,
     attestation: EthereumUTSAttestation,
   ): Promise<AttestationStatus> {
-    if (!Object.hasOwn(this.ethRPCs, attestation.chain)) {
-      return {
-        attestation,
-        status: AttestationStatusKind.UNKNOWN,
-        error: new VerifyError(
-          ErrorCode.UNSUPPORTED_ATTESTATION,
-          `No RPC provider configured for Ethereum chain ${attestation.chain}`,
-        ),
+    // Try web3Provider first (works in browser without CORS issues)
+    let provider: AbstractProvider | null = await this.getWeb3ProviderForChain(attestation.chain)
+
+    // Fallback to ethRPCs
+    if (!provider) {
+      if (!Object.hasOwn(this.ethRPCs, attestation.chain)) {
+        return {
+          attestation,
+          status: AttestationStatusKind.UNKNOWN,
+          error: new VerifyError(
+            ErrorCode.UNSUPPORTED_ATTESTATION,
+            `No RPC provider configured for Ethereum chain ${attestation.chain}`,
+          ),
+        }
       }
+      provider = this.ethRPCs[attestation.chain]!
     }
-    const provider = this.ethRPCs[attestation.chain]!
 
     try {
       const logs = await provider.getLogs({

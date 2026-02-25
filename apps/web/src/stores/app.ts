@@ -44,7 +44,7 @@ export const useAppStore = defineStore('app', () => {
 
   watch(calendarUrls, (urls) => {
     saveCalendars(urls)
-    resetSDK(urls.map((u) => new URL(u)))
+    resetSDK({ calendars: urls.map((u) => new URL(u)) })
   }, { deep: true })
 
   async function checkChains() {

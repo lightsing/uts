@@ -62,7 +62,7 @@ function truncate(hash: string): string {
         class="py-8 text-center font-mono text-xs text-white/30"
       >
         <Clock class="mx-auto mb-2 h-5 w-5 text-white/20" />
-        Polling Ethereum RPCs for Attested events...
+        Polling for Attested events...
       </div>
       <div
         v-else-if="entries.length === 0"
