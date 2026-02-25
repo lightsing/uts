@@ -172,12 +172,6 @@ function handleWalletClick() {
                 :key="chain.chainId"
                 class="flex items-center gap-0.5"
               >
-                <img
-                  v-if="SCROLL_CHAIN_IDS.has(chain.chainId)"
-                  :src="ScrollLogo"
-                  alt="Scroll"
-                  class="h-3 w-3"
-                />
                 <span
                   class="h-1.5 w-1.5 rounded-full"
                   :class="{
@@ -212,12 +206,6 @@ function handleWalletClick() {
                     class="rounded-lg bg-surface/40 px-3 py-2"
                   >
                     <div class="flex items-center gap-2">
-                      <img
-                        v-if="SCROLL_CHAIN_IDS.has(chain.chainId)"
-                        :src="ScrollLogo"
-                        alt="Scroll"
-                        class="h-4 w-4"
-                      />
                       <span
                         class="h-2 w-2 rounded-full"
                         :class="{
