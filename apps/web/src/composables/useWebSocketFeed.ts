@@ -20,6 +20,7 @@ export interface FeedEntry {
   chainId: number
   blockHeight: number
   sender?: string
+  txHash?: string
   timestamp: number
 }
 
@@ -73,6 +74,7 @@ export function useWebSocketFeed() {
           chainId,
           blockHeight: log.blockNumber,
           sender: parsed.args[1],
+          txHash: log.transactionHash,
           timestamp: Number(parsed.args[2] as bigint) * 1000,
         })
       }
@@ -121,6 +123,7 @@ export function useWebSocketFeed() {
             chainId,
             blockHeight: log.blockNumber,
             sender: parsed.args[1],
+            txHash: log.transactionHash,
             timestamp: Number(parsed.args[2] as bigint) * 1000,
           })
         }

@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { DEFAULT_CALENDARS } from '@uts/sdk'
 import type { DetachedTimestamp, SecureDigestOp } from '@uts/sdk'
 import { getSDK, resetSDK } from '@/composables/useTimestampSDK'
+import { JsonRpcProvider } from 'ethers'
 
 const CHAIN_NAMES: Record<number, string> = {
   1: 'Ethereum',
@@ -21,6 +22,12 @@ export interface EthChainNode {
 
 const STORAGE_KEY = 'uts-calendars'
 const SETTINGS_KEY = 'uts-settings'
+const CHAINS_KEY = 'uts-custom-chains'
+
+// Default chain IDs from SDK ethRPCs
+function getDefaultChainIds(): number[] {
+  return Object.keys(getSDK().ethRPCs).map(Number)
+}
 
 function loadCalendars(): string[] {
   try {
@@ -52,12 +59,40 @@ function saveSettings(settings: { keepPending: boolean; internalHashAlgo: Secure
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
 }
 
+function loadCustomChains(): number[] | null {
+  try {
+    const stored = localStorage.getItem(CHAINS_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch { /* ignore */ }
+  return null
+}
+
+function saveCustomChains(chainIds: number[]) {
+  localStorage.setItem(CHAINS_KEY, JSON.stringify(chainIds))
+}
+
+// Public RPC endpoints for common chains (used when user adds a chain not in SDK ethRPCs)
+const PUBLIC_RPCS: Record<number, string> = {
+  1: 'https://eth.llamarpc.com',
+  17000: 'https://rpc.holesky.ethpandaops.io',
+  11155111: 'https://rpc.sepolia.org',
+  534352: 'https://rpc.scroll.io',
+  534351: 'https://sepolia-rpc.scroll.io',
+  42161: 'https://arb1.arbitrum.io/rpc',
+  10: 'https://mainnet.optimism.io',
+  8453: 'https://mainnet.base.org',
+  137: 'https://polygon-rpc.com',
+}
+
 export const useAppStore = defineStore('app', () => {
   const calendarUrls = ref<string[]>(loadCalendars())
   const keepPending = ref(loadSettings().keepPending)
   const internalHashAlgo = ref<SecureDigestOp>(loadSettings().internalHashAlgo)
   const ethChains = ref<EthChainNode[]>([])
   const recentStamps = ref<DetachedTimestamp[]>([])
+
+  // Chain IDs to monitor (persisted or default from SDK)
+  const customChainIds = ref<number[]>(loadCustomChains() ?? getDefaultChainIds())
 
   const onlineCount = computed(
     () => ethChains.value.filter((c) => c.status === 'online').length,
@@ -78,7 +113,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function checkChains() {
     const sdk = getSDK()
-    const chainIds = Object.keys(sdk.ethRPCs).map(Number)
+    const chainIds = customChainIds.value
 
     ethChains.value = chainIds.map((chainId) => ({
       chainId,
@@ -87,7 +122,14 @@ export const useAppStore = defineStore('app', () => {
     }))
 
     for (const chain of ethChains.value) {
-      const provider = sdk.getEthProvider(chain.chainId)
+      // Try SDK provider first, then public RPC
+      let provider = sdk.getEthProvider(chain.chainId)
+      if (!provider && PUBLIC_RPCS[chain.chainId]) {
+        try {
+          provider = new JsonRpcProvider(PUBLIC_RPCS[chain.chainId])
+        } catch { /* ignore */ }
+      }
+
       if (!provider) {
         chain.status = 'offline'
         continue
@@ -102,6 +144,23 @@ export const useAppStore = defineStore('app', () => {
         chain.latency = undefined
       }
     }
+  }
+
+  function addChain(chainId: number) {
+    if (customChainIds.value.includes(chainId)) return
+    customChainIds.value.push(chainId)
+    saveCustomChains(customChainIds.value)
+  }
+
+  function removeChain(chainId: number) {
+    customChainIds.value = customChainIds.value.filter((id) => id !== chainId)
+    ethChains.value = ethChains.value.filter((c) => c.chainId !== chainId)
+    saveCustomChains(customChainIds.value)
+  }
+
+  function resetChains() {
+    customChainIds.value = getDefaultChainIds()
+    localStorage.removeItem(CHAINS_KEY)
   }
 
   function addStamp(stamp: DetachedTimestamp) {
@@ -127,6 +186,9 @@ export const useAppStore = defineStore('app', () => {
     recentStamps,
     onlineCount,
     checkChains,
+    addChain,
+    removeChain,
+    resetChains,
     addStamp,
     setCalendars,
     resetCalendars,

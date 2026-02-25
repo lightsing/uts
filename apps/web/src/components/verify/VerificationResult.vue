@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { hexlify } from 'ethers/utils'
-import { FileUp, Search, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { FileUp, Search, ShieldCheck, ChevronDown, ChevronUp, FileCheck, FileX } from 'lucide-vue-next'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import StatusBadge from '@/components/base/StatusBadge.vue'
 import MerkleTreeViz from '@/components/verify/MerkleTreeViz.vue'
 import AttestationDetail from '@/components/verify/AttestationDetail.vue'
 import { useTimestampSDK } from '@/composables/useTimestampSDK'
+import { useFileDigest } from '@/composables/useFileDigest'
 import { VerifyStatus } from '@uts/sdk'
-import type { DetachedTimestamp } from '@uts/sdk'
+import type { DetachedTimestamp, SecureDigestOp } from '@uts/sdk'
 
 const {
   verifyStatus,
@@ -21,9 +22,14 @@ const {
   resetVerify,
 } = useTimestampSDK()
 
+const { digestFile, isDigesting: isDigestingOriginal, progress: digestProgress } = useFileDigest()
+
 const otsFileRef = ref<HTMLInputElement>()
+const originalFileRef = ref<HTMLInputElement>()
 const loadedTimestamp = ref<DetachedTimestamp | null>(null)
 const showProofPath = ref(false)
+const originalFileMatch = ref<'match' | 'mismatch' | null>(null)
+const originalFileName = ref<string | null>(null)
 
 function mapVerifyStatus(status: VerifyStatus | null): 'valid' | 'invalid' | 'pending' | 'partial' | 'unknown' {
   if (!status) return 'unknown'
@@ -52,11 +58,32 @@ async function handleOtsUpload(event: Event) {
   }
 }
 
+async function handleOriginalFileUpload(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file || !loadedTimestamp.value) return
+
+  originalFileName.value = file.name
+  originalFileMatch.value = null
+
+  try {
+    const algo = loadedTimestamp.value.header.kind as SecureDigestOp
+    const result = await digestFile(file, algo)
+    const headerHex = hexlify(loadedTimestamp.value.header.digest as Uint8Array)
+    originalFileMatch.value = result.digest === headerHex ? 'match' : 'mismatch'
+  } catch {
+    originalFileMatch.value = 'mismatch'
+  }
+}
+
 function handleReset() {
   resetVerify()
   loadedTimestamp.value = null
   showProofPath.value = false
+  originalFileMatch.value = null
+  originalFileName.value = null
   if (otsFileRef.value) otsFileRef.value.value = ''
+  if (originalFileRef.value) originalFileRef.value.value = ''
 }
 </script>
 
@@ -109,6 +136,44 @@ function handleReset() {
         </div>
         <div class="break-all font-mono text-xs text-neon-cyan">
           {{ hexlify(loadedTimestamp.header.digest as Uint8Array) }}
+        </div>
+      </div>
+
+      <!-- Optional: verify original file matches the header digest -->
+      <div class="space-y-2 rounded-lg border border-glass-border bg-surface/30 p-4">
+        <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
+          Verify Original File (Optional)
+        </div>
+        <p class="font-mono text-[10px] text-white/25">
+          Upload the original file to verify it matches the .ots header digest
+        </p>
+        <div class="flex items-center gap-3">
+          <BaseButton variant="secondary" @click="originalFileRef?.click()" :disabled="isDigestingOriginal">
+            <FileUp class="h-3.5 w-3.5" />
+            {{ isDigestingOriginal ? 'Digesting...' : 'Upload Original' }}
+          </BaseButton>
+          <span v-if="originalFileName" class="font-mono text-[10px] text-white/40">
+            {{ originalFileName }}
+          </span>
+        </div>
+        <input
+          ref="originalFileRef"
+          type="file"
+          class="hidden"
+          @change="handleOriginalFileUpload"
+        />
+        <!-- Progress bar -->
+        <div v-if="isDigestingOriginal" class="h-1 w-full overflow-hidden rounded-full bg-surface">
+          <div class="h-full rounded-full bg-neon-cyan transition-all duration-150" :style="{ width: `${digestProgress}%` }" />
+        </div>
+        <!-- Match result -->
+        <div v-if="originalFileMatch === 'match'" class="flex items-center gap-2 rounded-lg bg-valid/10 px-3 py-2">
+          <FileCheck class="h-4 w-4 text-valid" />
+          <span class="font-mono text-xs text-valid">File digest matches — this is the original file</span>
+        </div>
+        <div v-else-if="originalFileMatch === 'mismatch'" class="flex items-center gap-2 rounded-lg bg-invalid/10 px-3 py-2">
+          <FileX class="h-4 w-4 text-invalid" />
+          <span class="font-mono text-xs text-invalid">File digest does NOT match the .ots header</span>
         </div>
       </div>
 

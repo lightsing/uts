@@ -135,8 +135,8 @@ function getStepDescription(step: WorkflowStep): string {
           </div>
           <div class="font-mono text-[11px] text-white/30">{{ getStepDescription(step) }}</div>
 
-          <!-- Download button inside the Complete step only when phase is 'complete' -->
-          <div v-if="step.id === 'complete' && phase === 'complete'" class="mt-2">
+          <!-- Download button inside the Complete step — visible while pending (complete or upgrading), hidden once upgraded -->
+          <div v-if="step.id === 'complete' && (phase === 'complete' || phase === 'upgrading')" class="mt-2">
             <BaseButton variant="secondary" @click="emit('download')">
               <Download class="h-3.5 w-3.5" />
               Download pending .ots

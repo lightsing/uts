@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, ExternalLink, AlertTriangle } from 'lucide-vue-next'
 import StatusBadge from '@/components/base/StatusBadge.vue'
 import type { AttestationStatus } from '@uts/sdk'
 import { WELL_KNOWN_CHAINS } from '@uts/sdk'
 import { hexlify } from 'ethers/utils'
+import ScrollLogo from '@/assets/Scroll_Logomark.svg'
+
+const SCROLL_CHAIN_IDS = new Set([534352, 534351])
 
 const props = defineProps<{
   attestation: AttestationStatus
@@ -12,6 +15,18 @@ const props = defineProps<{
 }>()
 
 const expanded = ref(props.defaultExpanded ?? false)
+
+const MAINNET_CHAIN_IDS = new Set([1, 534352])
+
+function isTestnetOrUnknown(chainId: number): boolean {
+  return !MAINNET_CHAIN_IDS.has(chainId)
+}
+
+function getNetworkWarning(chainId: number): string | null {
+  if (MAINNET_CHAIN_IDS.has(chainId)) return null
+  if (ETHERSCAN_URLS[chainId]) return 'Testnet attestation — not suitable for production use'
+  return 'Unknown network — cannot verify on-chain'
+}
 
 const ETHERSCAN_URLS: Record<number, string> = {
   1: 'https://etherscan.io',
@@ -87,13 +102,21 @@ function formatTimestamp(ts: bigint | number): string {
           Bitcoin block #{{ attestation.attestation.height }}
         </template>
         <template v-else-if="attestation.attestation.kind === 'ethereum-uts'">
-          {{ getChainName(attestation.attestation.chain) }} block #{{ attestation.attestation.height }}
+          <span class="inline-flex items-center gap-1">
+            <img v-if="SCROLL_CHAIN_IDS.has(attestation.attestation.chain)" :src="ScrollLogo" alt="Scroll" class="inline h-3.5 w-3.5" />
+            {{ getChainName(attestation.attestation.chain) }} block #{{ attestation.attestation.height }}
+          </span>
         </template>
         <template v-else-if="attestation.attestation.kind === 'pending'">
           Pending → {{ attestation.attestation.url }}
         </template>
         <template v-else>Unknown attestation</template>
       </span>
+      <AlertTriangle
+        v-if="attestation.attestation.kind === 'ethereum-uts' && isTestnetOrUnknown(attestation.attestation.chain)"
+        class="h-3.5 w-3.5 shrink-0 text-pending"
+        :title="getNetworkWarning(attestation.attestation.chain) ?? ''"
+      />
       <component :is="expanded ? ChevronUp : ChevronDown" class="h-3.5 w-3.5 text-white/30" />
     </button>
 
@@ -125,7 +148,10 @@ function formatTimestamp(ts: bigint | number): string {
           <div class="space-y-1.5 font-mono text-[11px]">
             <div class="flex items-center justify-between">
               <span class="text-white/30">Type</span>
-              <span class="text-neon-purple">Ethereum UTS</span>
+              <span class="flex items-center gap-1 text-neon-purple">
+                <img v-if="SCROLL_CHAIN_IDS.has(attestation.attestation.chain)" :src="ScrollLogo" alt="Scroll" class="h-3.5 w-3.5" />
+                Ethereum UTS
+              </span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-white/30">Chain</span>
@@ -203,6 +229,14 @@ function formatTimestamp(ts: bigint | number): string {
                 </span>
               </div>
             </template>
+            <!-- Testnet / unknown network warning -->
+            <div
+              v-if="isTestnetOrUnknown(attestation.attestation.chain)"
+              class="mt-2 flex items-center gap-1.5 rounded bg-pending/10 px-2 py-1.5 font-mono text-[10px] text-pending"
+            >
+              <AlertTriangle class="h-3 w-3 shrink-0" />
+              <span>{{ getNetworkWarning(attestation.attestation.chain) }}</span>
+            </div>
           </div>
         </template>
 

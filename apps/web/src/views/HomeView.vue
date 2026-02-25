@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Zap, Shield, Settings, Plus, Trash2, RotateCcw, Wallet } from 'lucide-vue-next'
+import { Zap, Shield, Settings, Plus, Trash2, RotateCcw, Wallet, RefreshCw, ChevronDown } from 'lucide-vue-next'
 import HeroTerminal from '@/components/terminal/HeroTerminal.vue'
 import StampingWorkflow from '@/components/stamp/StampingWorkflow.vue'
 import VerificationResult from '@/components/verify/VerificationResult.vue'
+import UpgradePanel from '@/components/upgrade/UpgradePanel.vue'
 import LiveFeed from '@/components/feed/LiveFeed.vue'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -11,6 +12,9 @@ import { useTimestampSDK, setWeb3Provider, getSDK } from '@/composables/useTimes
 import { useWallet } from '@/composables/useWallet'
 import type { FileDigestResult } from '@/composables/useFileDigest'
 import { useAppStore } from '@/stores/app'
+import ScrollLogo from '@/assets/Scroll_Logomark.svg'
+
+const SCROLL_CHAIN_IDS = new Set([534352, 534351])
 
 const store = useAppStore()
 const { stampPhase, stampError, broadcastProgress, stamp, downloadPendingStamp } = useTimestampSDK()
@@ -26,11 +30,15 @@ const {
   truncateAddress,
 } = useWallet()
 
-const savedTab = localStorage.getItem('uts-active-tab') as 'stamp' | 'verify' | null
-const activeTab = ref<'stamp' | 'verify'>(savedTab === 'verify' ? 'verify' : 'stamp')
+type TabId = 'stamp' | 'verify' | 'upgrade'
+const savedTab = localStorage.getItem('uts-active-tab') as TabId | null
+const validTabs: TabId[] = ['stamp', 'verify', 'upgrade']
+const activeTab = ref<TabId>(savedTab && validTabs.includes(savedTab) ? savedTab : 'stamp')
 const showWorkflow = ref(false)
 const showSettings = ref(false)
+const showChainPanel = ref(false)
 const newCalendarUrl = ref('')
+const newChainId = ref('')
 
 watch(activeTab, (tab) => {
   localStorage.setItem('uts-active-tab', tab)
@@ -39,6 +47,14 @@ watch(activeTab, (tab) => {
 onMounted(() => {
   store.checkChains()
 })
+
+function handleAddChain() {
+  const id = parseInt(newChainId.value.trim(), 10)
+  if (!id || isNaN(id)) return
+  store.addChain(id)
+  store.checkChains()
+  newChainId.value = ''
+}
 
 // Sync wallet provider to SDK when wallet connects/disconnects
 watch(walletConnected, (connected) => {
@@ -131,23 +147,122 @@ function handleWalletClick() {
         </div>
 
         <div class="flex items-center gap-4">
-          <!-- Ethereum chain status -->
-          <div class="flex items-center gap-2">
-            <span
-              v-for="chain in store.ethChains"
-              :key="chain.chainId"
-              class="group relative h-2 w-2 cursor-help rounded-full"
-              :class="{
-                'bg-valid animate-glow-pulse': chain.status === 'online',
-                'bg-invalid': chain.status === 'offline',
-                'bg-pending animate-glow-pulse': chain.status === 'checking',
-              }"
-              :title="`${chain.name} (${chain.chainId}) — ${chain.status}${chain.latency ? ` (${chain.latency}ms)` : ''}`"
-            />
+          <!-- Ethereum chain status — clickable -->
+          <div class="relative">
+            <button
+              class="flex items-center gap-2 rounded-lg border border-glass-border px-3 py-1.5 font-mono text-xs text-white/50 transition hover:border-white/20 hover:text-white/70"
+              @click="showChainPanel = !showChainPanel"
+            >
+              <span
+                v-for="chain in store.ethChains"
+                :key="chain.chainId"
+                class="flex items-center gap-0.5"
+              >
+                <img
+                  v-if="SCROLL_CHAIN_IDS.has(chain.chainId)"
+                  :src="ScrollLogo"
+                  alt="Scroll"
+                  class="h-3 w-3"
+                />
+                <span
+                  class="h-1.5 w-1.5 rounded-full"
+                  :class="{
+                    'bg-valid': chain.status === 'online',
+                    'bg-invalid': chain.status === 'offline',
+                    'bg-pending': chain.status === 'checking',
+                  }"
+                />
+              </span>
+              <span>{{ store.onlineCount }}/{{ store.ethChains.length }} chains</span>
+              <ChevronDown class="h-3 w-3" />
+            </button>
+
+            <!-- Chain detail dropdown -->
+            <Transition name="fade">
+              <div
+                v-if="showChainPanel"
+                class="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-glass-border bg-midnight/95 p-4 shadow-xl backdrop-blur-lg"
+              >
+                <div class="mb-3 flex items-center justify-between">
+                  <h4 class="font-heading text-xs font-semibold text-white/80">Ethereum Chains</h4>
+                  <BaseButton variant="secondary" @click="store.checkChains()">
+                    <RefreshCw class="h-3 w-3" />
+                    Refresh
+                  </BaseButton>
+                </div>
+
+                <div class="space-y-1.5">
+                  <div
+                    v-for="chain in store.ethChains"
+                    :key="chain.chainId"
+                    class="flex items-center gap-2 rounded-lg bg-surface/40 px-3 py-2"
+                  >
+                    <img
+                      v-if="SCROLL_CHAIN_IDS.has(chain.chainId)"
+                      :src="ScrollLogo"
+                      alt="Scroll"
+                      class="h-4 w-4"
+                    />
+                    <span
+                      class="h-2 w-2 rounded-full"
+                      :class="{
+                        'bg-valid': chain.status === 'online',
+                        'bg-invalid': chain.status === 'offline',
+                        'bg-pending animate-glow-pulse': chain.status === 'checking',
+                      }"
+                    />
+                    <div class="min-w-0 flex-1">
+                      <div class="font-heading text-xs font-medium text-white/70">{{ chain.name }}</div>
+                      <div class="font-mono text-[10px] text-white/30">Chain ID: {{ chain.chainId }}</div>
+                    </div>
+                    <div class="text-right">
+                      <div class="font-mono text-[10px]" :class="{
+                        'text-valid': chain.status === 'online',
+                        'text-invalid': chain.status === 'offline',
+                        'text-pending': chain.status === 'checking',
+                      }">
+                        {{ chain.status }}
+                      </div>
+                      <div v-if="chain.latency" class="font-mono text-[10px] text-white/20">
+                        {{ chain.latency }}ms
+                      </div>
+                    </div>
+                    <button
+                      class="rounded p-0.5 text-white/20 transition hover:bg-invalid/10 hover:text-invalid"
+                      title="Remove chain"
+                      @click="store.removeChain(chain.chainId)"
+                    >
+                      <Trash2 class="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Add custom chain -->
+                <div class="mt-3 border-t border-glass-border pt-3">
+                  <div class="font-mono text-[10px] text-white/30 mb-1.5">Add chain by ID</div>
+                  <div class="flex gap-2">
+                    <input
+                      v-model="newChainId"
+                      type="text"
+                      placeholder="e.g. 42161"
+                      class="flex-1 rounded-lg border border-glass-border bg-surface px-2 py-1 font-mono text-xs text-white/80 outline-none placeholder:text-white/20 focus:border-neon-cyan/40"
+                      @keyup.enter="handleAddChain"
+                    />
+                    <BaseButton variant="secondary" @click="handleAddChain">
+                      <Plus class="h-3 w-3" />
+                      Add
+                    </BaseButton>
+                  </div>
+                  <div class="mt-2 flex justify-end">
+                    <BaseButton variant="secondary" @click="store.resetChains(); store.checkChains()">
+                      <RotateCcw class="h-3 w-3" />
+                      Reset defaults
+                    </BaseButton>
+                  </div>
+                </div>
+              </div>
+            </Transition>
           </div>
-          <span class="font-mono text-[10px] text-white/30">
-            {{ store.onlineCount }}/{{ store.ethChains.length }} chains
-          </span>
           <!-- Connect Wallet button -->
           <button
             class="flex items-center gap-2 rounded-lg border px-3 py-1.5 font-mono text-xs transition-all"
@@ -293,6 +408,18 @@ function handleWalletClick() {
           <Shield class="h-4 w-4" />
           Verify
         </button>
+        <button
+          class="flex items-center gap-2 rounded-lg px-6 py-2.5 font-heading text-sm font-medium transition-all"
+          :class="
+            activeTab === 'upgrade'
+              ? 'bg-neon-purple/10 text-neon-purple'
+              : 'text-white/40 hover:text-white/60'
+          "
+          @click="activeTab = 'upgrade'"
+        >
+          <RefreshCw class="h-4 w-4" />
+          Upgrade
+        </button>
       </div>
 
       <!-- Content -->
@@ -318,6 +445,11 @@ function handleWalletClick() {
           <!-- Verify tab (preserved with v-show) -->
           <div v-show="activeTab === 'verify'">
             <VerificationResult />
+          </div>
+
+          <!-- Upgrade tab (preserved with v-show) -->
+          <div v-show="activeTab === 'upgrade'">
+            <UpgradePanel />
           </div>
         </div>
 
