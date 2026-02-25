@@ -18,11 +18,13 @@ export interface EthChainNode {
   name: string
   status: 'online' | 'offline' | 'checking'
   latency?: number
+  rpcUrl?: string
 }
 
 const STORAGE_KEY = 'uts-calendars'
 const SETTINGS_KEY = 'uts-settings'
 const CHAINS_KEY = 'uts-custom-chains'
+const CHAIN_RPCS_KEY = 'uts-chain-rpcs'
 
 // Default chain IDs from SDK ethRPCs
 function getDefaultChainIds(): number[] {
@@ -71,6 +73,18 @@ function saveCustomChains(chainIds: number[]) {
   localStorage.setItem(CHAINS_KEY, JSON.stringify(chainIds))
 }
 
+function loadChainRpcs(): Record<number, string> {
+  try {
+    const stored = localStorage.getItem(CHAIN_RPCS_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch { /* ignore */ }
+  return {}
+}
+
+function saveChainRpcs(rpcs: Record<number, string>) {
+  localStorage.setItem(CHAIN_RPCS_KEY, JSON.stringify(rpcs))
+}
+
 // Public RPC endpoints for common chains (used when user adds a chain not in SDK ethRPCs)
 const PUBLIC_RPCS: Record<number, string> = {
   1: 'https://eth.llamarpc.com',
@@ -94,6 +108,9 @@ export const useAppStore = defineStore('app', () => {
   // Chain IDs to monitor (persisted or default from SDK)
   const customChainIds = ref<number[]>(loadCustomChains() ?? getDefaultChainIds())
 
+  // Custom RPC endpoints per chain (persisted)
+  const customRpcs = ref<Record<number, string>>(loadChainRpcs())
+
   const onlineCount = computed(
     () => ethChains.value.filter((c) => c.status === 'online').length,
   )
@@ -115,15 +132,28 @@ export const useAppStore = defineStore('app', () => {
     const sdk = getSDK()
     const chainIds = customChainIds.value
 
-    ethChains.value = chainIds.map((chainId) => ({
-      chainId,
-      name: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
-      status: 'checking' as const,
-    }))
+    ethChains.value = chainIds.map((chainId) => {
+      const rpc = customRpcs.value[chainId] ?? PUBLIC_RPCS[chainId]
+      return {
+        chainId,
+        name: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
+        status: 'checking' as const,
+        rpcUrl: rpc,
+      }
+    })
 
     for (const chain of ethChains.value) {
-      // Try SDK provider first, then public RPC
-      let provider = sdk.getEthProvider(chain.chainId)
+      // Try custom RPC first, then SDK provider, then public RPC fallback
+      let provider: JsonRpcProvider | null = null
+      const rpc = customRpcs.value[chain.chainId]
+      if (rpc) {
+        try {
+          provider = new JsonRpcProvider(rpc)
+        } catch { /* ignore */ }
+      }
+      if (!provider) {
+        provider = sdk.getEthProvider(chain.chainId)
+      }
       if (!provider && PUBLIC_RPCS[chain.chainId]) {
         try {
           provider = new JsonRpcProvider(PUBLIC_RPCS[chain.chainId])
@@ -160,7 +190,24 @@ export const useAppStore = defineStore('app', () => {
 
   function resetChains() {
     customChainIds.value = getDefaultChainIds()
+    customRpcs.value = {}
     localStorage.removeItem(CHAINS_KEY)
+    localStorage.removeItem(CHAIN_RPCS_KEY)
+  }
+
+  function setChainRpc(chainId: number, rpcUrl: string) {
+    const trimmed = rpcUrl.trim()
+    if (trimmed) {
+      customRpcs.value[chainId] = trimmed
+    } else {
+      delete customRpcs.value[chainId]
+    }
+    saveChainRpcs(customRpcs.value)
+    // Update the rpcUrl in the displayed chain list
+    const chain = ethChains.value.find((c) => c.chainId === chainId)
+    if (chain) {
+      chain.rpcUrl = trimmed || PUBLIC_RPCS[chainId]
+    }
   }
 
   function addStamp(stamp: DetachedTimestamp) {
@@ -189,6 +236,7 @@ export const useAppStore = defineStore('app', () => {
     addChain,
     removeChain,
     resetChains,
+    setChainRpc,
     addStamp,
     setCalendars,
     resetCalendars,

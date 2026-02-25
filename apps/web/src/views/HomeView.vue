@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Zap, Shield, Settings, Plus, Trash2, RotateCcw, Wallet, RefreshCw, ChevronDown } from 'lucide-vue-next'
+import { Zap, Shield, Settings, Plus, Trash2, RotateCcw, Wallet, RefreshCw, ChevronDown, Pencil, Check } from 'lucide-vue-next'
 import HeroTerminal from '@/components/terminal/HeroTerminal.vue'
 import StampingWorkflow from '@/components/stamp/StampingWorkflow.vue'
 import VerificationResult from '@/components/verify/VerificationResult.vue'
@@ -39,6 +39,20 @@ const showSettings = ref(false)
 const showChainPanel = ref(false)
 const newCalendarUrl = ref('')
 const newChainId = ref('')
+const editingChainRpc = ref<number | null>(null)
+const editRpcValue = ref('')
+
+function startEditRpc(chainId: number, currentRpc?: string) {
+  editingChainRpc.value = chainId
+  editRpcValue.value = currentRpc ?? ''
+}
+
+function saveEditRpc(chainId: number) {
+  store.setChainRpc(chainId, editRpcValue.value)
+  editingChainRpc.value = null
+  editRpcValue.value = ''
+  store.checkChains()
+}
 
 watch(activeTab, (tab) => {
   localStorage.setItem('uts-active-tab', tab)
@@ -132,7 +146,7 @@ function handleWalletClick() {
 <template>
   <div class="scanlines min-h-screen bg-deep-black">
     <!-- Header -->
-    <header class="border-b border-glass-border bg-midnight/80 backdrop-blur-md">
+    <header class="relative z-50 border-b border-glass-border bg-midnight/80 backdrop-blur-md">
       <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div class="flex items-center gap-3">
           <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-neon-cyan/10">
@@ -195,45 +209,74 @@ function handleWalletClick() {
                   <div
                     v-for="chain in store.ethChains"
                     :key="chain.chainId"
-                    class="flex items-center gap-2 rounded-lg bg-surface/40 px-3 py-2"
+                    class="rounded-lg bg-surface/40 px-3 py-2"
                   >
-                    <img
-                      v-if="SCROLL_CHAIN_IDS.has(chain.chainId)"
-                      :src="ScrollLogo"
-                      alt="Scroll"
-                      class="h-4 w-4"
-                    />
-                    <span
-                      class="h-2 w-2 rounded-full"
-                      :class="{
-                        'bg-valid': chain.status === 'online',
-                        'bg-invalid': chain.status === 'offline',
-                        'bg-pending animate-glow-pulse': chain.status === 'checking',
-                      }"
-                    />
-                    <div class="min-w-0 flex-1">
-                      <div class="font-heading text-xs font-medium text-white/70">{{ chain.name }}</div>
-                      <div class="font-mono text-[10px] text-white/30">Chain ID: {{ chain.chainId }}</div>
-                    </div>
-                    <div class="text-right">
-                      <div class="font-mono text-[10px]" :class="{
-                        'text-valid': chain.status === 'online',
-                        'text-invalid': chain.status === 'offline',
-                        'text-pending': chain.status === 'checking',
-                      }">
-                        {{ chain.status }}
+                    <div class="flex items-center gap-2">
+                      <img
+                        v-if="SCROLL_CHAIN_IDS.has(chain.chainId)"
+                        :src="ScrollLogo"
+                        alt="Scroll"
+                        class="h-4 w-4"
+                      />
+                      <span
+                        class="h-2 w-2 rounded-full"
+                        :class="{
+                          'bg-valid': chain.status === 'online',
+                          'bg-invalid': chain.status === 'offline',
+                          'bg-pending animate-glow-pulse': chain.status === 'checking',
+                        }"
+                      />
+                      <div class="min-w-0 flex-1">
+                        <div class="font-heading text-xs font-medium text-white/70">{{ chain.name }}</div>
+                        <div class="font-mono text-[10px] text-white/30">Chain ID: {{ chain.chainId }}</div>
                       </div>
-                      <div v-if="chain.latency" class="font-mono text-[10px] text-white/20">
-                        {{ chain.latency }}ms
+                      <div class="text-right">
+                        <div class="font-mono text-[10px]" :class="{
+                          'text-valid': chain.status === 'online',
+                          'text-invalid': chain.status === 'offline',
+                          'text-pending': chain.status === 'checking',
+                        }">
+                          {{ chain.status }}
+                        </div>
+                        <div v-if="chain.latency" class="font-mono text-[10px] text-white/20">
+                          {{ chain.latency }}ms
+                        </div>
                       </div>
+                      <button
+                        class="rounded p-0.5 text-white/20 transition hover:bg-neon-cyan/10 hover:text-neon-cyan"
+                        title="Edit RPC endpoint"
+                        @click="startEditRpc(chain.chainId, chain.rpcUrl)"
+                      >
+                        <Pencil class="h-3 w-3" />
+                      </button>
+                      <button
+                        class="rounded p-0.5 text-white/20 transition hover:bg-invalid/10 hover:text-invalid"
+                        title="Remove chain"
+                        @click="store.removeChain(chain.chainId)"
+                      >
+                        <Trash2 class="h-3 w-3" />
+                      </button>
                     </div>
-                    <button
-                      class="rounded p-0.5 text-white/20 transition hover:bg-invalid/10 hover:text-invalid"
-                      title="Remove chain"
-                      @click="store.removeChain(chain.chainId)"
-                    >
-                      <Trash2 class="h-3 w-3" />
-                    </button>
+                    <!-- RPC editing row -->
+                    <div v-if="editingChainRpc === chain.chainId" class="mt-1.5 flex gap-1.5">
+                      <input
+                        v-model="editRpcValue"
+                        type="text"
+                        placeholder="https://rpc-endpoint.example.com"
+                        class="flex-1 rounded border border-glass-border bg-surface px-2 py-1 font-mono text-[10px] text-white/70 outline-none placeholder:text-white/20 focus:border-neon-cyan/40"
+                        @keyup.enter="saveEditRpc(chain.chainId)"
+                      />
+                      <button
+                        class="rounded bg-neon-cyan/10 px-1.5 py-1 text-neon-cyan transition hover:bg-neon-cyan/20"
+                        title="Save"
+                        @click="saveEditRpc(chain.chainId)"
+                      >
+                        <Check class="h-3 w-3" />
+                      </button>
+                    </div>
+                    <div v-else-if="chain.rpcUrl" class="mt-0.5 truncate font-mono text-[10px] text-white/20 pl-4">
+                      {{ chain.rpcUrl }}
+                    </div>
                   </div>
                 </div>
 
