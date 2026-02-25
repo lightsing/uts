@@ -29,8 +29,8 @@ const ETHERSCAN_URLS: Record<number, string> = {
   1: 'https://etherscan.io',
   17000: 'https://holesky.etherscan.io',
   11155111: 'https://sepolia.etherscan.io',
-  54352: 'https://scrollscan.com',
-  54351: 'https://sepolia.scrollscan.com',
+  534352: 'https://scrollscan.com',
+  534351: 'https://sepolia.scrollscan.com',
 }
 
 function getBlockUrl(chainId: number, height: number): string | null {

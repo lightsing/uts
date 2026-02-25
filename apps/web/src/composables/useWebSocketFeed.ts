@@ -8,8 +8,8 @@ const CHAIN_NAMES: Record<number, string> = {
   1: 'Ethereum',
   17000: 'Holesky',
   11155111: 'Sepolia',
-  54352: 'Scroll',
-  54351: 'Scroll Sepolia',
+  534352: 'Scroll',
+  534351: 'Scroll Sepolia',
 }
 
 export interface FeedEntry {

@@ -17,16 +17,16 @@ const ETHERSCAN_URLS: Record<number, string> = {
   1: 'https://etherscan.io',
   17000: 'https://holesky.etherscan.io',
   11155111: 'https://sepolia.etherscan.io',
-  54352: 'https://scrollscan.com',
-  54351: 'https://sepolia.scrollscan.com',
+  534352: 'https://scrollscan.com',
+  534351: 'https://sepolia.scrollscan.com',
 }
 
 const CHAIN_NAMES: Record<number, string> = {
   1: 'Ethereum',
   17000: 'Holesky',
   11155111: 'Sepolia',
-  54352: 'Scroll',
-  54351: 'Scroll Sepolia',
+  534352: 'Scroll',
+  534351: 'Scroll Sepolia',
 }
 
 function statusLabel(status: string): 'valid' | 'invalid' | 'pending' | 'unknown' {

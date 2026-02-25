@@ -7,10 +7,12 @@ import VerificationResult from '@/components/verify/VerificationResult.vue'
 import LiveFeed from '@/components/feed/LiveFeed.vue'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import { useTimestampSDK, setWeb3Provider } from '@/composables/useTimestampSDK'
+import { useTimestampSDK, setWeb3Provider, getSDK } from '@/composables/useTimestampSDK'
 import { useWallet } from '@/composables/useWallet'
 import type { FileDigestResult } from '@/composables/useFileDigest'
+import { Encoder } from '@uts/sdk'
 import { useAppStore } from '@/stores/app'
+import JSZip from 'jszip'
 
 const store = useAppStore()
 const { stampPhase, stampError, broadcastProgress, stamp, downloadPendingStamp } = useTimestampSDK()
@@ -49,11 +51,38 @@ watch(walletConnected, (connected) => {
   }
 })
 
-async function handleStampFromDigest(digest: FileDigestResult) {
+async function handleStampFromDigest(digests: FileDigestResult[]) {
   showWorkflow.value = true
+
+  // Apply internal hash algorithm setting
+  getSDK().hashAlgorithm = store.internalHashAlgo
+
+  const isBatch = digests.length > 1
+  const firstFileName = digests[0]?.fileName
+
   try {
-    const results = await stamp([digest.header], digest.fileName)
+    const headers = digests.map((d) => d.header)
+    const results = await stamp(headers, firstFileName)
     for (const r of results) store.addStamp(r)
+
+    // For batch (directory): download all as zip
+    if (isBatch && results.length > 0) {
+      const zip = new JSZip()
+      for (let i = 0; i < results.length; i++) {
+        const fileName = digests[i]?.fileName ?? `file-${i}`
+        const encoded = Encoder.encodeDetachedTimestamp(results[i]!)
+        zip.file(`${fileName}.ots`, encoded)
+      }
+      const blob = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'timestamps.zip'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
   } catch {
     // error is tracked in stampError
   }
@@ -61,6 +90,10 @@ async function handleStampFromDigest(digest: FileDigestResult) {
 
 async function handleStampFromHash(hash: string) {
   showWorkflow.value = true
+
+  // Apply internal hash algorithm setting
+  getSDK().hashAlgorithm = store.internalHashAlgo
+
   const digest = hash.startsWith('0x') ? hash : `0x${hash}`
   const bytes = new Uint8Array(
     (digest.slice(2).match(/.{2}/g) ?? []).map((b) => parseInt(b, 16)),
@@ -213,7 +246,7 @@ function handleWalletClick() {
             </div>
 
             <!-- Upgrade behavior -->
-            <div class="mt-4 border-t border-glass-border pt-3">
+            <div class="mt-4 border-t border-glass-border pt-3 space-y-3">
               <label class="flex items-center gap-3 cursor-pointer">
                 <input
                   v-model="store.keepPending"
@@ -225,6 +258,19 @@ function handleWalletClick() {
                   <div class="font-mono text-[10px] text-white/30">When enabled, the original pending attestation is preserved alongside the upgraded one</div>
                 </div>
               </label>
+
+              <!-- Internal hash algorithm -->
+              <div class="flex items-center gap-3">
+                <label class="font-heading text-xs font-medium text-white/70">Internal hash algorithm</label>
+                <select
+                  v-model="store.internalHashAlgo"
+                  class="rounded border border-glass-border bg-surface px-2 py-1 font-mono text-xs text-neon-cyan outline-none focus:border-neon-cyan/40"
+                >
+                  <option value="KECCAK256">Keccak-256</option>
+                  <option value="SHA256">SHA-256</option>
+                </select>
+                <span class="font-mono text-[10px] text-white/30">Used for Merkle tree construction</span>
+              </div>
             </div>
           </GlassCard>
         </div>
@@ -272,9 +318,9 @@ function handleWalletClick() {
       </div>
 
       <!-- Content -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <!-- Main panel (2/3) -->
-        <div class="space-y-6 lg:col-span-2">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <!-- Main panel (3/5) -->
+        <div class="space-y-6 lg:col-span-3">
           <!-- Stamp tab (preserved with v-show) -->
           <div v-show="activeTab === 'stamp'" class="space-y-6">
             <HeroTerminal
@@ -297,8 +343,8 @@ function handleWalletClick() {
           </div>
         </div>
 
-        <!-- Sidebar (1/3) -->
-        <div class="space-y-6">
+        <!-- Sidebar (2/5) -->
+        <div class="space-y-6 lg:col-span-2">
           <LiveFeed />
         </div>
       </div>

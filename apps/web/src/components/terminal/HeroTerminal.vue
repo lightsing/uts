@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useDropZone } from '@vueuse/core'
-import { Upload, Hash, FileText, X } from 'lucide-vue-next'
+import { Upload, Hash, FileText, FolderOpen, X } from 'lucide-vue-next'
 import GlassCard from '@/components/base/GlassCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import { useFileDigest, type FileDigestResult } from '@/composables/useFileDigest'
 import type { SecureDigestOp } from '@uts/sdk'
 
 const emit = defineEmits<{
-  submit: [digest: FileDigestResult]
+  submit: [digests: FileDigestResult[]]
   submitRaw: [hash: string]
 }>()
 
 const dropZoneRef = ref<HTMLDivElement>()
 const fileInputRef = ref<HTMLInputElement>()
+const dirInputRef = ref<HTMLInputElement>()
 const manualHash = ref('')
-const selectedAlgorithm = ref<SecureDigestOp>('SHA256')
+const selectedAlgorithm = ref<SecureDigestOp>('KECCAK256')
 
 const { isDigesting, progress, error: digestError, result: digestResult, digestFile, reset: resetDigest } = useFileDigest()
 
@@ -24,19 +25,34 @@ const { isOverDropZone } = useDropZone(dropZoneRef, {
   dataTypes: ['Files'],
 })
 
+// Store selected files (not yet hashed)
+const selectedFiles = ref<File[]>([])
+const isStamping = ref(false)
+
+const hasFiles = computed(() => selectedFiles.value.length > 0)
 const hasResult = computed(() => digestResult.value !== null)
+const canSubmit = computed(() => (hasFiles.value || manualHash.value.trim()) && !isStamping.value)
 
 function handleDrop(files: File[] | null) {
   if (files && files.length > 0) {
-    processFile(files[0]!)
+    selectedFiles.value = [...files]
+    resetDigest()
   }
 }
 
 function handleFileInput(event: Event) {
   const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (file) {
-    processFile(file)
+  if (target.files && target.files.length > 0) {
+    selectedFiles.value = Array.from(target.files)
+    resetDigest()
+  }
+}
+
+function handleDirInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    selectedFiles.value = Array.from(target.files)
+    resetDigest()
   }
 }
 
@@ -44,28 +60,46 @@ function openFilePicker() {
   fileInputRef.value?.click()
 }
 
-async function processFile(file: File) {
-  await digestFile(file, selectedAlgorithm.value)
+function openDirPicker() {
+  dirInputRef.value?.click()
 }
 
-function handleSubmit() {
-  if (digestResult.value) {
-    emit('submit', digestResult.value)
+async function handleSubmit() {
+  if (hasFiles.value) {
+    isStamping.value = true
+    try {
+      const results: FileDigestResult[] = []
+      for (const file of selectedFiles.value) {
+        const result = await digestFile(file, selectedAlgorithm.value)
+        results.push(result)
+      }
+      emit('submit', results)
+    } catch {
+      // error tracked in digestError
+    } finally {
+      isStamping.value = false
+    }
   } else if (manualHash.value.trim()) {
     emit('submitRaw', manualHash.value.trim())
   }
 }
 
 function handleClear() {
+  selectedFiles.value = []
   resetDigest()
   manualHash.value = ''
   if (fileInputRef.value) fileInputRef.value.value = ''
+  if (dirInputRef.value) dirInputRef.value.value = ''
 }
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function totalSize(): number {
+  return selectedFiles.value.reduce((sum, f) => sum + f.size, 0)
 }
 </script>
 
@@ -86,8 +120,8 @@ function formatSize(bytes: number): string {
             v-model="selectedAlgorithm"
             class="rounded border border-glass-border bg-surface px-2 py-0.5 font-mono text-xs text-neon-cyan outline-none focus:border-neon-cyan/40"
           >
-            <option value="SHA256">SHA-256</option>
             <option value="KECCAK256">Keccak-256</option>
+            <option value="SHA256">SHA-256</option>
           </select>
         </label>
       </div>
@@ -99,8 +133,8 @@ function formatSize(bytes: number): string {
       class="relative rounded-lg border-2 border-dashed p-8 text-center transition-all duration-300"
       :class="{
         'border-neon-cyan/50 bg-neon-cyan/5': isOverDropZone,
-        'border-glass-border hover:border-white/20': !isOverDropZone && !hasResult,
-        'border-valid/30 bg-valid/5': hasResult,
+        'border-glass-border hover:border-white/20': !isOverDropZone && !hasFiles && !isDigesting && !hasResult,
+        'border-valid/30 bg-valid/5': hasFiles || hasResult,
       }"
     >
       <!-- Digesting progress -->
@@ -118,11 +152,13 @@ function formatSize(bytes: number): string {
         <div class="font-mono text-xs text-white/40">{{ progress.toFixed(0) }}%</div>
       </div>
 
-      <!-- Result display -->
-      <div v-else-if="hasResult && digestResult" class="space-y-3">
+      <!-- Files selected (not yet hashed) -->
+      <div v-else-if="hasFiles" class="space-y-3">
         <div class="flex items-center justify-center gap-2">
-          <FileText class="h-5 w-5 text-valid" />
-          <span class="font-heading text-sm font-semibold text-valid">File Digested</span>
+          <FileText class="h-5 w-5 text-neon-cyan" />
+          <span class="font-heading text-sm font-semibold text-neon-cyan">
+            {{ selectedFiles.length }} file{{ selectedFiles.length > 1 ? 's' : '' }} selected
+          </span>
           <button
             class="ml-2 rounded p-1 text-white/30 transition hover:bg-white/10 hover:text-white"
             @click="handleClear"
@@ -130,16 +166,20 @@ function formatSize(bytes: number): string {
             <X class="h-4 w-4" />
           </button>
         </div>
-        <div class="font-mono text-xs text-white/50">
-          {{ digestResult.fileName }} ({{ formatSize(digestResult.fileSize) }})
+        <div class="mx-auto max-w-md space-y-1">
+          <div
+            v-for="(file, i) in selectedFiles.slice(0, 5)"
+            :key="i"
+            class="font-mono text-xs text-white/50"
+          >
+            {{ file.name }} <span class="text-white/30">({{ formatSize(file.size) }})</span>
+          </div>
+          <div v-if="selectedFiles.length > 5" class="font-mono text-xs text-white/30">
+            ... and {{ selectedFiles.length - 5 }} more
+          </div>
         </div>
-        <div
-          class="mx-auto max-w-lg break-all rounded bg-surface/80 px-4 py-2 font-mono text-xs text-neon-cyan"
-        >
-          {{ digestResult.digest }}
-        </div>
-        <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
-          {{ digestResult.algorithm }}
+        <div class="font-mono text-[10px] text-white/30">
+          Total: {{ formatSize(totalSize()) }} · Hash on stamp with {{ selectedAlgorithm }}
         </div>
       </div>
 
@@ -148,21 +188,36 @@ function formatSize(bytes: number): string {
         <Upload class="mx-auto h-10 w-10 text-white/20" />
         <div class="space-y-1">
           <p class="font-heading text-sm font-medium text-white/60">
-            Drop a file here to compute its digest
+            Drop files here
           </p>
           <p class="font-mono text-xs text-white/30">or</p>
         </div>
-        <BaseButton variant="secondary" @click="openFilePicker">
-          <FileText class="h-4 w-4" />
-          Choose File
-        </BaseButton>
+        <div class="flex items-center justify-center gap-2">
+          <BaseButton variant="secondary" @click="openFilePicker">
+            <FileText class="h-4 w-4" />
+            Choose File
+          </BaseButton>
+          <BaseButton variant="secondary" @click="openDirPicker">
+            <FolderOpen class="h-4 w-4" />
+            Choose Directory
+          </BaseButton>
+        </div>
       </div>
 
       <input
         ref="fileInputRef"
         type="file"
+        multiple
         class="hidden"
         @change="handleFileInput"
+      />
+      <!-- Directory picker (webkitdirectory) -->
+      <input
+        ref="dirInputRef"
+        type="file"
+        class="hidden"
+        webkitdirectory
+        @change="handleDirInput"
       />
     </div>
 
@@ -183,12 +238,12 @@ function formatSize(bytes: number): string {
           type="text"
           placeholder="0x..."
           class="flex-1 rounded-lg border border-glass-border bg-surface px-4 py-2.5 font-mono text-sm text-white/80 outline-none transition placeholder:text-white/20 focus:border-neon-cyan/40"
-          :disabled="hasResult"
+          :disabled="hasFiles"
           @keyup.enter="handleSubmit"
         />
         <BaseButton
-          :disabled="!hasResult && !manualHash.trim()"
-          :loading="isDigesting"
+          :disabled="!canSubmit"
+          :loading="isDigesting || isStamping"
           @click="handleSubmit"
         >
           <Hash class="h-4 w-4" />

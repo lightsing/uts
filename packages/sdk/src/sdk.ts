@@ -63,8 +63,8 @@ export const WELL_KNOWN_CHAINS: Record<number, { chainId: string; chainName: str
   1: { chainId: '0x1', chainName: 'Ethereum Mainnet' },
   17000: { chainId: '0x4268', chainName: 'Holesky' },
   11155111: { chainId: '0xaa36a7', chainName: 'Sepolia' },
-  54352: { chainId: '0xd460', chainName: 'Scroll' },
-  54351: { chainId: '0xd45f', chainName: 'Scroll Sepolia' },
+  534352: { chainId: '0x82750', chainName: 'Scroll' },
+  534351: { chainId: '0x8274f', chainName: 'Scroll Sepolia' },
 }
 
 export const DEFAULT_CALENDARS = [
@@ -137,8 +137,8 @@ export default class SDK {
           new JsonRpcProvider('https://0xrpc.io/sep'),
           new JsonRpcProvider('https://rpc.sepolia.org'),
         ]),
-        54352: new JsonRpcProvider('https://rpc.scroll.io'),
-        54351: new JsonRpcProvider('https://sepolia-rpc.scroll.io'),
+        534352: new JsonRpcProvider('https://rpc.scroll.io'),
+        534351: new JsonRpcProvider('https://sepolia-rpc.scroll.io'),
       },
       web3Provider = null,
       timeout = 10000,

@@ -1,15 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { DEFAULT_CALENDARS } from '@uts/sdk'
-import type { DetachedTimestamp } from '@uts/sdk'
+import type { DetachedTimestamp, SecureDigestOp } from '@uts/sdk'
 import { getSDK, resetSDK } from '@/composables/useTimestampSDK'
 
 const CHAIN_NAMES: Record<number, string> = {
   1: 'Ethereum',
   17000: 'Holesky',
   11155111: 'Sepolia',
-  54352: 'Scroll',
-  54351: 'Scroll Sepolia',
+  534352: 'Scroll',
+  534351: 'Scroll Sepolia',
 }
 
 export interface EthChainNode {
@@ -34,21 +34,28 @@ function saveCalendars(urls: string[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(urls))
 }
 
-function loadSettings(): { keepPending: boolean } {
+function loadSettings(): { keepPending: boolean; internalHashAlgo: SecureDigestOp } {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY)
-    if (stored) return JSON.parse(stored)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      return {
+        keepPending: parsed.keepPending ?? false,
+        internalHashAlgo: parsed.internalHashAlgo ?? 'KECCAK256',
+      }
+    }
   } catch { /* ignore */ }
-  return { keepPending: false }
+  return { keepPending: false, internalHashAlgo: 'KECCAK256' }
 }
 
-function saveSettings(settings: { keepPending: boolean }) {
+function saveSettings(settings: { keepPending: boolean; internalHashAlgo: SecureDigestOp }) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
 }
 
 export const useAppStore = defineStore('app', () => {
   const calendarUrls = ref<string[]>(loadCalendars())
   const keepPending = ref(loadSettings().keepPending)
+  const internalHashAlgo = ref<SecureDigestOp>(loadSettings().internalHashAlgo)
   const ethChains = ref<EthChainNode[]>([])
   const recentStamps = ref<DetachedTimestamp[]>([])
 
@@ -62,7 +69,11 @@ export const useAppStore = defineStore('app', () => {
   }, { deep: true })
 
   watch(keepPending, (val) => {
-    saveSettings({ keepPending: val })
+    saveSettings({ keepPending: val, internalHashAlgo: internalHashAlgo.value })
+  })
+
+  watch(internalHashAlgo, (val) => {
+    saveSettings({ keepPending: keepPending.value, internalHashAlgo: val })
   })
 
   async function checkChains() {
@@ -111,6 +122,7 @@ export const useAppStore = defineStore('app', () => {
   return {
     calendarUrls,
     keepPending,
+    internalHashAlgo,
     ethChains,
     recentStamps,
     onlineCount,
