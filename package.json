@@ -3,7 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "eslint packages --cache --fix"
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test:run",
+    "lint": "eslint packages apps --cache --fix",
+    "typecheck": "pnpm -r run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "eslint": "^10.0.2",

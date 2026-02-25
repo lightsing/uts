@@ -346,7 +346,15 @@ const plugins = {
 }
 export default defineConfig(
   {
-    files: ['packages/**/*.ts', 'packages/**/*.tsx'],
+    ignores: ['**/dist/**', '**/.rollup.cache/**', '**/node_modules/**'],
+  },
+  {
+    files: [
+      'packages/**/*.ts',
+      'packages/**/*.tsx',
+      'apps/**/*.ts',
+      'apps/**/*.tsx',
+    ],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
@@ -369,7 +377,12 @@ export default defineConfig(
     }),
   },
   {
-    files: ['packages/**/tests/**/*.ts'],
+    files: [
+      'packages/**/tests/**/*.ts',
+      'packages/**/test/**/*.ts',
+      'apps/**/tests/**/*.ts',
+      'apps/**/test/**/*.ts',
+    ],
     rules: {
       'unicorn/consistent-function-scoping': 'off',
     },
