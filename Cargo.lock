@@ -6295,6 +6295,7 @@ dependencies = [
  "rocksdb",
  "sha3 0.11.0-rc.3",
  "tokio",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
  "uts-bmt",

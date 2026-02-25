@@ -48,7 +48,16 @@
     "incremental": true,
 
     // Completeness
-    "skipLibCheck": true // skip all type checks for .d.ts files
+    "skipLibCheck": true, // skip all type checks for .d.ts files
+
+    "paths": {
+      "@uts/sdk": ["./packages/sdk/src/index.ts"]
+    },
+    "customConditions": ["uts-source"]
   },
-  "references": [{ "path": "./packages/sdk" }, { "path": "./packages/sdk/test/" }, { "path": "./apps/web" }]
+  "references": [
+    { "path": "./packages/sdk" },
+    { "path": "./packages/sdk/test/" },
+    { "path": "./apps/web" }
+  ]
 }

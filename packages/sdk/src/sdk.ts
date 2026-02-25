@@ -1,5 +1,7 @@
 import {
   type AbstractProvider,
+  type Eip1193Provider,
+  BrowserProvider,
   getBytes,
   hexlify,
   id,
@@ -33,14 +35,45 @@ import { ripemd160, sha1 } from '@noble/hashes/legacy.js'
 import BitcoinRPC from './rpc/btc.ts'
 import { FallbackProvider } from 'ethers'
 
+export type StampEvent =
+  | { phase: 'generating-nonce' }
+  | { phase: 'building-merkle-tree' }
+  | { phase: 'broadcasting'; totalCalendars: number }
+  | {
+      phase: 'calendar-response'
+      calendarUrl: string
+      success: boolean
+      responsesReceived: number
+      totalCalendars: number
+    }
+  | { phase: 'building-proof' }
+  | { phase: 'complete' }
+
+export type StampEventCallback = (event: StampEvent) => void
+
 export interface SDKOptions {
   calendars?: URL[]
   btcRPC?: BitcoinRPC
   ethRPCs?: Record<number, AbstractProvider>
+  web3Provider?: Eip1193Provider | null
   timeout?: number
   quorum?: number
   nonceSize?: number
   hashAlgorithm?: SecureDigestOp
+}
+
+/**
+ * Well-known EVM chain IDs to hex for wallet_switchEthereumChain.
+ */
+export const WELL_KNOWN_CHAINS: Record<
+  number,
+  { chainId: string; chainName: string }
+> = {
+  1: { chainId: '0x1', chainName: 'Ethereum Mainnet' },
+  17000: { chainId: '0x4268', chainName: 'Holesky' },
+  11155111: { chainId: '0xaa36a7', chainName: 'Sepolia' },
+  534352: { chainId: '0x82750', chainName: 'Scroll' },
+  534351: { chainId: '0x8274f', chainName: 'Scroll Sepolia' },
 }
 
 export const DEFAULT_CALENDARS = [
@@ -58,8 +91,9 @@ export const UTS_ABI = [
 
 export default class SDK {
   readonly calendars: URL[]
-  readonly btcRPC: BitcoinRPC
-  readonly ethRPCs: Record<number, AbstractProvider>
+  btcRPC: BitcoinRPC
+  ethRPCs: Record<number, AbstractProvider>
+  web3Provider: Eip1193Provider | null = null
 
   /**
    * Maximum time to wait for calendar responses in milliseconds.
@@ -98,23 +132,10 @@ export default class SDK {
       calendars = DEFAULT_CALENDARS,
       btcRPC = new BitcoinRPC(),
       ethRPCs = {
-        1: new FallbackProvider([
-          new JsonRpcProvider('https://eth.drpc.org'),
-          new JsonRpcProvider('https://eth.llamarpc.com'),
-          new JsonRpcProvider('https://eth.llamarpc.com'),
-        ]),
-        17000: new FallbackProvider([
-          new JsonRpcProvider('https://holesky.drpc.org'),
-          new JsonRpcProvider('https://1rpc.io/holesky'),
-        ]),
-        11155111: new FallbackProvider([
-          new JsonRpcProvider('https://sepolia.drpc.org'),
-          new JsonRpcProvider('https://0xrpc.io/sep'),
-          new JsonRpcProvider('https://rpc.sepolia.org'),
-        ]),
-        54352: new JsonRpcProvider('https://rpc.scroll.io'),
-        54351: new JsonRpcProvider('https://sepolia-rpc.scroll.io'),
+        534352: new JsonRpcProvider('https://rpc.scroll.io'),
+        534351: new JsonRpcProvider('https://sepolia-rpc.scroll.io'),
       },
+      web3Provider = null,
       timeout = 10000,
       nonceSize = 32,
       hashAlgorithm = 'KECCAK256',
@@ -124,6 +145,7 @@ export default class SDK {
     this.calendars = calendars
     this.btcRPC = btcRPC
     this.ethRPCs = ethRPCs
+    this.web3Provider = web3Provider
 
     this.timeout = timeout
     this.nonceSize = nonceSize
@@ -166,13 +188,54 @@ export default class SDK {
   }
 
   /**
+   * Try to get a provider for the given chain from the web3 wallet.
+   * If the wallet is on a different chain, attempts to switch to the target chain if it's well-known.
+   * Returns null if no web3Provider or if switching fails.
+   */
+  async getWeb3ProviderForChain(
+    chainId: number,
+  ): Promise<AbstractProvider | null> {
+    if (!this.web3Provider) return null
+
+    try {
+      const browser = new BrowserProvider(this.web3Provider)
+      const network = await browser.getNetwork()
+      if (Number(network.chainId) === chainId) {
+        return browser
+      }
+
+      // Try switching to the target chain if it's well-known
+      const knownChain = WELL_KNOWN_CHAINS[chainId]
+      if (knownChain) {
+        try {
+          await this.web3Provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: knownChain.chainId }],
+          })
+          return new BrowserProvider(this.web3Provider)
+        } catch {
+          // Switch failed, fall through
+        }
+      }
+    } catch {
+      // web3Provider not usable
+    }
+    return null
+  }
+
+  /**
    * Stamp the provided digests by submitting them to the configured calendars.
    *
    * @param digests The digests to be stamped, each with its associated header information. Input digests can use different hash algorithms, but the internal Merkle tree will be constructed using the SDK's configured hash algorithm (default KECCAK256).
    */
-  async stamp(digests: DigestHeader[]): Promise<DetachedTimestamp[]> {
+  async stamp(
+    digests: DigestHeader[],
+    onEvent?: StampEventCallback,
+  ): Promise<DetachedTimestamp[]> {
     const nonces: Uint8Array[] = []
     const nonceDigests: Uint8Array[] = []
+
+    onEvent?.({ phase: 'generating-nonce' })
 
     for (const digest of digests) {
       const hasher = this.hasher.create()
@@ -184,6 +247,8 @@ export default class SDK {
       nonceDigests.push(nonceDigest)
     }
 
+    onEvent?.({ phase: 'building-merkle-tree' })
+
     const internalMerkleTree = UnorderedMerkleTree.new(
       nonceDigests,
       this.hasher,
@@ -191,8 +256,34 @@ export default class SDK {
     const root = internalMerkleTree.root()
     console.debug(`Internal Merkle root: ${hexlify(root)}`)
 
+    onEvent?.({ phase: 'broadcasting', totalCalendars: this.calendars.length })
+
+    let responsesReceived = 0
     const calendarResponses = await Promise.allSettled(
-      this.calendars.map((calendar) => this.requestAttest(calendar, root)),
+      this.calendars.map(async (calendar) => {
+        try {
+          const result = await this.requestAttest(calendar, root)
+          responsesReceived++
+          onEvent?.({
+            phase: 'calendar-response',
+            calendarUrl: calendar.toString(),
+            success: true,
+            responsesReceived,
+            totalCalendars: this.calendars.length,
+          })
+          return result
+        } catch (error) {
+          responsesReceived++
+          onEvent?.({
+            phase: 'calendar-response',
+            calendarUrl: calendar.toString(),
+            success: false,
+            responsesReceived,
+            totalCalendars: this.calendars.length,
+          })
+          throw error
+        }
+      }),
     )
 
     const successfulResponses = calendarResponses.filter(
@@ -214,7 +305,9 @@ export default class SDK {
             } as ForkStep,
           ]
 
-    return digests.map((digest, i) => {
+    onEvent?.({ phase: 'building-proof' })
+
+    const results = digests.map((digest, i) => {
       const timestamp: Timestamp = [
         { op: 'APPEND', data: nonces[i] },
         { op: this.hashAlg },
@@ -256,6 +349,10 @@ export default class SDK {
         timestamp,
       }
     })
+
+    onEvent?.({ phase: 'complete' })
+
+    return results
   }
 
   /**
@@ -299,12 +396,17 @@ export default class SDK {
   /**
    * Perform in-place upgrade of the provided detached timestamp by replacing any pending attestations with their upgraded timestamp steps, if they have become available.
    * @param detached The detached timestamp to be upgraded.
+   * @param keepPending Whether to keep the original pending attestation alongside the upgraded one. Default is false (purge pending on success).
    * @returns The result of the upgrade operation, including the original and upgraded timestamps if applicable.
    */
-  async upgrade(detached: DetachedTimestamp): Promise<UpgradeResult[]> {
+  async upgrade(
+    detached: DetachedTimestamp,
+    keepPending: boolean = false,
+  ): Promise<UpgradeResult[]> {
     return this.upgradeTimestamp(
       getBytes(detached.header.digest),
       detached.timestamp,
+      keepPending,
     )
   }
 
@@ -313,11 +415,13 @@ export default class SDK {
    * This function will recursively traverse the timestamp steps and perform in-place upgrades of any pending attestations encountered.
    * @param input The original digest input associated with the timestamp, which is needed to verify and upgrade the pending attestations.
    * @param timestamp The timestamp steps to be upgraded, which may contain pending attestations that need to be replaced with their upgraded timestamp steps if they have become available.
+   * @param keepPending Whether to keep the original pending attestation alongside the upgraded one. Default is false (purge pending on success).
    * @returns The result of the upgrade operation, including the original and upgraded timestamps if applicable.
    */
   async upgradeTimestamp(
     input: Uint8Array,
     timestamp: Timestamp,
+    keepPending: boolean = false,
   ): Promise<UpgradeResult[]> {
     let current = input
 
@@ -341,7 +445,9 @@ export default class SDK {
           // upgrade sub stamps
           const results = (
             await Promise.all(
-              step.steps.map((branch) => this.upgradeTimestamp(input, branch)),
+              step.steps.map((branch) =>
+                this.upgradeTimestamp(input, branch, keepPending),
+              ),
             )
           ).flat()
           result.push(...results)
@@ -362,10 +468,15 @@ export default class SDK {
               })
               continue
             }
-            // preserve the original attestation in the upgraded timestamp for transparency
-            timestamp[i] = {
-              op: 'FORK',
-              steps: [[step], upgraded],
+            if (keepPending) {
+              // preserve the original attestation in the upgraded timestamp for transparency
+              timestamp[i] = {
+                op: 'FORK',
+                steps: [[step], upgraded],
+              }
+            } else {
+              // replace the pending attestation with the upgraded one
+              timestamp.splice(i, 1, ...upgraded)
             }
             result.push({
               status: UpgradeStatus.Upgraded,
@@ -565,17 +676,25 @@ export default class SDK {
     input: Uint8Array,
     attestation: EthereumUTSAttestation,
   ): Promise<AttestationStatus> {
-    if (!Object.hasOwn(this.ethRPCs, attestation.chain)) {
-      return {
-        attestation,
-        status: AttestationStatusKind.UNKNOWN,
-        error: new VerifyError(
-          ErrorCode.UNSUPPORTED_ATTESTATION,
-          `No RPC provider configured for Ethereum chain ${attestation.chain}`,
-        ),
+    // Try web3Provider first (works in browser without CORS issues)
+    let provider: AbstractProvider | null = await this.getWeb3ProviderForChain(
+      attestation.chain,
+    )
+
+    // Fallback to ethRPCs
+    if (!provider) {
+      if (!Object.hasOwn(this.ethRPCs, attestation.chain)) {
+        return {
+          attestation,
+          status: AttestationStatusKind.UNKNOWN,
+          error: new VerifyError(
+            ErrorCode.UNSUPPORTED_ATTESTATION,
+            `No RPC provider configured for Ethereum chain ${attestation.chain}`,
+          ),
+        }
       }
+      provider = this.ethRPCs[attestation.chain]!
     }
-    const provider = this.ethRPCs[attestation.chain]!
 
     try {
       const logs = await provider.getLogs({
