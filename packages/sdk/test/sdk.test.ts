@@ -72,7 +72,7 @@ describe('Verify', () => {
     expect(verified).toBeDefined()
     console.debug('Verification details:', JSON.stringify(verified, null, 2))
 
-    const result = sdk.trasformResult(verified)
+    const result = sdk.transformResult(verified)
     expect(result).toBeDefined()
     console.debug('Verification result:', JSON.stringify(result, null, 2))
   })

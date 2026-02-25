@@ -6,6 +6,7 @@ import {
   ETHEREUM_UTS_ATTESTATION_TAG,
   MAX_URI_LEN,
   URI_SAFE_CHAR_REGEX,
+  DIGEST_LENGTHS,
 } from './constants'
 import type {
   DetachedTimestamp,
@@ -145,6 +146,13 @@ export default class Encoder {
   writeHeader(header: DigestHeader): Encoder {
     this.writeOp(header.kind)
     const digestBytes = getBytes(header.digest)
+    if (digestBytes.length != DIGEST_LENGTHS[header.kind]) {
+      throw new EncodeError(
+        ErrorCode.LENGTH_MISMATCH,
+        `Digest length mismatch for ${header.kind}: expected ${DIGEST_LENGTHS[header.kind]}, got ${digestBytes.length}`,
+        { offset: this.offset, context: { header } },
+      )
+    }
     this.writeBytes(digestBytes)
     return this
   }

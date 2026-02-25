@@ -34,7 +34,7 @@ export const hexlify = (obj: any): any => {
   if (typeof obj === 'object' && obj !== null) {
     const result: any = {}
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         result[key] = hexlify(obj[key])
       }
     }

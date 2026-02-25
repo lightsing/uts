@@ -40,19 +40,69 @@ export default class BitcoinRPC {
   }
 
   async call(method: string, params: any[] = []): Promise<any> {
-    const response = await fetch(this.url.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '1.0',
-        method,
-        params,
-        id: 1,
-      }),
-    })
-    const data: BitcoinRPCResponse = await response.json()
+    let response: Response
+    try {
+      response = await fetch(this.url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '1.0',
+          method,
+          params,
+          id: 1,
+        }),
+      })
+    } catch (err) {
+      throw new RemoteError('Bitcoin RPC network error', {
+        context: {
+          url: this.url.toString(),
+          error: err instanceof Error ? err.message : String(err),
+        },
+      })
+    }
+
+    let rawBody: string
+    try {
+      rawBody = await response.text()
+    } catch (err) {
+      throw new RemoteError('Bitcoin RPC error reading response body', {
+        context: {
+          status: response.status,
+          statusText: response.statusText,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      })
+    }
+
+    if (!response.ok) {
+      throw new RemoteError(
+        `Bitcoin RPC HTTP error: ${response.status} ${response.statusText}`,
+        {
+          context: {
+            status: response.status,
+            statusText: response.statusText,
+            response: rawBody,
+          },
+        },
+      )
+    }
+
+    let data: BitcoinRPCResponse
+    try {
+      data = JSON.parse(rawBody) as BitcoinRPCResponse
+    } catch (err) {
+      throw new RemoteError('Bitcoin RPC invalid JSON response', {
+        context: {
+          status: response.status,
+          statusText: response.statusText,
+          body: rawBody,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      })
+    }
+
     if (data.result !== undefined) {
       return data.result
     }

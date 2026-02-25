@@ -15,11 +15,11 @@ import {
   type BitcoinAttestation,
   type DetachedTimestamp,
   type DigestHeader,
-  type DigestOp,
   type EthereumUTSAttestation,
   type ExecutionStep,
   type ForkStep,
   type PendingAttestation,
+  type SecureDigestOp,
   type Timestamp,
   type UpgradeResult,
 } from './types'
@@ -32,7 +32,6 @@ import { EncodeError, ErrorCode, RemoteError, VerifyError } from './errors'
 import { ripemd160, sha1 } from '@noble/hashes/legacy.js'
 import BitcoinRPC from './rpc/btc'
 import { FallbackProvider } from 'ethers'
-import { WebSocketProvider } from 'ethers'
 
 export interface SDKOptions {
   calendars?: URL[]
@@ -41,7 +40,7 @@ export interface SDKOptions {
   timeout?: number
   quorum?: number
   nonceSize?: number
-  hashAlgorithm?: DigestOp
+  hashAlgorithm?: SecureDigestOp
 }
 
 export const DEFAULT_CALENDARS = [
@@ -85,7 +84,7 @@ export default class SDK {
    */
   nonceSize: number
 
-  private hashAlg: DigestOp = 'KECCAK256'
+  private hashAlg: SecureDigestOp = 'KECCAK256'
   private hasher: CHash = keccak_256
 
   private static encoder = new TextEncoder()
@@ -133,7 +132,7 @@ export default class SDK {
     this.hashAlgorithm = hashAlgorithm
   }
 
-  get hashAlgorithm(): DigestOp {
+  get hashAlgorithm(): SecureDigestOp {
     return this.hashAlg
   }
 
@@ -145,7 +144,7 @@ export default class SDK {
    * Supported algorithms are 'SHA256' and 'KECCAK256'.
    * @param alg
    */
-  set hashAlgorithm(alg: DigestOp) {
+  set hashAlgorithm(alg: SecureDigestOp) {
     this.hashAlg = alg
     switch (alg) {
       case 'SHA256':
@@ -300,7 +299,7 @@ export default class SDK {
    * @returns The result of the upgrade operation, including the original and upgraded timestamps if applicable.
    */
   async upgrade(detached: DetachedTimestamp): Promise<UpgradeResult[]> {
-    return this.upgradeTimesamp(
+    return this.upgradeTimestamp(
       getBytes(detached.header.digest),
       detached.timestamp,
     )
@@ -313,7 +312,7 @@ export default class SDK {
    * @param timestamp The timestamp steps to be upgraded, which may contain pending attestations that need to be replaced with their upgraded timestamp steps if they have become available.
    * @returns The result of the upgrade operation, including the original and upgraded timestamps if applicable.
    */
-  async upgradeTimesamp(
+  async upgradeTimestamp(
     input: Uint8Array,
     timestamp: Timestamp,
   ): Promise<UpgradeResult[]> {
@@ -339,7 +338,7 @@ export default class SDK {
           // upgrade sub stamps
           const results = (
             await Promise.all(
-              step.steps.map((branch) => this.upgradeTimesamp(input, branch)),
+              step.steps.map((branch) => this.upgradeTimestamp(input, branch)),
             )
           ).flat()
           result.push(...results)
@@ -647,7 +646,7 @@ export default class SDK {
    * - If there are no VALID or PENDING attestations, the overall status is INVALID
    * @param attestations
    */
-  trasformResult(attestations: AttestationStatus[]): VerifyStatus {
+  transformResult(attestations: AttestationStatus[]): VerifyStatus {
     let counts = {
       [AttestationStatusKind.VALID]: 0,
       [AttestationStatusKind.INVALID]: 0,

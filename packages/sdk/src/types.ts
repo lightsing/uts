@@ -3,6 +3,7 @@ import { type BytesLike } from 'ethers/utils'
 export const DIGEST_OPS = ['SHA1', 'SHA256', 'RIPEMD160', 'KECCAK256'] as const
 
 export type DigestOp = (typeof DIGEST_OPS)[number]
+export type SecureDigestOp = Exclude<DigestOp, 'SHA1' | 'RIPEMD160'>
 export type Op =
   | DigestOp
   | 'APPEND'
