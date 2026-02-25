@@ -166,7 +166,7 @@ function handleResetWorkflow() {
     <!-- Footer -->
     <footer class="border-t border-glass-border py-6 text-center">
       <p class="font-mono text-[10px] text-white/20">
-        UTS Protocol — Powered by OpenTimestamps
+        UTS Protocol — Powered by Universal Timestamps
       </p>
     </footer>
   </div>
