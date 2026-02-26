@@ -33,7 +33,6 @@ import Decoder from './codec/decode.ts'
 import { EncodeError, ErrorCode, RemoteError, VerifyError } from './errors.ts'
 import { ripemd160, sha1 } from '@noble/hashes/legacy.js'
 import BitcoinRPC from './rpc/btc.ts'
-import { FallbackProvider } from 'ethers'
 
 export type StampEvent =
   | { phase: 'generating-nonce' }
@@ -77,10 +76,11 @@ export const WELL_KNOWN_CHAINS: Record<
 }
 
 export const DEFAULT_CALENDARS = [
-  new URL('https://a.pool.opentimestamps.org/'),
-  new URL('https://b.pool.opentimestamps.org/'),
-  new URL('https://a.pool.eternitywall.com/'),
-  new URL('https://ots.btc.catallaxy.com/'),
+  // new URL('https://a.pool.opentimestamps.org/'),
+  // new URL('https://b.pool.opentimestamps.org/'),
+  // new URL('https://a.pool.eternitywall.com/'),
+  // new URL('https://ots.btc.catallaxy.com/'),
+  new URL('http://127.0.0.1:3000/'),
 ]
 
 export const UTS_ABI = [
