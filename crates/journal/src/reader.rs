@@ -1,6 +1,6 @@
 use crate::{ConsumerWait, JournalInner};
 use std::{
-    fmt,
+    fmt, io,
     pin::Pin,
     sync::{Arc, atomic::Ordering},
     task::{Context, Poll},
@@ -30,13 +30,16 @@ impl<const ENTRY_SIZE: usize> Drop for JournalReader<ENTRY_SIZE> {
 
 impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
     pub(super) fn new(journal: Arc<JournalInner<ENTRY_SIZE>>) -> Self {
-        let consumed = journal.consumed_index.load(Ordering::Acquire);
+        let consumed = journal.consumed_checkpoint.current_index();
         Self { journal, consumed }
     }
 
     /// Returns the number of available entries that are settled but not yet consumed by this reader.
     #[inline]
     pub fn available(&self) -> usize {
+        if self.journal.shutdown.load(Ordering::Acquire) {
+            return 0;
+        }
         let persisted = self.journal.persisted_index.load(Ordering::Acquire);
         persisted.wrapping_sub(self.consumed) as usize
     }
@@ -55,7 +58,7 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
             // - didn't commit previously read entries, then asks for more than new entries than the buffer can hold
             // this is considered a misuse of the API / design flaw in the caller, so we panics
             let journal_buffer_size = self.journal.buffer.len() as u64;
-            let current_consumed = self.journal.consumed_index.load(Ordering::Acquire);
+            let current_consumed = self.journal.consumed_checkpoint.current_index();
             let max_possible_target = current_consumed.wrapping_add(journal_buffer_size);
             if target_index > max_possible_target {
                 panic!(
@@ -132,22 +135,19 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
     }
 
     /// Commit current consumed index.
-    pub fn commit(&mut self) {
-        self.journal
-            .consumed_index
-            .store(self.consumed, Ordering::Release);
+    pub fn commit(&mut self) -> io::Result<()> {
+        self.journal.consumed_checkpoint.update(self.consumed)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::tests::*;
-    use std::sync::atomic::Ordering;
     use tokio::time::{Duration, sleep, timeout};
 
     #[tokio::test(flavor = "current_thread")]
     async fn available_tracks_persisted_entries() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4);
+        let journal = Journal::with_capacity(4)?;
         let mut reader = journal.reader();
 
         assert_eq!(reader.available(), 0);
@@ -166,7 +166,7 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn commit_updates_shared_consumed_boundary() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4);
+        let journal = Journal::with_capacity(4)?;
         let mut reader = journal.reader();
 
         for entry in TEST_DATA.iter().take(3) {
@@ -177,19 +177,19 @@ mod tests {
         assert_eq!(slice.len(), 2);
         assert_eq!(reader.available(), 1);
         assert_eq!(
-            reader.journal.consumed_index.load(Ordering::Acquire),
+            reader.journal.consumed_checkpoint.current_index(),
             0,
             "global consumed boundary should not advance before commit",
         );
 
-        reader.commit();
-        assert_eq!(reader.journal.consumed_index.load(Ordering::Acquire), 2);
+        reader.commit()?;
+        assert_eq!(reader.journal.consumed_checkpoint.current_index(), 2);
         Ok(())
     }
 
     #[tokio::test(flavor = "current_thread")]
     async fn wait_at_least_resumes_after_persistence() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4);
+        let journal = Journal::with_capacity(4)?;
         let mut reader = journal.reader();
 
         let journal_clone = journal.clone();
@@ -207,7 +207,7 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn wait_at_least_waits_for_correct_count() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4);
+        let journal = Journal::with_capacity(4)?;
         let mut reader = journal.reader();
 
         let journal_clone = journal.clone();
@@ -230,7 +230,7 @@ mod tests {
         expected = "requested (5) exceeds max possible (4): journal.buffer.len()=4, journal.consumed_index=0"
     )]
     async fn wait_at_least_exceeds_buffer_size() {
-        let journal = Journal::with_capacity(4);
+        let journal = Journal::with_capacity(4).unwrap();
         let mut reader = journal.reader();
 
         timeout(Duration::from_secs(1), reader.wait_at_least(5))
@@ -243,7 +243,7 @@ mod tests {
         expected = "requested (5) exceeds max possible (4): journal.buffer.len()=4, journal.consumed_index=0"
     )]
     async fn wait_at_least_dirty_read_exceeds_available() {
-        let journal = Journal::with_capacity(4);
+        let journal = Journal::with_capacity(4).unwrap();
         journal.commit(&TEST_DATA[0]).await;
 
         let mut reader = journal.reader();

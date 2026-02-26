@@ -10,7 +10,8 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
-dyn-clone = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 eyre = { workspace = true }

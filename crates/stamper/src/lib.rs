@@ -299,6 +299,6 @@ where
         }
         self.cache.push_back(merkle_tree);
         self.cache_index.insert(root, self.cache.len() - 1);
-        self.reader.commit();
+        self.reader.commit().expect("Failed to commit read entries"); // FIXME: handle error properly
     }
 }
