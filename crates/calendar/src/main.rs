@@ -37,7 +37,7 @@ async fn main() -> eyre::Result<()> {
         RING_BUFFER_CAPACITY,
         JournalConfig {
             consumer_checkpoint: CheckpointConfig {
-                path: PathBuf::from("./.checkpoint"),
+                path: PathBuf::from("./.journal/.checkpoint"),
                 ..Default::default()
             },
             wal_dir: PathBuf::from("./.journal"),

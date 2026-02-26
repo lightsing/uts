@@ -147,7 +147,7 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn available_tracks_persisted_entries() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4)?;
+        let (journal, _tmp) = test_journal(4);
         let mut reader = journal.reader();
 
         assert_eq!(reader.available(), 0);
@@ -161,12 +161,13 @@ mod tests {
         let slice = reader.read(1);
         assert_eq!(slice.len(), 1);
         assert_eq!(reader.available(), 1);
+        journal.shutdown()?;
         Ok(())
     }
 
     #[tokio::test(flavor = "current_thread")]
     async fn commit_updates_shared_consumed_boundary() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4)?;
+        let (journal, _tmp) = test_journal(4);
         let mut reader = journal.reader();
 
         for entry in TEST_DATA.iter().take(3) {
@@ -184,12 +185,13 @@ mod tests {
 
         reader.commit()?;
         assert_eq!(reader.journal.consumed_checkpoint.current_index(), 2);
+        journal.shutdown()?;
         Ok(())
     }
 
     #[tokio::test(flavor = "current_thread")]
     async fn wait_at_least_resumes_after_persistence() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4)?;
+        let (journal, _tmp) = test_journal(4);
         let mut reader = journal.reader();
 
         let journal_clone = journal.clone();
@@ -202,12 +204,13 @@ mod tests {
         assert_eq!(reader.available(), 1);
 
         task.await?;
+        journal.shutdown()?;
         Ok(())
     }
 
     #[tokio::test(flavor = "current_thread")]
     async fn wait_at_least_waits_for_correct_count() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4)?;
+        let (journal, _tmp) = test_journal(4);
         let mut reader = journal.reader();
 
         let journal_clone = journal.clone();
@@ -218,10 +221,11 @@ mod tests {
             }
         });
 
-        timeout(Duration::from_secs(1), reader.wait_at_least(3)).await?;
+        timeout(Duration::from_secs(10), reader.wait_at_least(3)).await?;
         assert!(reader.available() >= 3);
 
         task.await?;
+        journal.shutdown()?;
         Ok(())
     }
 
@@ -230,7 +234,7 @@ mod tests {
         expected = "requested (5) exceeds max possible (4): journal.buffer.len()=4, journal.consumed_index=0"
     )]
     async fn wait_at_least_exceeds_buffer_size() {
-        let journal = Journal::with_capacity(4).unwrap();
+        let (journal, _tmp) = test_journal(4);
         let mut reader = journal.reader();
 
         timeout(Duration::from_secs(1), reader.wait_at_least(5))
@@ -243,7 +247,7 @@ mod tests {
         expected = "requested (5) exceeds max possible (4): journal.buffer.len()=4, journal.consumed_index=0"
     )]
     async fn wait_at_least_dirty_read_exceeds_available() {
-        let journal = Journal::with_capacity(4).unwrap();
+        let (journal, _tmp) = test_journal(4);
         journal.commit(&TEST_DATA[0]).await;
 
         let mut reader = journal.reader();

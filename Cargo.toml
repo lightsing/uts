@@ -86,6 +86,7 @@ sha1 = "0.11.0-rc.3"
 sha2 = "0.11.0-rc.3"
 sha3 = "0.11.0-rc.3"
 
+tempfile = "3"
 uts-bmt = { path = "crates/bmt" }
 uts-contracts = { path = "crates/contracts" }
 uts-core = { path = "crates/core" }
