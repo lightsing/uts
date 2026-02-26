@@ -73,9 +73,14 @@ pub(crate) struct JournalInner<const ENTRY_SIZE: usize> {
     /// Mask for indexing into the ring buffer.
     index_mask: u64,
     /// Next Write Position, aka:
-    /// - Total entries written count.
+    /// - Total entries reserved count.
     /// - Position to write the next entry to.
     write_index: AtomicU64,
+    /// Filled Boundary, aka:
+    /// - Total entries that have been fully written to the ring buffer.
+    /// - Advanced in order after each writer finishes copying data into its reserved slot.
+    /// - The WAL worker uses this (not `write_index`) to determine how far it can safely read.
+    filled_index: AtomicU64,
     /// WAL Committed Boundary, aka.:
     /// - Total committed entries count.
     /// - Position has not yet been persisted to durable storage.
@@ -129,6 +134,7 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
             waker_buffer,
             index_mask,
             write_index: AtomicU64::new(0),
+            filled_index: AtomicU64::new(0),
             persisted_index: AtomicU64::new(0),
             consumed_checkpoint: Checkpoint::new(config.consumer_checkpoint)?,
             reader_taken: AtomicBool::new(false),
@@ -214,10 +220,28 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
         let slot = unsafe { &mut *self.data_slot_ptr(current_written) };
         slot.copy_from_slice(data);
 
-        // 4. Notify WAL worker if needed.
+        // 4. Publish the filled slot.
+        //    Spin-wait until all prior slots are filled, then advance `filled_index`.
+        //    The Release ordering ensures the slot write above is visible to the WAL worker
+        //    before it reads `filled_index`.
+        while self
+            .inner
+            .filled_index
+            .compare_exchange_weak(
+                current_written,
+                current_written.wrapping_add(1),
+                Ordering::Release,
+                Ordering::Relaxed,
+            )
+            .is_err()
+        {
+            std::hint::spin_loop();
+        }
+
+        // 5. Notify WAL worker if needed.
         let committed = self.inner.persisted_index.load(Ordering::Relaxed);
-        // Explain: Before we wrote to the slot, if there is no pending committed entry,
-        // There's a chance the WAL worker is sleeping, we need to wake it up.
+        // Explain: If there is no pending committed entry before ours,
+        // the WAL worker may be sleeping, so we need to wake it up.
         if current_written == committed {
             // Notify the WAL worker thread to persist new entries.
             self.wal.unpark();
@@ -342,7 +366,7 @@ impl Deref for WakerEntry {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
+    use crate::checkpoint::CheckpointConfig;
 
     pub const ENTRY_SIZE: usize = 8;
     pub const TEST_DATA: &[[u8; ENTRY_SIZE]] = &[
@@ -359,9 +383,25 @@ pub(crate) mod tests {
     ];
     pub type Journal = crate::Journal<ENTRY_SIZE>;
 
+    /// Create a journal with an isolated temporary directory for WAL and checkpoint files.
+    /// Returns the journal and the temp dir guard (must be kept alive for the test duration).
+    pub fn test_journal(capacity: usize) -> (Journal, tempfile::TempDir) {
+        let tmp = tempfile::tempdir().expect("failed to create temp dir");
+        let config = crate::JournalConfig {
+            consumer_checkpoint: CheckpointConfig {
+                path: tmp.path().join("checkpoint.meta"),
+                ..Default::default()
+            },
+            wal_dir: tmp.path().join("wal"),
+        };
+        let journal =
+            Journal::with_capacity_and_config(capacity, config).expect("failed to create journal");
+        (journal, tmp)
+    }
+
     #[tokio::test(flavor = "current_thread")]
     async fn try_reader_is_exclusive() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(2)?;
+        let (journal, _tmp) = test_journal(2);
 
         let reader = journal.try_reader().unwrap();
 
@@ -376,12 +416,13 @@ pub(crate) mod tests {
             "reader acquisition should succeed after drop"
         );
 
+        journal.shutdown()?;
         Ok(())
     }
 
     #[tokio::test(flavor = "current_thread")]
     async fn commit_and_read_round_trip() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4)?;
+        let (journal, _tmp) = test_journal(4);
         let mut reader = journal.reader();
 
         journal.commit(&TEST_DATA[0]).await;
@@ -396,12 +437,13 @@ pub(crate) mod tests {
 
         reader.commit()?;
         assert_eq!(reader.available(), 0);
+        journal.shutdown()?;
         Ok(())
     }
 
     #[tokio::test(flavor = "current_thread")]
     async fn commit_returns_error_when_full() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(2)?;
+        let (journal, _tmp) = test_journal(2);
 
         journal.commit(&TEST_DATA[1]).await;
         journal.commit(&TEST_DATA[2]).await;
@@ -409,13 +451,17 @@ pub(crate) mod tests {
         let err = journal
             .try_commit(&TEST_DATA[3])
             .expect_err("buffer should report full on third commit");
-        assert!(matches!(err, JournalBusy));
+        assert!(
+            matches!(err, crate::error::JournalUnavailable::Full),
+            "expected Full, got {err:?}"
+        );
+        journal.shutdown()?;
         Ok(())
     }
 
     #[tokio::test(flavor = "current_thread")]
     async fn reader_handles_wrap_around_reads() -> eyre::Result<()> {
-        let journal = Journal::with_capacity(4)?;
+        let (journal, _tmp) = test_journal(4);
         let mut reader = journal.reader();
 
         for entry in TEST_DATA.iter().take(4) {
@@ -450,6 +496,7 @@ pub(crate) mod tests {
 
         reader.commit()?;
         assert_eq!(reader.available(), 0);
+        journal.shutdown()?;
         Ok(())
     }
 }

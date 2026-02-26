@@ -6379,6 +6379,7 @@ name = "uts-journal"
 version = "0.1.0"
 dependencies = [
  "eyre",
+ "tempfile",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
