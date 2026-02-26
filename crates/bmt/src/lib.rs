@@ -238,14 +238,17 @@ mod tests {
 
         // Manually compute the expected root
         let mut hasher = D::new();
+        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
         Digest::update(&mut hasher, &leaves[0]);
         Digest::update(&mut hasher, &leaves[1]);
         let left_hash = hasher.finalize_reset();
 
+        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
         Digest::update(&mut hasher, &leaves[2]);
         Digest::update(&mut hasher, &leaves[3]);
         let right_hash = hasher.finalize_reset();
 
+        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
         Digest::update(&mut hasher, &left_hash);
         Digest::update(&mut hasher, &right_hash);
         let expected_root = hasher.finalize();
@@ -277,10 +280,12 @@ mod tests {
             while let Some((side, sibling_hash)) = iter.next() {
                 match side {
                     NodePosition::Left => {
+                        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
                         Digest::update(&mut hasher, &current_hash);
                         Digest::update(&mut hasher, sibling_hash);
                     }
                     NodePosition::Right => {
+                        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
                         Digest::update(&mut hasher, sibling_hash);
                         Digest::update(&mut hasher, &current_hash);
                     }
