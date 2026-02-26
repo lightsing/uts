@@ -15,6 +15,9 @@ use std::{
     thread::JoinHandle,
 };
 
+const MAX_SPIN: usize = 100;
+const MAX_IO_BATCH: u64 = 128;
+
 /// Write-Ahead Log
 ///
 /// Busy-Wait + Parking when there's no work to do.
@@ -168,12 +171,16 @@ impl<const ENTRY_SIZE: usize> WalWorker<ENTRY_SIZE> {
         let segment_size = journal.capacity() as u64;
 
         let mut persisted = journal.persisted_index.load(Ordering::Acquire);
+        let mut spin_count = 0;
 
         while !shutdown_flag.load(Ordering::Acquire) {
             let filled = journal.filled_index.load(Ordering::Acquire);
             let available = filled.wrapping_sub(persisted);
 
             if available > 0 {
+                spin_count = 0;
+
+                let available = available.min(MAX_IO_BATCH);
                 let target_index = persisted + available;
 
                 // write ALL available entries to segment files, rotating files as needed
@@ -222,6 +229,13 @@ impl<const ENTRY_SIZE: usize> WalWorker<ENTRY_SIZE> {
                     }
                 }
 
+                continue;
+            }
+
+            // no new data to persist, spin for a while before parking
+            if spin_count <= MAX_SPIN {
+                spin_count += 1;
+                std::hint::spin_loop();
                 continue;
             }
 
@@ -419,7 +433,10 @@ mod tests {
     fn format_segment_file_name_pads_to_twelve_digits() {
         assert_eq!(format_segment_file_name(0), "000000000000.wal");
         assert_eq!(format_segment_file_name(1), "000000000001.wal");
-        assert_eq!(format_segment_file_name(999_999_999_999), "999999999999.wal");
+        assert_eq!(
+            format_segment_file_name(999_999_999_999),
+            "999999999999.wal"
+        );
     }
 
     #[test]
