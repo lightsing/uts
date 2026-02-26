@@ -55,7 +55,7 @@ impl Default for JournalConfig {
 /// All index here are monotonic u64, wrapping around on overflow.
 ///
 /// Following invariants are maintained:
-/// `consumed_index` <= `persisted_index` <= `write_index`.
+/// `consumed_index` <= `persisted_index` <= `filled_index` <= `write_index`.
 #[derive(Clone)]
 pub struct Journal<const ENTRY_SIZE: usize> {
     inner: Arc<JournalInner<{ ENTRY_SIZE }>>,
