@@ -35,9 +35,9 @@ pub mod wal;
 pub struct JournalConfig {
     /// Configuration for the consumer checkpoint, which tracks the `consumed_index` of the journal.
     pub consumer_checkpoint: CheckpointConfig,
-    /// Directory for the write-ahead log (WAL) backend, which is used for durability and recovery
-    /// of the journal. The WAL will store committed entries that have not yet been persisted to the
-    /// ring buffer, allowing the journal to recover from crashes without data loss.
+    /// Directory for the write-ahead log (WAL) backend, which persists committed entries to disk
+    /// for durability and crash recovery, allowing the journal to recover from crashes without data
+    /// loss.
     pub wal_dir: PathBuf,
 }
 
@@ -50,7 +50,7 @@ impl Default for JournalConfig {
     }
 }
 
-/// A `At-Least-Once` journal for storing fixed-size entries in a ring buffer.
+/// An `At-Least-Once` journal for storing fixed-size entries in a ring buffer.
 ///
 /// All index here are monotonic u64, wrapping around on overflow.
 ///

@@ -91,6 +91,7 @@ impl<const ENTRY_SIZE: usize> Wal<ENTRY_SIZE> {
         let worker = WalWorker {
             current_segment_id,
             current_file: BufWriter::new(current_file),
+            persisted_index: journal.persisted_index.load(Ordering::Acquire),
 
             base_dir: base_dir.to_path_buf(),
             journal: journal.clone(),
@@ -99,7 +100,10 @@ impl<const ENTRY_SIZE: usize> Wal<ENTRY_SIZE> {
 
         let handle = thread::Builder::new()
             .name("wal-worker".to_string())
-            .spawn(move || worker.run())
+            .spawn(move || {
+                let mut worker = worker;
+                worker.run()
+            })
             .expect("Failed to spawn WAL worker thread");
 
         let inner = WalInner {
@@ -152,6 +156,7 @@ impl<const ENTRY_SIZE: usize> Wal<ENTRY_SIZE> {
 struct WalWorker<const ENTRY_SIZE: usize> {
     current_segment_id: u64,
     current_file: BufWriter<File>,
+    persisted_index: u64,
 
     base_dir: PathBuf,
     journal: Arc<JournalInner<ENTRY_SIZE>>,
@@ -159,75 +164,23 @@ struct WalWorker<const ENTRY_SIZE: usize> {
 }
 
 impl<const ENTRY_SIZE: usize> WalWorker<ENTRY_SIZE> {
-    fn run(self) {
-        let Self {
-            mut current_segment_id,
-            mut current_file,
-            base_dir,
-            journal,
-            shutdown_flag,
-        } = self;
-
-        let segment_size = journal.capacity() as u64;
-
-        let mut persisted = journal.persisted_index.load(Ordering::Acquire);
+    fn run(&mut self) {
         let mut spin_count = 0;
 
-        while !shutdown_flag.load(Ordering::Acquire) {
-            let filled = journal.filled_index.load(Ordering::Acquire);
-            let available = filled.wrapping_sub(persisted);
+        while !self.shutdown_flag.load(Ordering::Acquire) {
+            let filled = self.journal.filled_index.load(Ordering::Acquire);
+            let available = filled.wrapping_sub(self.persisted_index);
 
             if available > 0 {
                 spin_count = 0;
 
-                let available = available.min(MAX_IO_BATCH);
-                let target_index = persisted + available;
+                let new_persisted_index = self
+                    .write(available.min(MAX_IO_BATCH))
+                    .expect("Failed to write WAL entries");
 
-                // write ALL available entries to segment files, rotating files as needed
-                for i in persisted..target_index {
-                    let seg_id = i / segment_size;
-                    if seg_id != current_segment_id {
-                        // rotate to new segment file
-                        current_segment_id = seg_id;
-                        let new_file = open_segment_file(&base_dir, seg_id)
-                            .expect("Failed to open WAL segment file");
-                        current_file = BufWriter::new(new_file);
-                        let base_dir = base_dir.clone();
-                        thread::spawn(move || truncate_old_segments(base_dir, seg_id));
-                    }
-
-                    current_file
-                        .write_all(unsafe { &*journal.data_slot_ptr(i) })
-                        .expect("Failed to write to WAL segment file");
-                }
-                current_file
-                    .flush()
-                    .expect("Failed to flush WAL segment file");
-                current_file
-                    .get_ref()
-                    .sync_all()
-                    .expect("Failed to sync WAL segment file");
-
-                // notify waiters only after data is persisted
-                for i in persisted..target_index {
-                    let entry = journal.waker_slot(i);
-                    if let Some(waker) = entry.lock().unwrap().take() {
-                        waker.wake();
-                    }
-                }
-
-                // update persisted index
-                persisted = target_index;
-                journal.persisted_index.store(persisted, Ordering::Release);
-
-                // notify consumer if needed
-                let mut guard = journal.consumer_wait.lock().unwrap();
-                if let Some(wait) = guard.as_ref() {
-                    // Only wake if the target_index is reached
-                    if persisted >= wait.target_index {
-                        guard.take().unwrap().waker.wake();
-                    }
-                }
+                self.notify_writer(new_persisted_index);
+                self.update_index(new_persisted_index);
+                self.notify_consumer();
 
                 continue;
             }
@@ -241,6 +194,72 @@ impl<const ENTRY_SIZE: usize> WalWorker<ENTRY_SIZE> {
 
             // park until unparked by a new commit
             thread::park();
+        }
+
+        // cleanup before exiting: persist any remaining entries
+        let filled = self.journal.filled_index.load(Ordering::Acquire);
+        let available = filled.wrapping_sub(self.persisted_index);
+        let new_persisted_index = self
+            .write(available.min(MAX_IO_BATCH))
+            .expect("Failed to write WAL entries");
+
+        self.notify_writer(new_persisted_index);
+        self.update_index(new_persisted_index);
+        self.notify_consumer();
+    }
+
+    /// update the persisted index
+    fn update_index(&mut self, new_persisted_index: u64) {
+        self.persisted_index = new_persisted_index;
+        self.journal
+            .persisted_index
+            .store(self.persisted_index, Ordering::Release);
+    }
+
+    /// Write `n` entries from the journal to the current WAL segment file, rotating files as needed.
+    fn write(&mut self, n: u64) -> io::Result<u64> {
+        let segment_size: u64 = self.journal.capacity() as u64;
+        let new_persisted_index = self.persisted_index + n;
+
+        // write ALL available entries to segment files, rotating files as needed
+        for i in self.persisted_index..new_persisted_index {
+            let seg_id = i / segment_size;
+            if seg_id != self.current_segment_id {
+                // rotate to new segment file
+                self.current_segment_id = seg_id;
+                let new_file = open_segment_file(&self.base_dir, seg_id)?;
+                self.current_file = BufWriter::new(new_file);
+                let base_dir = self.base_dir.clone();
+                thread::spawn(move || truncate_old_segments(base_dir, seg_id));
+            }
+
+            self.current_file
+                .write_all(unsafe { &*self.journal.data_slot_ptr(i) })?;
+        }
+
+        self.current_file.flush()?;
+        self.current_file.get_ref().sync_all()?;
+        Ok(new_persisted_index)
+    }
+
+    fn notify_writer(&mut self, new_persisted_index: u64) {
+        // notify waiters only after data is persisted
+        for i in self.persisted_index..new_persisted_index {
+            let entry = self.journal.waker_slot(i);
+            if let Some(waker) = entry.lock().unwrap().take() {
+                waker.wake();
+            }
+        }
+    }
+
+    fn notify_consumer(&mut self) {
+        // notify consumer if needed
+        let mut guard = self.journal.consumer_wait.lock().unwrap();
+        if let Some(wait) = guard.as_ref() {
+            // Only wake if the new_persisted_index is reached
+            if self.persisted_index >= wait.target_index {
+                guard.take().unwrap().waker.wake();
+            }
         }
     }
 }
@@ -285,7 +304,11 @@ fn recover<const ENTRY_SIZE: usize>(
         f.sync_all()?;
     }
 
-    let write_index = segments.len() as u64 * segment_size + valid_count;
+    let write_index = if last_segment_id == 0 {
+        valid_count
+    } else {
+        last_segment_id * segment_size + valid_count
+    };
     // consumed_checkpoint just recovered.
     let consumed_index = journal.consumed_checkpoint.persisted_index();
     // Data loss happens, don't continue to recover, as it may cause more damage.
@@ -325,10 +348,6 @@ fn scan_segments(base_dir: &Path) -> io::Result<Vec<u64>> {
 
         let file_name = entry.file_name();
         let Some(file_name) = file_name.to_str().and_then(|n| n.strip_suffix(".wal")) else {
-            warn!(
-                "Skipping non-WAL file during recovery: {}",
-                entry.path().display()
-            );
             continue;
         };
 
@@ -392,6 +411,7 @@ fn open_segment_file(base_dir: &Path, segment_id: u64) -> io::Result<File> {
         .open(path)
 }
 
+#[instrument(err)]
 fn truncate_old_segments(base_dir: PathBuf, current_segment_id: u64) -> io::Result<()> {
     let Some(to_delete) = current_segment_id.checked_sub(2) else {
         // not segments to truncate

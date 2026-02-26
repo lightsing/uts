@@ -62,7 +62,7 @@ impl Checkpoint {
     pub fn new(config: CheckpointConfig) -> io::Result<Self> {
         let parent = config.path.parent().ok_or(io::Error::new(
             io::ErrorKind::NotFound,
-            "parent directory not exist",
+            "parent directory does not exist",
         ))?;
         fs::create_dir_all(parent)?;
 
@@ -165,7 +165,6 @@ impl CheckpointInner {
     }
 }
 
-#[instrument(ret, err)]
 fn recover_from_disk(path: &Path) -> io::Result<u64> {
     let mut file = File::open(&path)?;
     let metadata = file.metadata()?;
