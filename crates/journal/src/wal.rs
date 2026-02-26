@@ -158,7 +158,7 @@ impl<const ENTRY_SIZE: usize> WalWorker<ENTRY_SIZE> {
 
         let segment_size = journal.capacity() as u64;
 
-        let mut persisted = 0;
+        let mut persisted = journal.persisted_index.load(Ordering::Acquire);
         let mut spins = 0;
 
         while !shutdown_flag.load(Ordering::Acquire) {
