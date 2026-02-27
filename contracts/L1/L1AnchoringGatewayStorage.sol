@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.29;
 
 import {IL1ScrollMessenger} from "scroll-contracts/L1/IL1ScrollMessenger.sol";
-import {IL1AnchoringManager} from "../L2/manager/IL1AnchoringManager.sol";
+import {IL2AnchoringManager} from "../L2/manager/IL2AnchoringManager.sol";
+import {IUniversalTimestamps} from "../core/IUniversalTimestamps.sol";
 
 /**
  * @dev Library containing the ERC-7201 namespace constant.
@@ -16,10 +17,12 @@ library L1AnchoringGatewayStorage {
 
     /// @custom:storage-location erc7201:uts.storage.L1AnchoringGateway
     struct Storage {
+        /// @notice Reference to the Universal Timestamps contract for recording anchoring events
+        IUniversalTimestamps uts;
         /// @notice Reference to the L1 Scroll Messenger contract
         IL1ScrollMessenger l1Messenger;
-        /// @notice Reference to the L1 Anchoring Manager contract on L2 (for address lookup)
-        IL1AnchoringManager l1AnchoringManagerL2;
+        /// @notice Reference to the L2 Anchoring Manager contract
+        IL2AnchoringManager l2AnchoringManager;
     }
 
     function get() internal pure returns (L1AnchoringGatewayStorage.Storage storage $) {

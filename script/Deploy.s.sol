@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.29;
 
 import {Script, console} from "forge-std/Script.sol";
 import {UniversalTimestamps} from "../contracts/core/UniversalTimestamps.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {L1AnchoringManager} from "../contracts/L2/manager/L1AnchoringManager.sol";
+import {L2AnchoringManager} from "../contracts/L2/manager/L2AnchoringManager.sol";
+import {IL2AnchoringManager} from "../contracts/L2/manager/IL2AnchoringManager.sol";
 import {L1FeeOracle} from "../contracts/L2/oracle/L1FeeOracle.sol";
 import {IL1FeeOracle} from "../contracts/L2/oracle/IL1FeeOracle.sol";
 import {L1AnchoringGateway} from "../contracts/L1/L1AnchoringGateway.sol";
-import {Constants} from "../contracts/Constants.sol";
 
-bytes32 constant SALT = keccak256("universal-timestamps");
-
-// Note: all address here are sepolia/scroll-sepolia addresses.
+bytes32 constant SALT = keccak256("UniversalTimestamps");
 
 contract DeployTimestampCreate2 is Script {
     function run() public {
@@ -20,7 +18,6 @@ contract DeployTimestampCreate2 is Script {
 
         vm.startBroadcast();
         UniversalTimestamps implementation = new UniversalTimestamps{salt: SALT}();
-        //   Implementation deployed at: 0x13889107F758b4c220E6422ef0f00965D5D2b178
         console.log("Implementation deployed at:", address(implementation));
 
         bytes memory initData = abi.encodeCall(UniversalTimestamps.initialize, (owner));
@@ -28,7 +25,6 @@ contract DeployTimestampCreate2 is Script {
         ERC1967Proxy proxy = new ERC1967Proxy{salt: SALT}(address(implementation), initData);
         vm.stopBroadcast();
 
-        //   Proxy deployed at: 0xdf939C24d9c075862837e3c9EC0cc1feD6376D59
         console.log("Proxy deployed at:", address(proxy));
     }
 }
@@ -45,49 +41,95 @@ contract DeployFeeOracle is Script {
         );
         vm.stopBroadcast();
 
-        //   Proxy deployed at: 0x36E62Da7f040fC19B857541474D2c5dc114f12af
         console.log("FeeOracle deployed at", address(implementation));
     }
 }
 
-contract DeployL1Manager is Script {
+contract DeployManager is Script {
     function run() public {
         address owner = vm.envAddress("OWNER_ADDRESS");
-        address l1Messenger = vm.envAddress("L1_MESSENGER_ADDRESS");
+        address uts = vm.envAddress("UTS");
+        address feeOracle = vm.envAddress("FEE_ORACLE");
+        address l1Messenger = vm.envAddress("L1_MESSENGER");
+        address l2Messenger = vm.envAddress("L2_MESSENGER");
 
         vm.startBroadcast();
-        L1AnchoringManager implementation = new L1AnchoringManager();
-        //  Implementation deployed at: 0xc496516540367Aa3E5c209E36d68AD326566943B
+        L2AnchoringManager implementation = new L2AnchoringManager();
         console.log("Implementation deployed at:", address(implementation));
-
-        bytes memory initData = abi.encodeCall(L1AnchoringManager.initialize, (owner, IL1FeeOracle(l1Messenger)));
+        // function initialize(address initialOwner, address uts, address feeOracle, address l1Messenger, address l2Messenger)
+        bytes memory initData =
+            abi.encodeCall(L2AnchoringManager.initialize, (owner, uts, feeOracle, l1Messenger, l2Messenger));
 
         ERC1967Proxy proxy = new ERC1967Proxy{salt: SALT}(address(implementation), initData);
         vm.stopBroadcast();
 
-        //   Proxy deployed at: 0x5f44B75D6A0D26533EAECaAcf81eDc9A947a39e9
         console.log("Proxy deployed at:", address(proxy));
     }
 }
 
-contract DeployL1Gateway is Script {
+contract DeployGateway is Script {
     function run() public {
         address owner = vm.envAddress("OWNER_ADDRESS");
-        address l1Messenger = vm.envAddress("L1_MESSENGER_ADDRESS");
-        address l1AnchoringManagerL2 = vm.envAddress("L1_ANCHORING_MANAGER_L2_ADDRESS");
+        address uts = vm.envAddress("UTS");
+        address l1Messenger = vm.envAddress("L1_MESSENGER");
+        address anchoringManager = vm.envAddress("ANCHORING_MANAGER");
 
         vm.startBroadcast();
         L1AnchoringGateway implementation = new L1AnchoringGateway();
-        //   Implementation deployed at: 0x8b28f0D465EC9780459E08827E662e35F24D5197
         console.log("Implementation deployed at:", address(implementation));
-
+        // function initialize(address initialOwner, address uts, address l1Messenger, address l2AnchoringManager)
         bytes memory initData =
-            abi.encodeCall(L1AnchoringGateway.initialize, (owner, l1Messenger, l1AnchoringManagerL2));
+            abi.encodeCall(L1AnchoringGateway.initialize, (owner, uts, l1Messenger, anchoringManager));
 
         ERC1967Proxy proxy = new ERC1967Proxy{salt: SALT}(address(implementation), initData);
         vm.stopBroadcast();
 
-        //   Proxy deployed at: 0x91FA317cf93AAefc044B59df5dd463F513Cea516
         console.log("Proxy deployed at:", address(proxy));
+    }
+}
+
+contract SetGateway is Script {
+    function run() public {
+        address l1Gateway = vm.envAddress("ANCHORING_GATEWAY");
+        address anchoringManager = vm.envAddress("ANCHORING_MANAGER");
+
+        IL2AnchoringManager manager = IL2AnchoringManager(anchoringManager);
+        vm.startBroadcast();
+        manager.setL1Gateway(l1Gateway);
+        vm.stopBroadcast();
+    }
+}
+
+contract UpgradeManager is Script {
+    function run() public {
+        address anchoringManager = vm.envAddress("ANCHORING_MANAGER");
+
+        vm.startBroadcast();
+        L2AnchoringManager newImplementation = new L2AnchoringManager();
+        console.log("New implementation deployed at:", address(newImplementation));
+
+        L2AnchoringManager manager = L2AnchoringManager(payable(anchoringManager));
+
+        manager.upgradeToAndCall(address(newImplementation), "");
+        vm.stopBroadcast();
+
+        console.log("Manager upgraded to new implementation at:", address(newImplementation));
+    }
+}
+
+contract UpgradeGateway is Script {
+    function run() public {
+        address l1Gateway = vm.envAddress("ANCHORING_GATEWAY");
+
+        vm.startBroadcast();
+        L1AnchoringGateway newImplementation = new L1AnchoringGateway();
+        console.log("New implementation deployed at:", address(newImplementation));
+
+        L1AnchoringGateway gateway = L1AnchoringGateway(payable(l1Gateway));
+
+        gateway.upgradeToAndCall(address(newImplementation), "");
+        vm.stopBroadcast();
+
+        console.log("Gateway upgraded to new implementation at:", address(newImplementation));
     }
 }

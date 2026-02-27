@@ -6,12 +6,12 @@ ffi = true
 fs_permissions = [{ access = "read", path = "target/foundry" }]
 ignored_error_codes = [
   2018, # Function state mutability can be restricted to pure
-  2394, # ransient storage as defined by EIP-1153 can break the composability of smart contracts
+  2394, # Transient storage as defined by EIP-1153 can break the composability of smart contracts
 ]
 libs = ["lib"]
 out = "target/foundry"
 script = "contract-scripts"
-solc_version = "0.8.24"
+solc_version = "0.8.29"
 src = "contracts"
 test = "contract-tests"
 

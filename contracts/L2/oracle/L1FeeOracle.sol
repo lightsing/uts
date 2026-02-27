@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.29;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IL1GasPriceOracle} from "scroll-contracts/L2/predeploys/IL1GasPriceOracle.sol";
 import {IL1FeeOracle} from "./IL1FeeOracle.sol";
-import {Constants} from "../../Constants.sol";
 
 /**
  * @title L1FeeOracle
@@ -18,6 +17,9 @@ import {Constants} from "../../Constants.sol";
  * - _discountRatio: The fraction (< 1.0) representing the aggregated share + protocol margin (e.g., 0.005e18).
  */
 contract L1FeeOracle is IL1FeeOracle, Ownable {
+    IL1GasPriceOracle public constant L1_GAS_PRICE_ORACLE =
+        IL1GasPriceOracle(0x5300000000000000000000000000000000000002);
+
     // Estimated gas consumed on L1 per attestation (in a batch)
     uint256 private _gasPerAttestation;
     // Discount: The ratio (< 1.0) representing the aggregated share + protocol margin.
@@ -57,18 +59,18 @@ contract L1FeeOracle is IL1FeeOracle, Ownable {
 
     /// @inheritdoc IL1FeeOracle
     function getL1BaseFee() external view returns (uint256) {
-        return Constants.L1_GAS_PRICE_ORACLE.l1BaseFee();
+        return L1_GAS_PRICE_ORACLE.l1BaseFee();
     }
 
     /// @inheritdoc IL1FeeOracle
     function getFeePerAttestation() external view returns (uint256) {
-        uint256 l1BaseFee = Constants.L1_GAS_PRICE_ORACLE.l1BaseFee();
+        uint256 l1BaseFee = L1_GAS_PRICE_ORACLE.l1BaseFee();
         return (l1BaseFee * _gasPerAttestation) / 1e18;
     }
 
     /// @inheritdoc IL1FeeOracle
     function getFloorFee() external view returns (uint256) {
-        uint256 l1BaseFee = Constants.L1_GAS_PRICE_ORACLE.l1BaseFee();
+        uint256 l1BaseFee = L1_GAS_PRICE_ORACLE.l1BaseFee();
         // Calculate the fee with discount applied
         return (l1BaseFee * _gasPerAttestation * _discountRatio) / 1e18;
     }

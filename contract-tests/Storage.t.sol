@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.29;
 
 import {Test, console} from "forge-std/Test.sol";
 import {SlotDerivation} from "@openzeppelin/contracts/utils/SlotDerivation.sol";
 import {UniversalTimestampsStorage} from "../contracts/core/UniversalTimestampsStorage.sol";
 import {L1AnchoringGatewayStorage} from "../contracts/L1/L1AnchoringGatewayStorage.sol";
-import {L1AnchoringManagerStorage} from "../contracts/L2/manager/L1AnchoringManagerStorage.sol";
+import {L2AnchoringManagerStorage} from "../contracts/L2/manager/L2AnchoringManagerStorage.sol";
 
 /**
  * @title UniversalTimestampsStorageTest
@@ -19,7 +19,7 @@ contract StorageSlotTest is Test {
 
         test(L1AnchoringGatewayStorage.SLOT, L1AnchoringGatewayStorage.NAMESPACE);
 
-        test(L1AnchoringManagerStorage.SLOT, L1AnchoringManagerStorage.NAMESPACE);
+        test(L2AnchoringManagerStorage.SLOT, L2AnchoringManagerStorage.NAMESPACE);
     }
 
     function test(bytes32 hardcodedSlot, string memory namespace) internal pure virtual {
