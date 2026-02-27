@@ -16,5 +16,11 @@
       "name": "v0.4.0",
       "rev": "cbce1e00305e943aa1661d43f41e5ac72c662b07"
     }
+  },
+  "lib/scroll-contracts": {
+    "tag": {
+      "name": "v4.0.0",
+      "rev": "42de954bee237cfa478a5b443ac0aeb900aca5ad"
+    }
   }
 }

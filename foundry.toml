@@ -6,6 +6,7 @@ ffi = true
 fs_permissions = [{ access = "read", path = "target/foundry" }]
 ignored_error_codes = [
   2018, # Function state mutability can be restricted to pure
+  2394, # ransient storage as defined by EIP-1153 can break the composability of smart contracts
 ]
 libs = ["lib"]
 out = "target/foundry"
@@ -24,3 +25,7 @@ cbor_metadata = false
 # If using optimizer, keep settings consistent
 optimizer = true
 optimizer_runs = 200
+
+[rpc_endpoints]
+l1_sepolia = "https://0xrpc.io/sep/"
+l2_scroll_sepolia = "https://sepolia-rpc.scroll.io/"
