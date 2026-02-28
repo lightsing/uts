@@ -67,7 +67,8 @@ contract L2AnchoringManagerTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(impl),
             abi.encodeCall(
-                L2AnchoringManager.initialize, (address(this), address(uts), address(feeOracle), address(l2Messenger))
+                L2AnchoringManager.initialize,
+                (address(this), address(uts), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/")
             )
         );
         manager = IL2AnchoringManager(address(proxy));
@@ -126,7 +127,8 @@ contract L2AnchoringManagerGasTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(impl),
             abi.encodeCall(
-                L2AnchoringManager.initialize, (address(this), address(uts), address(feeOracle), address(l2Messenger))
+                L2AnchoringManager.initialize,
+                (address(this), address(uts), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/")
             )
         );
         manager = IL2AnchoringManager(address(proxy));

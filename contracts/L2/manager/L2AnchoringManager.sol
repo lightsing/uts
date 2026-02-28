@@ -16,12 +16,15 @@ import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConsta
 import {
     AccessControlDefaultAdminRulesUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 contract L2AnchoringManager is
     Initializable,
     UUPSUpgradeable,
     ReentrancyGuardTransient,
     AccessControlDefaultAdminRulesUpgradeable,
+    ERC721Upgradeable,
     IL2AnchoringManager
 {
     bytes32 public constant FEE_COLLECTOR_ROLE = keccak256("FEE_COLLECTOR_ROLE");
@@ -31,8 +34,15 @@ contract L2AnchoringManager is
         _disableInitializers();
     }
 
-    function initialize(address initialOwner, address uts, address feeOracle, address l2Messenger) public initializer {
+    function initialize(
+        address initialOwner,
+        address uts,
+        address feeOracle,
+        address l2Messenger,
+        string memory baseTokenURI
+    ) public initializer {
         __AccessControlDefaultAdminRules_init(3 days, initialOwner);
+        __ERC721_init("UTS Anchoring Certificate", "UTS");
 
         require(feeOracle != address(0), "UTS: Invalid FeeOracle address");
 
@@ -43,7 +53,7 @@ contract L2AnchoringManager is
         $.queueIndex = 1;
         $.confirmedIndex = 1;
         $.l2Messenger = IL2ScrollMessenger(l2Messenger);
-
+        $.baseTokenURI = baseTokenURI;
         // Set up roles
         grantRole(FEE_COLLECTOR_ROLE, initialOwner);
         _setRoleAdmin(FEE_COLLECTOR_ROLE, DEFAULT_ADMIN_ROLE);
@@ -79,7 +89,7 @@ contract L2AnchoringManager is
     }
 
     /// @inheritdoc IL2AnchoringManager
-    function isConfirmed(bytes32 root) external view returns (bool) {
+    function isConfirmed(bytes32 root) public view returns (bool) {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         uint256 index = $.roots[root];
         return index != 0 && index < $.confirmedIndex;
@@ -135,6 +145,38 @@ contract L2AnchoringManager is
         delete $.pendingBatch;
     }
 
+    /// @inheritdoc IL2AnchoringManager
+    function claimNFT(bytes32 root) external {
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        uint256 index = $.roots[root];
+        claimNFT(index);
+    }
+
+    /// @inheritdoc IL2AnchoringManager
+    function claimNFT(uint256 index) public nonReentrant {
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+
+        require(index != 0 && index < $.confirmedIndex, "UTS: Invalid or unconfirmed index");
+        require(!$.nftClaimed[index], "UTS: NFT already claimed");
+
+        L2AnchoringManagerTypes.AnchoringItem storage item = $.items[index];
+        address submitter = item.submitter;
+
+        require(_msgSender() == submitter, "UTS: Only submitter can claim");
+
+        $.nftClaimed[index] = true;
+
+        _safeMint(submitter, index, bytes.concat(item.root));
+
+        emit NFTClaimed(submitter, index, item.root, block.timestamp);
+    }
+
+    /// @inheritdoc IL2AnchoringManager
+    function getBaseURI() external view returns (string memory) {
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        return $.baseTokenURI;
+    }
+
     // --- Admin Functions ---
 
     function setFeeOracle(address _oracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -183,7 +225,26 @@ contract L2AnchoringManager is
         emit FeesWithdrawn(to, amount);
     }
 
+    // --- Others ---
+
+    function _baseURI() internal view virtual override returns (string memory) {
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        return $.baseTokenURI;
+    }
+
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
+
+    /// @dev See {IERC165-supportsInterface}.
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(AccessControlDefaultAdminRulesUpgradeable, ERC721Upgradeable)
+        returns (bool)
+    {
+        return AccessControlDefaultAdminRulesUpgradeable.supportsInterface(interfaceId)
+            || ERC721Upgradeable.supportsInterface(interfaceId);
+    }
 
     receive() external payable {}
 }

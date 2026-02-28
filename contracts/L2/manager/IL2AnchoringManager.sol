@@ -44,6 +44,9 @@ interface IL2AnchoringManager {
         uint256 timestamp
     );
 
+    /// @notice Emitted when a user claims their NFT after batch confirmation.
+    event NFTClaimed(address indexed submitter, uint256 indexed tokenId, bytes32 indexed root, uint256 timestamp);
+
     /// @notice Emitted when fee parameters are updated.
     event FeeOracleUpdated(address indexed oldOracle, address indexed newOracle);
     /// @notice Emitted when fees are withdrawn by the fee collector.
@@ -75,6 +78,17 @@ interface IL2AnchoringManager {
      * @return True if the root has been confirmed as anchored on L1, false otherwise.
      */
     function isConfirmed(bytes32 root) external view returns (bool);
+
+    /// @notice Claim the NFT for a confirmed root by providing the root directly. This is a convenience function
+    /// that looks up the index from the root and calls claimNFT(index).
+    function claimNFT(bytes32 root) external;
+
+    /// @notice Claim the NFT for a confirmed root by providing the index of the root in the queue. This can be
+    /// used if the user already knows the index or wants to save gas by avoiding the root lookup.
+    function claimNFT(uint256 index) external;
+
+    /// @notice Returns the current base URI for token metadata
+    function getBaseURI() external view returns (string memory);
 
     /**
      * @notice Called by the L1AnchoringGateway to notify that a batch of roots has been anchored on L1.

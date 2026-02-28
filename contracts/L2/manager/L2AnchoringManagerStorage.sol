@@ -34,6 +34,9 @@ library L2AnchoringManagerStorage {
 
         mapping(uint256 => L2AnchoringManagerTypes.AnchoringItem) items;
         mapping(bytes32 => uint256) roots; // Mapping to track submitted roots for quick lookup
+
+        string baseTokenURI;
+        mapping(uint256 => bool) nftClaimed;
     }
 
     function get() internal pure returns (L2AnchoringManagerStorage.Storage storage $) {
