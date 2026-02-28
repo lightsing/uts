@@ -14,20 +14,16 @@ library L2AnchoringManagerStorage {
     string internal constant NAMESPACE = "uts.storage.L2AnchoringManager";
 
     /// @dev keccak256(abi.encode(uint256(keccak256("uts.storage.L2AnchoringManager")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 internal constant SLOT = 0x9831cc7956aa6e272a6b3f7bd193bca727880ec1ca574ef61afc1d64fc9e5000;
+    bytes32 internal constant SLOT = 0x5accfd2b2bcf275f7d10bb4569421f50f846511017720654fefc7e6d91daf100;
 
     /// @custom:storage-location erc7201:uts.storage.L2AnchoringManager
     struct Storage {
         IUniversalTimestamps uts;
         IL1FeeOracle feeOracle;
-        /// @notice L1 contract that sends messages to this manager on L2
-        address l1Messenger;
         /// @notice Executor for L1 -> L2 messages
         IL2ScrollMessenger l2Messenger;
         /// @notice L1 sender address
         address l1Gateway;
-        /// @notice Address that collects the fees
-        address feeCollector;
         /// @notice Queue index for the next anchoring item to be added
         uint256 queueIndex;
         /// @notice Next index of the anchoring item to be confirmed

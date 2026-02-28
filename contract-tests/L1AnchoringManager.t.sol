@@ -9,7 +9,6 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {UniversalTimestamps} from "../contracts/core/UniversalTimestamps.sol";
 import {IUniversalTimestamps} from "../contracts/core/IUniversalTimestamps.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
-import {AddressAliasHelper} from "scroll-contracts/libraries/common/AddressAliasHelper.sol";
 
 contract MockL1FeeOracle is IL1FeeOracle {
     function getL1BaseFee() external view returns (uint256) {
@@ -24,11 +23,11 @@ contract MockL1FeeOracle is IL1FeeOracle {
         return (0.05 gwei * 51_000 * 0.5e18) / 1e18;
     }
 
-    function gasPerAttestation() external view returns (uint256) {
+    function getGasPerAttestation() external view returns (uint256) {
         return 51_000;
     }
 
-    function discountRatio() external view returns (uint256) {
+    function getDiscountRatio() external view returns (uint256) {
         return 0.5e18; // 50% discount
     }
 }
@@ -57,24 +56,18 @@ contract L2AnchoringManagerTest is Test {
     IL2AnchoringManager manager;
     IL2ScrollMessenger l2Messenger;
 
-    address constant L1_MESSENGER = address(0x50c7d3e7f7c656493D1D76aaa1a836CedfCBB16A);
     address constant L1_GATEWAY = address(0x456);
 
     function setUp() public {
-        l2Messenger = new MockL2ScrollMessenger();
-        UniversalTimestamps utsImpl = new UniversalTimestamps();
-        ERC1967Proxy utsProxy =
-            new ERC1967Proxy(address(utsImpl), abi.encodeCall(UniversalTimestamps.initialize, (address(this))));
-        uts = IUniversalTimestamps(address(utsProxy));
-
+        uts = new UniversalTimestamps();
         feeOracle = new MockL1FeeOracle();
+        l2Messenger = new MockL2ScrollMessenger();
 
         L2AnchoringManager impl = new L2AnchoringManager();
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(impl),
             abi.encodeCall(
-                L2AnchoringManager.initialize,
-                (address(this), address(uts), address(feeOracle), L1_MESSENGER, address(l2Messenger))
+                L2AnchoringManager.initialize, (address(this), address(uts), address(feeOracle), address(l2Messenger))
             )
         );
         manager = IL2AnchoringManager(address(proxy));
@@ -98,7 +91,7 @@ contract L2AnchoringManagerTest is Test {
         assertFalse(confirmed, "Root should not be confirmed immediately after submission");
 
         // Simulate a call from bridge to confirm the anchoring
-        vm.prank(AddressAliasHelper.applyL1ToL2Alias(L1_MESSENGER)); // Simulate a call from the L1 messenger
+        vm.prank(address(l2Messenger)); // Simulate a call from the L2 messenger
         vm.expectEmit(true, true, true, true);
         emit IL2AnchoringManager.L1AnchoringBatchConfirmed(root, 0, 1, block.number, block.number, block.timestamp);
         manager.confirmL1AnchoringBatch(root, 0, 1, block.number);

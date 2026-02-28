@@ -19,15 +19,13 @@ interface IL2AnchoringManager {
     );
 
     /// @notice Emitted when fee parameters are updated.
-    event FeeParametersUpdated(address indexed feeOracle, address indexed feeCollector);
+    event FeeOracleUpdated(address indexed oldOracle, address indexed newOracle);
     /// @notice Emitted when fees are withdrawn by the fee collector.
     event FeesWithdrawn(address indexed to, uint256 amount);
     /// @notice Emitted when the L1 Gateway address is updated.
-    event L1GatewayUpdated(address indexed l1Gateway);
-    /// @notice Emitted when the L1 Messenger address is updated.
-    event L1MessengerUpdated(address indexed l1Messenger);
+    event L1GatewayUpdated(address indexed oldGateway, address indexed newGateway);
     /// @notice Emitted when the L2 Messenger address is updated.
-    event L2MessengerUpdated(address indexed l2Messenger);
+    event L2MessengerUpdated(address indexed oldMessenger, address indexed newMessenger);
 
     /**
      * @notice Submit a root for L2 timestamping + L1 anchoring.
@@ -55,9 +53,7 @@ interface IL2AnchoringManager {
     // --- Admin Functions ---
 
     function setFeeOracle(address oracle) external;
-    function setFeeCollector(address collector) external;
     function setL1Gateway(address l1Gateway) external;
-    function setL1Messenger(address l1Messenger) external;
     function setL2Messenger(address l2Messenger) external;
 
     /**

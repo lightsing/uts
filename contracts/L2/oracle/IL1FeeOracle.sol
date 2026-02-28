@@ -30,10 +30,10 @@ interface IL1FeeOracle {
     /**
      * @notice Return the current gas consumed on L1 per attestation.
      */
-    function gasPerAttestation() external view returns (uint256);
+    function getGasPerAttestation() external view returns (uint256);
 
     /**
      * @notice Return the current discount ratio applied to the baseline fee.
      */
-    function discountRatio() external view returns (uint256);
+    function getDiscountRatio() external view returns (uint256);
 }

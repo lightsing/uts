@@ -17,15 +17,9 @@ contract DeployTimestampCreate2 is Script {
         address owner = vm.envAddress("OWNER_ADDRESS");
 
         vm.startBroadcast();
-        UniversalTimestamps implementation = new UniversalTimestamps{salt: SALT}();
-        console.log("Implementation deployed at:", address(implementation));
-
-        bytes memory initData = abi.encodeCall(UniversalTimestamps.initialize, (owner));
-
-        ERC1967Proxy proxy = new ERC1967Proxy{salt: SALT}(address(implementation), initData);
+        UniversalTimestamps uts = new UniversalTimestamps{salt: SALT}();
         vm.stopBroadcast();
-
-        console.log("Proxy deployed at:", address(proxy));
+        console.log("UTS deployed at:", address(uts));
     }
 }
 

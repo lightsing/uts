@@ -3,7 +3,6 @@
 pragma solidity ^0.8.29;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IL2AnchoringManager} from "./IL2AnchoringManager.sol";
@@ -13,35 +12,38 @@ import {L2AnchoringManagerTypes} from "./L2AnchoringManagerTypes.sol";
 import {MerkleTree} from "../../core/MerkleTree.sol";
 import {IUniversalTimestamps} from "../../core/IUniversalTimestamps.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
-import {AddressAliasHelper} from "scroll-contracts/libraries/common/AddressAliasHelper.sol";
 import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConstants.sol";
+import {
+    AccessControlDefaultAdminRulesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 
 contract L2AnchoringManager is
     Initializable,
-    OwnableUpgradeable,
     UUPSUpgradeable,
     ReentrancyGuardTransient,
+    AccessControlDefaultAdminRulesUpgradeable,
     IL2AnchoringManager
 {
+    bytes32 public constant FEE_COLLECTOR_ROLE = keccak256("FEE_COLLECTOR_ROLE");
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address initialOwner, address uts, address feeOracle, address l1Messenger, address l2Messenger)
-        public
-        initializer
-    {
-        __Ownable_init(initialOwner);
+    function initialize(address initialOwner, address uts, address feeOracle, address l2Messenger) public initializer {
+        __AccessControlDefaultAdminRules_init(3 days, initialOwner);
 
         require(feeOracle != address(0), "UTS: Invalid FeeOracle address");
 
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         $.uts = IUniversalTimestamps(uts);
         $.feeOracle = IL1FeeOracle(feeOracle);
-        $.l1Messenger = l1Messenger;
         $.l2Messenger = IL2ScrollMessenger(l2Messenger);
-        $.feeCollector = initialOwner;
+
+        // Set up roles
+        grantRole(FEE_COLLECTOR_ROLE, initialOwner);
+        _setRoleAdmin(FEE_COLLECTOR_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
     /// @inheritdoc IL2AnchoringManager
@@ -101,35 +103,23 @@ contract L2AnchoringManager is
 
     // --- Admin Functions ---
 
-    function setFeeOracle(address _oracle) external onlyOwner {
+    function setFeeOracle(address _oracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(_oracle) != address(0), "UTS: Invalid Oracle");
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        address oldOracle = address($.feeOracle);
         $.feeOracle = IL1FeeOracle(_oracle);
-        emit FeeParametersUpdated(_oracle, $.feeCollector);
+        emit FeeOracleUpdated(oldOracle, _oracle);
     }
 
-    function setFeeCollector(address collector) external onlyOwner {
-        require(collector != address(0), "UTS: Invalid Collector");
-        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        $.feeCollector = collector;
-        emit FeeParametersUpdated(address($.feeOracle), collector);
-    }
-
-    function setL1Gateway(address l1Gateway) external onlyOwner {
+    function setL1Gateway(address l1Gateway) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(l1Gateway != address(0), "UTS: Invalid L1 Gateway address");
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        address oldGateway = $.l1Gateway;
         $.l1Gateway = l1Gateway;
-        emit L1GatewayUpdated(l1Gateway);
+        emit L1GatewayUpdated(oldGateway, l1Gateway);
     }
 
-    function setL1Messenger(address l1Messenger) external onlyOwner {
-        require(l1Messenger != address(0), "UTS: Invalid L1 Messenger address");
-        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        $.l1Messenger = l1Messenger;
-        emit L1MessengerUpdated(l1Messenger);
-    }
-
-    function setL2Messenger(address l2Messenger) external onlyOwner {
+    function setL2Messenger(address l2Messenger) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(l2Messenger != address(0), "UTS: Invalid L2 Messenger address");
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         IL2ScrollMessenger messenger = IL2ScrollMessenger(l2Messenger);
@@ -139,16 +129,11 @@ contract L2AnchoringManager is
             "UTS: Invalid L2 Messenger"
         );
         $.l2Messenger = messenger;
-        emit L2MessengerUpdated(l2Messenger);
+        emit L2MessengerUpdated(address($.l2Messenger), l2Messenger);
     }
 
     /// @inheritdoc IL2AnchoringManager
-    function withdrawFees(address to, uint256 amount) external nonReentrant {
-        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-
-        // Security: Allow either Owner or the designated Collector to withdraw
-        require(msg.sender == owner() || msg.sender == $.feeCollector, "UTS: Unauthorized");
-
+    function withdrawFees(address to, uint256 amount) external nonReentrant onlyRole(FEE_COLLECTOR_ROLE) {
         require(to != address(0), "UTS: Invalid address");
         require(amount > 0 && amount <= address(this).balance, "UTS: Invalid amount");
 
@@ -158,7 +143,7 @@ contract L2AnchoringManager is
         emit FeesWithdrawn(to, amount);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 
     receive() external payable {}
 }

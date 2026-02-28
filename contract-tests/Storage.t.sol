@@ -3,7 +3,6 @@ pragma solidity ^0.8.29;
 
 import {Test, console} from "forge-std/Test.sol";
 import {SlotDerivation} from "@openzeppelin/contracts/utils/SlotDerivation.sol";
-import {UniversalTimestampsStorage} from "../contracts/core/UniversalTimestampsStorage.sol";
 import {L1AnchoringGatewayStorage} from "../contracts/L1/L1AnchoringGatewayStorage.sol";
 import {L2AnchoringManagerStorage} from "../contracts/L2/manager/L2AnchoringManagerStorage.sol";
 
@@ -15,8 +14,6 @@ contract StorageSlotTest is Test {
     using SlotDerivation for string;
 
     function test_ERC7201_SlotDerivation() public pure {
-        test(UniversalTimestampsStorage.SLOT, UniversalTimestampsStorage.NAMESPACE);
-
         test(L1AnchoringGatewayStorage.SLOT, L1AnchoringGatewayStorage.NAMESPACE);
 
         test(L2AnchoringManagerStorage.SLOT, L2AnchoringManagerStorage.NAMESPACE);
