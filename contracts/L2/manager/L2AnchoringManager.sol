@@ -39,6 +39,8 @@ contract L2AnchoringManager is
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         $.uts = IUniversalTimestamps(uts);
         $.feeOracle = IL1FeeOracle(feeOracle);
+        // Start from 1 to use 0 as a sentinel value
+        $.queueIndex = 1;
         $.l2Messenger = IL2ScrollMessenger(l2Messenger);
 
         // Set up roles
@@ -78,7 +80,7 @@ contract L2AnchoringManager is
     function isConfirmed(bytes32 root) external view returns (bool) {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         uint256 index = $.roots[root];
-        return index < $.confirmedIndex;
+        return index != 0 && index < $.confirmedIndex;
     }
 
     /// @inheritdoc IL2AnchoringManager

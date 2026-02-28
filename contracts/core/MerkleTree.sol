@@ -12,7 +12,7 @@ pragma solidity ^0.8.29;
  */
 library MerkleTree {
     /// @dev Prefix byte to distinguish internal nodes from leaves (matches Rust INNER_NODE_PREFIX)
-    bytes32 private constant INNER_NODE_PREFIX = 0x0100000000000000000000000000000000000000000000000000000000000000;
+    bytes1 private constant INNER_NODE_PREFIX = 0x01;
 
     /// @dev Empty leaf used for padding to power of two
     bytes32 private constant EMPTY_LEAF = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -92,47 +92,14 @@ library MerkleTree {
      *      Matches Rust: Digest::update(&mut hasher, [INNER_NODE_PREFIX]); ...
      */
     function _hashNode(bytes32 left, bytes32 right) private pure returns (bytes32) {
-        assembly ("memory-safe") {
-            let ptr := mload(0x40) // Free memory pointer
-
-            // Store prefix (0x01) at the start of the 32-byte slot
-            mstore(ptr, INNER_NODE_PREFIX)
-            // Store left hash immediately after (offset 32)
-            mstore(add(ptr, 32), left)
-            // Store right hash immediately after (offset 64)
-            mstore(add(ptr, 64), right)
-
-            // Hash 96 bytes (3 words): prefix + left + right
-            let hash := keccak256(ptr, 96)
-
-            mstore(0x40, add(ptr, 96)) // Update free memory pointer (optional in pure view, but good practice)
-
-            // Return result via stack
-            mstore(0x00, hash) // Store temporarily to return? No, assembly returns via stack variable
-            // Actually, in inline assembly within a function returning bytes32, we just assign to the variable
-            // But here we are in a private pure function returning bytes32.
-            // The standard way is to let solidity handle the return, or use mstore(0, hash) and load.
-            // Let's stick to high-level return for safety, but use assembly for the keccak.
-            // Correction: To return from assembly block, we need to assign to a variable defined outside
-            // or use `result := ...` syntax if defined in `returns`.
-
-            // Re-writing slightly cleaner:
-            pop(0) // Placeholder to satisfy compiler if needed, but let's just use standard return logic below
-        }
-        // Fallback to high-level if assembly feels too risky for specific compiler versions,
-        // but the assembly above is standard. Let's provide the clean assembly return version.
-
         // Clean Assembly Implementation for _hashNode
         bytes32 result;
         assembly ("memory-safe") {
             let ptr := mload(0x40)
-            mstore(ptr, INNER_NODE_PREFIX)
-            mstore(add(ptr, 32), left)
-            mstore(add(ptr, 64), right)
-            result := keccak256(ptr, 96)
-            // We don't strictly need to update 0x40 in a pure function that doesn't allocate further,
-            // but it's safe to do so.
-            mstore(0x40, add(ptr, 96))
+            mstore8(ptr, INNER_NODE_PREFIX)
+            mstore(add(ptr, 1), left)
+            mstore(add(ptr, 33), right)
+            result := keccak256(ptr, 65)
         }
         return result;
     }
