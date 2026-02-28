@@ -84,7 +84,7 @@ contract L2AnchoringManagerTest is Test {
         vm.deal(address(1), 100 ether); // Fund the address with some ether to pay for the fee
         vm.expectEmit(true, true, true, true);
         emit IL2AnchoringManager.L1AnchoringQueued(root, 0, fee, block.number, block.timestamp);
-        manager.submitForL1Anchoring{value: fee}(root);
+        manager.submitForL1Anchoring{value: fee}(root, address(1));
 
         // Verify that the item was added to the queue
         bool confirmed = manager.isConfirmed(root);

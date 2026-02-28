@@ -47,7 +47,7 @@ contract L2AnchoringManager is
     }
 
     /// @inheritdoc IL2AnchoringManager
-    function submitForL1Anchoring(bytes32 root) external payable nonReentrant {
+    function submitForL1Anchoring(bytes32 root, address refundAddress) external payable nonReentrant {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
 
         require(address($.feeOracle) != address(0), "UTS: Oracle not set");
@@ -63,6 +63,15 @@ contract L2AnchoringManager is
         $.roots[root] = currentIndex;
 
         emit L1AnchoringQueued(root, currentIndex, msg.value, block.number, block.timestamp);
+
+        // refund fee to `refundAddress`
+        unchecked {
+            uint256 _refund = msg.value - requiredFee;
+            if (_refund > 0) {
+                (bool _success,) = refundAddress.call{value: _refund}("");
+                require(_success, "Failed to refund the fee");
+            }
+        }
     }
 
     /// @inheritdoc IL2AnchoringManager

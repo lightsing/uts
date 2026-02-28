@@ -29,9 +29,11 @@ interface IL2AnchoringManager {
 
     /**
      * @notice Submit a root for L2 timestamping + L1 anchoring.
+     * @param root The Merkle root to be anchored on L1.
+     * @param refundAddress The address to refund any excess fee after covering the required fee for L1 anchoring. This allows users to get a refund if they overpay.
      * @dev Requires msg.value >= Oracle calculated fee.
      */
-    function submitForL1Anchoring(bytes32 root) external payable;
+    function submitForL1Anchoring(bytes32 root, address refundAddress) external payable;
 
     /**
      * @notice Check if a root has been confirmed as anchored on L1.
