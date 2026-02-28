@@ -93,8 +93,13 @@ contract L2AnchoringManagerTest is Test {
         // Simulate a call from bridge to confirm the anchoring
         vm.prank(address(l2Messenger)); // Simulate a call from the L2 messenger
         vm.expectEmit(true, true, true, true);
-        emit IL2AnchoringManager.L1AnchoringBatchConfirmed(root, 1, 1, block.number, block.number, block.timestamp);
-        manager.confirmL1AnchoringBatch(root, 1, 1, block.number);
+        emit IL2AnchoringManager.L1BatchArrived(root, 1, 1, block.number, block.number, block.timestamp);
+        manager.notifyAnchored(root, 1, 1, block.number);
+
+        vm.prank(address(1));
+        vm.expectEmit(true, true, true, true);
+        emit IL2AnchoringManager.L1BatchFinalized(root, 1, 1, block.number, block.number, block.timestamp);
+        manager.finalizeBatch();
     }
 
     function test_NonExistentRoot() public view {
@@ -140,9 +145,15 @@ contract L2AnchoringManagerGasTest is Test {
     function confirmBatchGas(bytes32 expectedRoot, uint256 startIndex, uint256 count) private {
         vm.prank(address(l2Messenger));
         uint256 startGas = gasleft();
-        manager.confirmL1AnchoringBatch(expectedRoot, startIndex, count, block.number);
-        uint256 gasUsed = startGas - gasleft();
-        console.log("Gas used for confirming a batch of", count, "roots:", gasUsed);
+        manager.notifyAnchored(expectedRoot, startIndex, count, block.number);
+        uint256 l1L2GasUsed = startGas - gasleft();
+
+        vm.prank(address(1));
+        startGas = gasleft();
+        manager.finalizeBatch();
+        uint256 l2GasUsed = startGas - gasleft();
+
+        console.log("Gas used for confirming batch with count", count, l1L2GasUsed, l2GasUsed);
     }
 
     function test_ConfirmBatchGas_1() public {

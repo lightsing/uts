@@ -8,9 +8,35 @@ interface IL2AnchoringManager {
         bytes32 indexed root, uint256 queueIndex, uint256 fee, uint256 blockNumber, uint256 timestamp
     );
 
-    /// @notice Emitted when a batch of roots is confirmed as anchored on L1.
-    event L1AnchoringBatchConfirmed(
-        bytes32 indexed aggregateRoot,
+    /**
+     * Emitted when L1 notifies that a batch of roots has been anchored on L1.
+     * @param root The Merkle root of the batch being confirmed.
+     * @param startIndex The starting index of the batch in the queue.
+     * @param count The number of items in the batch.
+     * @param l1BlockNumber The L1 block number at which the batch was anchored.
+     * @param l2BlockNumber The L2 block number at which the notification is received.
+     * @param timestamp The timestamp when the notification is received.
+     */
+    event L1BatchArrived(
+        bytes32 indexed root,
+        uint256 indexed startIndex,
+        uint256 count,
+        uint256 l1BlockNumber,
+        uint256 l2BlockNumber,
+        uint256 timestamp
+    );
+
+    /**
+     * Emitted when a batch of roots is finalized after L1 confirmation.
+     * @param root The Merkle root of the batch being confirmed.
+     * @param startIndex The starting index of the batch in the queue.
+     * @param count The number of items in the batch.
+     * @param l1BlockNumber The L1 block number at which the batch was anchored.
+     * @param l2BlockNumber The L2 block number at which the batch is finalized.
+     * @param timestamp The timestamp when the batch is finalized.
+     */
+    event L1BatchFinalized(
+        bytes32 indexed root,
         uint256 indexed startIndex,
         uint256 count,
         uint256 l1BlockNumber,
@@ -30,10 +56,18 @@ interface IL2AnchoringManager {
     /**
      * @notice Submit a root for L2 timestamping + L1 anchoring.
      * @param root The Merkle root to be anchored on L1.
-     * @param refundAddress The address to refund any excess fee after covering the required fee for L1 anchoring. This allows users to get a refund if they overpay.
+     * @param refundAddress The address to refund any excess fee after covering the required fee for L1 anchoring.
+     * This allows users to get a refund if they overpay.
      * @dev Requires msg.value >= Oracle calculated fee.
      */
     function submitForL1Anchoring(bytes32 root, address refundAddress) external payable;
+
+    /**
+     * @notice Finalize the batch confirmation after receiving the L1 notification. This will verify the Merkle root
+     * and update the confirmed index. This can be called by anyone after the notification is received to save the
+     * cost of L2 execution since the cross chain gas price is higher than L2 execution.
+     */
+    function finalizeBatch() external;
 
     /**
      * @notice Check if a root has been confirmed as anchored on L1.
@@ -43,20 +77,28 @@ interface IL2AnchoringManager {
     function isConfirmed(bytes32 root) external view returns (bool);
 
     /**
-     * @notice Called by the L1AnchoringGateway to confirm a batch of anchored roots.
+     * @notice Called by the L1AnchoringGateway to notify that a batch of roots has been anchored on L1.
+     * The cross chain gas price is higher than l2 execution, so we separate the notification and finalization into
+     * two steps to save cost. The batch details will be stored when notifyAnchored is called, and the actual
+     * confirmation will be done in finalizeBatch which can be called by anyone after the notification.
+     *
      * @param expectedRoot The expected Merkle root of the batch being confirmed.
      * @param startIndex The starting index of the batch in the queue.
      * @param count The number of items in the batch.
      * @param l1BlockNumber The L1 block number at which the batch was anchored.
      */
-    function confirmL1AnchoringBatch(bytes32 expectedRoot, uint256 startIndex, uint256 count, uint256 l1BlockNumber)
-        external;
+    function notifyAnchored(bytes32 expectedRoot, uint256 startIndex, uint256 count, uint256 l1BlockNumber) external;
 
     // --- Admin Functions ---
 
     function setFeeOracle(address oracle) external;
     function setL1Gateway(address l1Gateway) external;
     function setL2Messenger(address l2Messenger) external;
+
+    /**
+     * @notice Clear the pending batch. This can be used by the admin to reset the state in case of an emergency or if the batch finalization fails due to unforeseen issues. It allows the contract to accept new batches without being stuck on a pending batch.
+     */
+    function clearBatch() external;
 
     /**
      * @notice Withdraw accumulated fees to the collector.

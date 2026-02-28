@@ -85,9 +85,7 @@ contract L2AnchoringManager is
     }
 
     /// @inheritdoc IL2AnchoringManager
-    function confirmL1AnchoringBatch(bytes32 expectedRoot, uint256 startIndex, uint256 count, uint256 l1BlockNumber)
-        external
-    {
+    function notifyAnchored(bytes32 expectedRoot, uint256 startIndex, uint256 count, uint256 l1BlockNumber) external {
         require(count > 0, "UTS: Count must be greater than zero");
 
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
@@ -97,20 +95,43 @@ contract L2AnchoringManager is
         address l1Sender = $.l2Messenger.xDomainMessageSender();
         require(l1Sender == $.l1Gateway, "UTS: Invalid L1 sender");
 
-        bytes32[] memory leaves = new bytes32[](count);
-        for (uint256 i = 0; i < count; i++) {
-            uint256 index = startIndex + i;
+        /// Require there's no pending batch to prevent overlapping batches which can cause state inconsistency
+        require($.pendingBatch.count == 0, "UTS: Pending batch already exists");
+
+        // Store the batch details for later finalization
+        $.pendingBatch = L2AnchoringManagerTypes.L1Batch({
+            expectedRoot: expectedRoot, startIndex: startIndex, count: count, l1BlockNumber: l1BlockNumber
+        });
+
+        emit L1BatchArrived(expectedRoot, startIndex, count, l1BlockNumber, block.number, block.timestamp);
+    }
+
+    /// @inheritdoc IL2AnchoringManager
+    function finalizeBatch() external {
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        L2AnchoringManagerTypes.L1Batch memory batch = $.pendingBatch;
+
+        require(batch.count > 0, "UTS: No pending batch");
+
+        bytes32[] memory leaves = new bytes32[](batch.count);
+        for (uint256 i = 0; i < batch.count; i++) {
+            uint256 index = batch.startIndex + i;
             L2AnchoringManagerTypes.AnchoringItem storage item = $.items[index];
             leaves[i] = item.root;
-            item.l1BlockNumber = l1BlockNumber;
+            item.l1BlockNumber = batch.l1BlockNumber;
         }
 
         bytes32 computedRoot = MerkleTree.computeRoot(leaves);
-        require(computedRoot == expectedRoot, "UTS: Invalid Merkle Root");
+        require(computedRoot == batch.expectedRoot, "UTS: Invalid Merkle Root");
 
-        emit L1AnchoringBatchConfirmed(computedRoot, startIndex, count, l1BlockNumber, block.number, block.timestamp);
+        $.confirmedIndex = batch.startIndex + batch.count;
 
-        $.confirmedIndex = startIndex + count;
+        emit L1BatchFinalized(
+            batch.expectedRoot, batch.startIndex, batch.count, batch.l1BlockNumber, block.number, block.timestamp
+        );
+
+        // Clear the pending batch
+        delete $.pendingBatch;
     }
 
     // --- Admin Functions ---
@@ -142,6 +163,12 @@ contract L2AnchoringManager is
         );
         $.l2Messenger = messenger;
         emit L2MessengerUpdated(address($.l2Messenger), l2Messenger);
+    }
+
+    /// @inheritdoc IL2AnchoringManager
+    function clearBatch() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        delete $.pendingBatch;
     }
 
     /// @inheritdoc IL2AnchoringManager

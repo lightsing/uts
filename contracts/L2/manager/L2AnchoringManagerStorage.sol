@@ -26,8 +26,12 @@ library L2AnchoringManagerStorage {
         address l1Gateway;
         /// @notice Queue index for the next anchoring item to be added
         uint256 queueIndex;
+
+        /// @notice Storage for pending L1 batch confirmation
+        L2AnchoringManagerTypes.L1Batch pendingBatch;
         /// @notice Next index of the anchoring item to be confirmed
         uint256 confirmedIndex;
+
         mapping(uint256 => L2AnchoringManagerTypes.AnchoringItem) items;
         mapping(bytes32 => uint256) roots; // Mapping to track submitted roots for quick lookup
     }

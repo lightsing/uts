@@ -68,9 +68,8 @@ contract L1AnchoringGateway is
             require(attestedBlockNumber != 0, "UTS: Merkle root not attested on L1");
         }
 
-        bytes memory message = abi.encodeCall(
-            IL2AnchoringManager.confirmL1AnchoringBatch, (merkleRoot, startIndex, count, attestedBlockNumber)
-        );
+        bytes memory message =
+            abi.encodeCall(IL2AnchoringManager.notifyAnchored, (merkleRoot, startIndex, count, attestedBlockNumber));
 
         $.l1Messenger.sendMessage{value: msg.value}(
             address($.l2AnchoringManager),
