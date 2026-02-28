@@ -62,7 +62,8 @@ contract L2AnchoringManager is
         $.uts.attest(root);
 
         uint256 currentIndex = $.queueIndex++;
-        $.items[currentIndex] = L2AnchoringManagerTypes.AnchoringItem({root: root, l1BlockNumber: 0});
+        $.items[currentIndex] =
+            L2AnchoringManagerTypes.AnchoringItem({root: root, submitter: _msgSender(), l1BlockNumber: 0});
         $.roots[root] = currentIndex;
 
         emit L1AnchoringQueued(root, currentIndex, requiredFee, block.number, block.timestamp);

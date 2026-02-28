@@ -3,11 +3,12 @@
 pragma solidity ^0.8.29;
 
 import {IUniversalTimestamps} from "./IUniversalTimestamps.sol";
+import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 
 /**
  * @title UniversalTimestamps
  */
-contract UniversalTimestamps is IUniversalTimestamps {
+contract UniversalTimestamps is Context, IUniversalTimestamps {
     mapping(bytes32 => Attestation) timestamps;
 
     function timestamp(bytes32 root) external view returns (uint256, bool) {
@@ -35,7 +36,7 @@ contract UniversalTimestamps is IUniversalTimestamps {
         require(timestamps[root].timestamp == 0, "UTS: Root already attested");
 
         timestamps[root] = Attestation({timestamp: block.timestamp, blockNumber: block.number});
-        emit Attested(root, msg.sender, block.timestamp, block.number);
+        emit Attested(root, _msgSender(), block.timestamp, block.number);
         return timestamps[root];
     }
 }

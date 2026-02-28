@@ -76,10 +76,10 @@ contract L1AnchoringGateway is
             0,
             message,
             gasLimit,
-            msg.sender // refund the caller for the gas cost of L2 execution
+            _msgSender() // refund the caller for the gas cost of L2 execution
         );
 
-        emit BatchSubmitted(merkleRoot, startIndex, count, msg.sender);
+        emit BatchSubmitted(merkleRoot, startIndex, count, _msgSender());
     }
 
     // -- Admin functions --
