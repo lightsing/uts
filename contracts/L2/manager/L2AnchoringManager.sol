@@ -41,6 +41,7 @@ contract L2AnchoringManager is
         $.feeOracle = IL1FeeOracle(feeOracle);
         // Start from 1 to use 0 as a sentinel value
         $.queueIndex = 1;
+        $.confirmedIndex = 1;
         $.l2Messenger = IL2ScrollMessenger(l2Messenger);
 
         // Set up roles

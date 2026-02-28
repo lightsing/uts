@@ -202,17 +202,21 @@ impl<D: Digest> ExactSizeIterator for SiblingIter<'_, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::{B256, U256};
+    use alloy_sol_types::SolValue;
+    use sha2::Sha256;
+    use sha3::Keccak256;
 
     #[test]
     fn basic() {
-        test_merkle_tree::<sha2::Sha256>();
-        test_merkle_tree::<sha3::Keccak256>();
+        test_merkle_tree::<Sha256>();
+        test_merkle_tree::<Keccak256>();
     }
 
     #[test]
     fn proof() {
-        test_proof::<sha2::Sha256>();
-        test_proof::<sha3::Keccak256>();
+        test_proof::<Sha256>();
+        test_proof::<Keccak256>();
     }
 
     fn test_merkle_tree<D: Digest + FixedOutputReset>()
@@ -285,6 +289,24 @@ mod tests {
             }
 
             assert_eq!(current_hash.as_slice(), tree.root().as_slice());
+        }
+    }
+
+    #[ignore]
+    #[test]
+    fn generate_sol_test() {
+        let mut leaves = Vec::with_capacity(1024);
+        for i in 0..1024 {
+            let mut hasher = Keccak256::new();
+            let value = U256::from(i).abi_encode_packed();
+            hasher.update(&value);
+            leaves.push(hasher.finalize());
+        }
+
+        for i in 0..=10u32 {
+            let tree = MerkleTree::<Keccak256>::new(&leaves[..2usize.pow(i)]);
+            let root = B256::new(tree.root().0);
+            println!("bytes32({}),", root);
         }
     }
 }

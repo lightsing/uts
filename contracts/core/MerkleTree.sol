@@ -12,7 +12,7 @@ pragma solidity ^0.8.29;
  */
 library MerkleTree {
     /// @dev Prefix byte to distinguish internal nodes from leaves (matches Rust INNER_NODE_PREFIX)
-    bytes1 private constant INNER_NODE_PREFIX = 0x01;
+    uint8 private constant INNER_NODE_PREFIX = 0x01;
 
     /// @dev Empty leaf used for padding to power of two
     bytes32 private constant EMPTY_LEAF = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -29,52 +29,44 @@ library MerkleTree {
         uint256 count = leaves.length;
         require(count > 0, "Merkle: Cannot compute root of empty set");
 
-        // If only one leaf, return it directly (Rust logic: tree of size 1 has root = leaf)
         if (count == 1) {
             return leaves[0];
         }
 
-        // Calculate the next power of two for the tree width
-        uint256 width = _nextPowerOfTwo(count);
+        uint256 width = nextPowerOfTwo(count);
+        uint256 halfWidth = width / 2;
 
-        // We need a buffer to hold the current level of hashes.
-        // Max width needed is 'width'. We can reuse memory or allocate new.
-        // For clarity and safety in loops, we allocate a dynamic array for the current level.
-        bytes32[] memory level = new bytes32[](width);
+        bytes32[] memory buffer = new bytes32[](halfWidth);
 
-        // 1. Initialize the leaf level (bottom of the tree)
-        // Copy leaves to the beginning of the buffer
-        for (uint256 i = 0; i < count; i++) {
-            level[i] = leaves[i];
+        uint256 fullPairs = count / 2;
+
+        // 1. Handle full pairs of leaves
+        for (uint256 i = 0; i < fullPairs; i++) {
+            buffer[i] = hashNode(leaves[i * 2], leaves[i * 2 + 1]);
         }
-        // Pad the rest with EMPTY_LEAF (bytes32(0))
-        // Note: Solidity arrays initialize to 0 by default, so explicit loop is optional
-        // but kept here for clarity if EMPTY_LEAF changes or for explicit intent.
-        // for (uint256 i = count; i < width; i++) { level[i] = EMPTY_LEAF; }
 
-        // 2. Build the tree bottom-up
-        // Current number of nodes in this level
-        uint256 currentSize = width;
-
-        while (currentSize > 1) {
-            uint256 nextSize = (currentSize + 1) / 2;
-
-            for (uint256 i = 0; i < nextSize; i++) {
-                uint256 leftIndex = 2 * i;
-                uint256 rightIndex = 2 * i + 1;
-
-                bytes32 left = level[leftIndex];
-                // If right index is out of bounds (shouldn't happen with power-of-two padding), treat as empty
-                bytes32 right = (rightIndex < currentSize) ? level[rightIndex] : EMPTY_LEAF;
-
-                // Hash: keccak256(0x01 || left || right)
-                level[i] = _hashNode(left, right);
+        // 2. May have an odd leaf left, which pairs with an empty leaf
+        if (count % 2 != 0) {
+            buffer[fullPairs] = hashNode(leaves[count - 1], bytes32(0));
+            for (uint256 i = fullPairs + 1; i < halfWidth; i++) {
+                buffer[i] = hashNode(bytes32(0), bytes32(0));
             }
-
-            currentSize = nextSize;
+        } else {
+            for (uint256 i = fullPairs; i < halfWidth; i++) {
+                buffer[i] = hashNode(bytes32(0), bytes32(0));
+            }
         }
 
-        return level[0];
+        // 3. Iteratively compute upper levels in-place within the buffer
+        uint256 currentLevelSize = halfWidth;
+        while (currentLevelSize > 1) {
+            currentLevelSize /= 2;
+            for (uint256 i = 0; i < currentLevelSize; i++) {
+                buffer[i] = hashNode(buffer[i * 2], buffer[i * 2 + 1]);
+            }
+        }
+
+        return buffer[0];
     }
 
     /**
@@ -91,7 +83,7 @@ library MerkleTree {
      * @dev Internal function to hash two child nodes into a parent node.
      *      Matches Rust: Digest::update(&mut hasher, [INNER_NODE_PREFIX]); ...
      */
-    function _hashNode(bytes32 left, bytes32 right) private pure returns (bytes32) {
+    function hashNode(bytes32 left, bytes32 right) public pure returns (bytes32) {
         // Clean Assembly Implementation for _hashNode
         bytes32 result;
         assembly ("memory-safe") {
@@ -107,7 +99,7 @@ library MerkleTree {
     /**
      * @dev Calculates the next power of two greater than or equal to n.
      */
-    function _nextPowerOfTwo(uint256 n) private pure returns (uint256) {
+    function nextPowerOfTwo(uint256 n) public pure returns (uint256) {
         if (n == 0) return 1;
         n--;
         n |= n >> 1;
