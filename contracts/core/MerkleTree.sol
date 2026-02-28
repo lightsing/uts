@@ -108,6 +108,8 @@ library MerkleTree {
         n |= n >> 8;
         n |= n >> 16;
         n |= n >> 32;
+        n |= n >> 64;
+        n |= n >> 128;
         n++;
         return n;
     }

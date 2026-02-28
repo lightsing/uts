@@ -36,7 +36,7 @@ contract L1AnchoringGateway is
 
         require(uts != address(0), "UTS: Invalid UniversalTimestamps address");
         require(l1Messenger != address(0), "UTS: Invalid L1ScrollMessenger address");
-        require(l2AnchoringManager != address(0), "UTS: Invalid L2AnchoringManagerL2 address");
+        require(l2AnchoringManager != address(0), "UTS: Invalid L2AnchoringManager address");
 
         L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
         $.uts = IUniversalTimestamps(uts);

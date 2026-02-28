@@ -65,7 +65,7 @@ contract L2AnchoringManager is
         $.items[currentIndex] = L2AnchoringManagerTypes.AnchoringItem({root: root, l1BlockNumber: 0});
         $.roots[root] = currentIndex;
 
-        emit L1AnchoringQueued(root, currentIndex, msg.value, block.number, block.timestamp);
+        emit L1AnchoringQueued(root, currentIndex, requiredFee, block.number, block.timestamp);
 
         // refund fee to `refundAddress`
         unchecked {

@@ -64,7 +64,7 @@ contract L1FeeOracle is IL1FeeOracle, AccessControlDefaultAdminRules {
     /// @inheritdoc IL1FeeOracle
     function getFeePerAttestation() external view returns (uint256) {
         uint256 l1BaseFee = L1_GAS_PRICE_ORACLE.l1BaseFee();
-        return (l1BaseFee * gasPerAttestation) / 1e18;
+        return l1BaseFee * gasPerAttestation;
     }
 
     /// @inheritdoc IL1FeeOracle
