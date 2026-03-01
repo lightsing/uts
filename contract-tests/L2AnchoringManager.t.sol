@@ -5,38 +5,45 @@ import {Test, console} from "forge-std/Test.sol";
 import {L2AnchoringManager} from "../contracts/L2/manager/L2AnchoringManager.sol";
 import {IL2AnchoringManager} from "../contracts/L2/manager/IL2AnchoringManager.sol";
 import {IL1FeeOracle} from "../contracts/L2/oracle/IL1FeeOracle.sol";
+import {L1AnchoringGateway} from "../contracts/L1/L1AnchoringGateway.sol";
+import {IL1AnchoringGateway} from "../contracts/L1/IL1AnchoringGateway.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UniversalTimestamps} from "../contracts/core/UniversalTimestamps.sol";
 import {IUniversalTimestamps} from "../contracts/core/IUniversalTimestamps.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
+import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConstants.sol";
+import {UniversalTimestampsConstants} from "../contracts/core/UniversalTimestampsConstants.sol";
+import {IL1ScrollMessenger} from "scroll-contracts/L1/IL1ScrollMessenger.sol";
 
 contract MockL1FeeOracle is IL1FeeOracle {
-    function getL1BaseFee() external view returns (uint256) {
+    function getL1BaseFee() external pure returns (uint256) {
         return 0.05 gwei;
     }
 
-    function getFeePerAttestation() external view returns (uint256) {
+    function getFeePerAttestation() external pure returns (uint256) {
         return 0.05 gwei * 51_000;
     }
 
-    function getFloorFee() external view returns (uint256) {
+    function getFloorFee() external pure returns (uint256) {
         return (0.05 gwei * 51_000 * 0.5e18) / 1e18;
     }
 
-    function getGasPerAttestation() external view returns (uint256) {
+    function getGasPerAttestation() external pure returns (uint256) {
         return 51_000;
     }
 
-    function getDiscountRatio() external view returns (uint256) {
+    function getDiscountRatio() external pure returns (uint256) {
         return 0.5e18; // 50% discount
     }
 }
 
 contract MockL2ScrollMessenger is IL2ScrollMessenger {
+    address sender = ScrollConstants.DEFAULT_XDOMAIN_MESSAGE_SENDER;
+
     function relayMessage(address from, address to, uint256 value, uint256 nonce, bytes calldata message) external {}
 
     function xDomainMessageSender() external view returns (address) {
-        return address(0x456); // Mock L1 sender address
+        return sender; // Mock L1 sender address
     }
 
     function sendMessage(address target, uint256 value, bytes calldata message, uint256 gasLimit) external payable {}
@@ -44,6 +51,10 @@ contract MockL2ScrollMessenger is IL2ScrollMessenger {
     function sendMessage(address target, uint256 value, bytes calldata message, uint256 gasLimit, address refundAddress)
         external
         payable {}
+
+    function setSender(address _sender) external {
+        sender = _sender;
+    }
 }
 
 /**
@@ -51,27 +62,27 @@ contract MockL2ScrollMessenger is IL2ScrollMessenger {
  * @dev Tests to verify the functionality of the L2AnchoringManager contract.
  */
 contract L2AnchoringManagerTest is Test {
-    IUniversalTimestamps uts;
     IL1FeeOracle feeOracle;
     IL2AnchoringManager manager;
-    IL2ScrollMessenger l2Messenger;
+    MockL2ScrollMessenger l2Messenger;
 
-    address constant L1_GATEWAY = address(0x456);
+    address L1_GATEWAY = address(0x123);
 
     function setUp() public {
-        uts = new UniversalTimestamps();
+        vm.etch(UniversalTimestampsConstants.UTS, address(new UniversalTimestamps()).code);
         feeOracle = new MockL1FeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
 
         L2AnchoringManager impl = new L2AnchoringManager();
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(
-                L2AnchoringManager.initialize,
-                (address(this), address(uts), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/")
-            )
+        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
+        L2AnchoringManager proxyInstance = L2AnchoringManager(payable(proxy));
+        proxyInstance.lateInitialize(
+            address(this), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/"
         );
-        manager = IL2AnchoringManager(address(proxy));
+        vm.warp(block.timestamp + 1);
+        proxyInstance.completeInitialization();
+
+        manager = IL2AnchoringManager(proxy);
         manager.setL1Gateway(L1_GATEWAY);
     }
 
@@ -92,6 +103,7 @@ contract L2AnchoringManagerTest is Test {
         assertFalse(confirmed, "Root should not be confirmed immediately after submission");
 
         // Simulate a call from bridge to confirm the anchoring
+        l2Messenger.setSender(L1_GATEWAY); // Simulate a call from the L1 gateway
         vm.prank(address(l2Messenger)); // Simulate a call from the L2 messenger
         vm.expectEmit(true, true, true, true);
         emit IL2AnchoringManager.L1BatchArrived(root, 1, 1, block.number, block.number, block.timestamp);
@@ -111,26 +123,25 @@ contract L2AnchoringManagerTest is Test {
 }
 
 contract L2AnchoringManagerGasTest is Test {
-    IUniversalTimestamps uts;
     IL1FeeOracle feeOracle;
     IL2AnchoringManager manager;
-    IL2ScrollMessenger l2Messenger;
+    MockL2ScrollMessenger l2Messenger;
 
-    address constant L1_GATEWAY = address(0x456);
+    address L1_GATEWAY = address(0x456);
 
     function setUp() public {
-        uts = new UniversalTimestamps();
+        vm.etch(UniversalTimestampsConstants.UTS, address(new UniversalTimestamps()).code);
         feeOracle = new MockL1FeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
 
         L2AnchoringManager impl = new L2AnchoringManager();
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(impl),
-            abi.encodeCall(
-                L2AnchoringManager.initialize,
-                (address(this), address(uts), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/")
-            )
+        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
+        L2AnchoringManager proxyInstance = L2AnchoringManager(payable(proxy));
+        proxyInstance.lateInitialize(
+            address(this), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/"
         );
+        vm.warp(block.timestamp + 1);
+        proxyInstance.completeInitialization();
         manager = IL2AnchoringManager(address(proxy));
         manager.setL1Gateway(L1_GATEWAY);
 
@@ -145,6 +156,7 @@ contract L2AnchoringManagerGasTest is Test {
     }
 
     function confirmBatchGas(bytes32 expectedRoot, uint256 startIndex, uint256 count) private {
+        l2Messenger.setSender(L1_GATEWAY);
         vm.prank(address(l2Messenger));
         uint256 startGas = gasleft();
         manager.notifyAnchored(expectedRoot, startIndex, count, block.number);

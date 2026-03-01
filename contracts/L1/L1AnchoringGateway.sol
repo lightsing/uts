@@ -13,6 +13,7 @@ import {IUniversalTimestamps} from "../core/IUniversalTimestamps.sol";
 import {
     AccessControlDefaultAdminRulesUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+import {UniversalTimestampsConstants} from "../core/UniversalTimestampsConstants.sol";
 
 contract L1AnchoringGateway is
     Initializable,
@@ -23,29 +24,48 @@ contract L1AnchoringGateway is
 {
     bytes32 public constant SUBMITTER_ROLE = keccak256("SUBMITTER_ROLE");
 
+    /// finalize a 512 entry batch requires 12.9M Gas, 1024 entries requires 25.8M Gas, which exceeds scroll's current block gas limit.
+    uint256 public constant MAX_BATCH_SIZE = 512;
+
+    /// @notice Safe bounds for gas limit of the L2 transaction to notify the L2 manager of a new batch submission.
+    /// Avoid accidentally setting a gas limit that is too low causing failed transactions on the L2, or too high costly L1 fees.
+    uint256 public constant MIN_GAS_LIMIT = 110_000;
+    uint256 public constant MAX_GAS_LIMIT = 200_000;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address initialOwner, address uts, address l1Messenger, address l2AnchoringManager)
-        public
-        initializer
-    {
-        __AccessControlDefaultAdminRules_init(3 days, initialOwner);
-
-        require(uts != address(0), "UTS: Invalid UniversalTimestamps address");
-        require(l1Messenger != address(0), "UTS: Invalid L1ScrollMessenger address");
-        require(l2AnchoringManager != address(0), "UTS: Invalid L2AnchoringManager address");
+    /// @notice For deterministic deployment, we use a separate initialize function instead of the constructor.
+    function initialize() public initializer {
+        __AccessControlDefaultAdminRules_init(0, msg.sender);
+        _setRoleAdmin(SUBMITTER_ROLE, DEFAULT_ADMIN_ROLE);
 
         L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
-        $.uts = IUniversalTimestamps(uts);
-        $.l1Messenger = IL1ScrollMessenger(l1Messenger);
-        $.l2AnchoringManager = IL2AnchoringManager(l2AnchoringManager);
+        $.uts = IUniversalTimestamps(UniversalTimestampsConstants.UTS);
+    }
 
-        // Set up roles
-        grantRole(SUBMITTER_ROLE, initialOwner);
-        _setRoleAdmin(SUBMITTER_ROLE, DEFAULT_ADMIN_ROLE);
+    /// @notice For deterministic deployment, we use a separate lateInitialize function to transfer ownership,
+    /// and setup any necessary parameters that are not provided at the time of deployment.
+    function lateInitialize(address newAdmin, address l1Messenger, address l2AnchoringManager)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(newAdmin != address(0), "UTS: Invalid admin address");
+        require(l1Messenger != address(0), "UTS: Invalid L1 Scroll Messenger address");
+        require(l2AnchoringManager != address(0), "UTS: Invalid L2 Anchoring Manager address");
+
+        setL1ScrollMessenger(l1Messenger);
+        setL2AnchoringManager(l2AnchoringManager);
+
+        beginDefaultAdminTransfer(newAdmin);
+    }
+
+    /// @notice Completes the ownership transfer process and sets a delay for future admin transfers.
+    function completeInitialization() external {
+        acceptDefaultAdminTransfer();
+        changeDefaultAdminDelay(3 days);
     }
 
     /// @inheritdoc IL1AnchoringGateway
@@ -59,6 +79,9 @@ contract L1AnchoringGateway is
 
         require(address($.l1Messenger) != address(0), "UTS: L1 Scroll Messenger not set");
         require(address($.l2AnchoringManager) != address(0), "UTS: L2 Anchoring Manager not set");
+
+        require(count > 0 && count <= MAX_BATCH_SIZE, "UTS: Invalid batch size");
+        require(gasLimit >= MIN_GAS_LIMIT && gasLimit <= MAX_GAS_LIMIT, "UTS: Invalid gas limit");
 
         uint256 attestedBlockNumber;
         try $.uts.attest(merkleRoot) {
@@ -83,7 +106,7 @@ contract L1AnchoringGateway is
     }
 
     // -- Admin functions --
-    function setUts(address newUts) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setUts(address newUts) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newUts != address(0), "UTS: Invalid UniversalTimestamps address");
         L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
         address oldUts = address($.uts);
@@ -91,7 +114,7 @@ contract L1AnchoringGateway is
         emit UTSUpdated(oldUts, newUts);
     }
 
-    function setL1ScrollMessenger(address newMessenger) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setL1ScrollMessenger(address newMessenger) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newMessenger != address(0), "UTS: Invalid L1 Scroll Messenger address");
         L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
         address oldMessenger = address($.l1Messenger);
@@ -99,7 +122,7 @@ contract L1AnchoringGateway is
         emit L1ScrollMessengerUpdated(oldMessenger, newMessenger);
     }
 
-    function setL2AnchoringManager(address newManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setL2AnchoringManager(address newManager) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newManager != address(0), "UTS: Invalid L2 Anchoring Manager address");
         L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
         address oldManager = address($.l2AnchoringManager);

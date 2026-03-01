@@ -18,6 +18,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {UniversalTimestampsConstants} from "../../core/UniversalTimestampsConstants.sol";
 
 contract L2AnchoringManager is
     Initializable,
@@ -34,29 +35,43 @@ contract L2AnchoringManager is
         _disableInitializers();
     }
 
-    function initialize(
-        address initialOwner,
-        address uts,
-        address feeOracle,
-        address l2Messenger,
-        string memory baseTokenURI
-    ) public initializer {
-        __AccessControlDefaultAdminRules_init(3 days, initialOwner);
+    /// @notice For deterministic deployment, we use a separate initialize function instead of the constructor.
+    function initialize() public initializer {
+        __AccessControlDefaultAdminRules_init(0, msg.sender);
         __ERC721_init("UTS Anchoring Certificate", "UTS");
 
-        require(feeOracle != address(0), "UTS: Invalid FeeOracle address");
-
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        $.uts = IUniversalTimestamps(uts);
-        $.feeOracle = IL1FeeOracle(feeOracle);
+        $.uts = IUniversalTimestamps(UniversalTimestampsConstants.UTS);
         // Start from 1 to use 0 as a sentinel value
         $.queueIndex = 1;
         $.confirmedIndex = 1;
-        $.l2Messenger = IL2ScrollMessenger(l2Messenger);
-        $.baseTokenURI = baseTokenURI;
-        // Set up roles
-        grantRole(FEE_COLLECTOR_ROLE, initialOwner);
+
         _setRoleAdmin(FEE_COLLECTOR_ROLE, DEFAULT_ADMIN_ROLE);
+    }
+
+    /// @notice For deterministic deployment, we use a separate lateInitialize function to transfer ownership,
+    /// and setup any necessary parameters that are not provided at the time of deployment.
+    function lateInitialize(address newAdmin, address feeOracle, address l2Messenger, string memory baseTokenURI)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(newAdmin != address(0), "UTS: Invalid admin address");
+        require(feeOracle != address(0), "UTS: Invalid FeeOracle address");
+        require(l2Messenger != address(0), "UTS: Invalid L2 Messenger address");
+
+        setFeeOracle(feeOracle);
+        setL2Messenger(l2Messenger);
+
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        $.baseTokenURI = baseTokenURI;
+
+        beginDefaultAdminTransfer(newAdmin);
+    }
+
+    /// @notice Completes the ownership transfer process and sets a delay for future admin transfers.
+    function completeInitialization() external {
+        acceptDefaultAdminTransfer();
+        changeDefaultAdminDelay(3 days);
     }
 
     /// @inheritdoc IL2AnchoringManager
@@ -179,7 +194,15 @@ contract L2AnchoringManager is
 
     // --- Admin Functions ---
 
-    function setFeeOracle(address _oracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setUts(address newUts) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newUts != address(0), "UTS: Invalid UniversalTimestamps address");
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        address oldUts = address($.uts);
+        $.uts = IUniversalTimestamps(newUts);
+        emit UtsUpdated(oldUts, newUts);
+    }
+
+    function setFeeOracle(address _oracle) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(_oracle) != address(0), "UTS: Invalid Oracle");
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         address oldOracle = address($.feeOracle);
@@ -187,7 +210,7 @@ contract L2AnchoringManager is
         emit FeeOracleUpdated(oldOracle, _oracle);
     }
 
-    function setL1Gateway(address l1Gateway) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setL1Gateway(address l1Gateway) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(l1Gateway != address(0), "UTS: Invalid L1 Gateway address");
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         address oldGateway = $.l1Gateway;
@@ -195,7 +218,7 @@ contract L2AnchoringManager is
         emit L1GatewayUpdated(oldGateway, l1Gateway);
     }
 
-    function setL2Messenger(address l2Messenger) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setL2Messenger(address l2Messenger) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(l2Messenger != address(0), "UTS: Invalid L2 Messenger address");
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         IL2ScrollMessenger messenger = IL2ScrollMessenger(l2Messenger);
@@ -206,6 +229,12 @@ contract L2AnchoringManager is
         );
         $.l2Messenger = messenger;
         emit L2MessengerUpdated(address($.l2Messenger), l2Messenger);
+    }
+
+    function setURI(string memory baseTokenURI) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        $.baseTokenURI = baseTokenURI;
+        emit BaseURIUpdated($.baseTokenURI, baseTokenURI);
     }
 
     /// @inheritdoc IL2AnchoringManager

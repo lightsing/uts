@@ -47,6 +47,8 @@ interface IL2AnchoringManager {
     /// @notice Emitted when a user claims their NFT after batch confirmation.
     event NFTClaimed(address indexed submitter, uint256 indexed tokenId, bytes32 indexed root, uint256 timestamp);
 
+    /// @notice Emitted when a batch is cleared by the admin.
+    event UtsUpdated(address indexed oldUts, address indexed newUts);
     /// @notice Emitted when fee parameters are updated.
     event FeeOracleUpdated(address indexed oldOracle, address indexed newOracle);
     /// @notice Emitted when fees are withdrawn by the fee collector.
@@ -55,6 +57,8 @@ interface IL2AnchoringManager {
     event L1GatewayUpdated(address indexed oldGateway, address indexed newGateway);
     /// @notice Emitted when the L2 Messenger address is updated.
     event L2MessengerUpdated(address indexed oldMessenger, address indexed newMessenger);
+    /// @notice Emitted when the base URI for token metadata is updated.
+    event BaseURIUpdated(string oldBaseURI, string newBaseURI);
 
     /**
      * @notice Submit a root for L2 timestamping + L1 anchoring.
