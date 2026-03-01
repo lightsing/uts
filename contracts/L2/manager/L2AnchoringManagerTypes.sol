@@ -7,7 +7,6 @@ library L2AnchoringManagerTypes {
     struct AnchoringItem {
         bytes32 root;
         address submitter;
-        uint256 l1BlockNumber;
     }
 
     /// @notice Struct to hold L1 notification details for batch confirmation

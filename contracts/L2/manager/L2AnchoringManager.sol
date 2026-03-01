@@ -7,7 +7,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IL2AnchoringManager} from "./IL2AnchoringManager.sol";
 import {L2AnchoringManagerStorage} from "./L2AnchoringManagerStorage.sol";
-import {IL1FeeOracle} from "../oracle/IL1FeeOracle.sol";
+import {IFeeOracle} from "../oracle/IFeeOracle.sol";
 import {L2AnchoringManagerTypes} from "./L2AnchoringManagerTypes.sol";
 import {MerkleTree} from "../../core/MerkleTree.sol";
 import {IUniversalTimestamps} from "../../core/IUniversalTimestamps.sol";
@@ -17,7 +17,6 @@ import {
     AccessControlDefaultAdminRulesUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {UniversalTimestampsConstants} from "../../core/UniversalTimestampsConstants.sol";
 
 contract L2AnchoringManager is
@@ -87,8 +86,7 @@ contract L2AnchoringManager is
         $.uts.attest(root);
 
         uint256 currentIndex = $.queueIndex++;
-        $.items[currentIndex] =
-            L2AnchoringManagerTypes.AnchoringItem({root: root, submitter: _msgSender(), l1BlockNumber: 0});
+        $.items[currentIndex] = L2AnchoringManagerTypes.AnchoringItem({root: root, submitter: _msgSender()});
         $.roots[root] = currentIndex;
 
         emit L1AnchoringQueued(root, currentIndex, requiredFee, block.number, block.timestamp);
@@ -144,13 +142,13 @@ contract L2AnchoringManager is
             uint256 index = batch.startIndex + i;
             L2AnchoringManagerTypes.AnchoringItem storage item = $.items[index];
             leaves[i] = item.root;
-            item.l1BlockNumber = batch.l1BlockNumber;
         }
 
         bytes32 computedRoot = MerkleTree.computeRoot(leaves);
         require(computedRoot == batch.expectedRoot, "UTS: Invalid Merkle Root");
 
         $.confirmedIndex = batch.startIndex + batch.count;
+        $.batchStartToL1Block[batch.startIndex] = batch.l1BlockNumber;
 
         emit L1BatchFinalized(
             batch.expectedRoot, batch.startIndex, batch.count, batch.l1BlockNumber, block.number, block.timestamp
@@ -161,6 +159,7 @@ contract L2AnchoringManager is
     }
 
     /// @inheritdoc IL2AnchoringManager
+    // forge-lint: disable-next-line(mixed-case-function)
     function claimNFT(bytes32 root) external {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         uint256 index = $.roots[root];
@@ -168,6 +167,7 @@ contract L2AnchoringManager is
     }
 
     /// @inheritdoc IL2AnchoringManager
+    // forge-lint: disable-next-line(mixed-case-function)
     function claimNFT(uint256 index) public nonReentrant {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
 
@@ -206,7 +206,7 @@ contract L2AnchoringManager is
         require(address(_oracle) != address(0), "UTS: Invalid Oracle");
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         address oldOracle = address($.feeOracle);
-        $.feeOracle = IL1FeeOracle(_oracle);
+        $.feeOracle = IFeeOracle(_oracle);
         emit FeeOracleUpdated(oldOracle, _oracle);
     }
 
@@ -256,6 +256,7 @@ contract L2AnchoringManager is
 
     // --- Others ---
 
+    // forge-lint: disable-next-line(mixed-case-function)
     function _baseURI() internal view virtual override returns (string memory) {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         return $.baseTokenURI;

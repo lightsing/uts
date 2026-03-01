@@ -4,18 +4,14 @@ pragma solidity ^0.8.29;
 import {Test, console} from "forge-std/Test.sol";
 import {L2AnchoringManager} from "../contracts/L2/manager/L2AnchoringManager.sol";
 import {IL2AnchoringManager} from "../contracts/L2/manager/IL2AnchoringManager.sol";
-import {IL1FeeOracle} from "../contracts/L2/oracle/IL1FeeOracle.sol";
-import {L1AnchoringGateway} from "../contracts/L1/L1AnchoringGateway.sol";
-import {IL1AnchoringGateway} from "../contracts/L1/IL1AnchoringGateway.sol";
+import {IFeeOracle} from "../contracts/L2/oracle/IFeeOracle.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UniversalTimestamps} from "../contracts/core/UniversalTimestamps.sol";
-import {IUniversalTimestamps} from "../contracts/core/IUniversalTimestamps.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
 import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConstants.sol";
 import {UniversalTimestampsConstants} from "../contracts/core/UniversalTimestampsConstants.sol";
-import {IL1ScrollMessenger} from "scroll-contracts/L1/IL1ScrollMessenger.sol";
 
-contract MockL1FeeOracle is IL1FeeOracle {
+contract MockFeeOracle is IFeeOracle {
     function getL1BaseFee() external pure returns (uint256) {
         return 0.05 gwei;
     }
@@ -62,15 +58,15 @@ contract MockL2ScrollMessenger is IL2ScrollMessenger {
  * @dev Tests to verify the functionality of the L2AnchoringManager contract.
  */
 contract L2AnchoringManagerTest is Test {
-    IL1FeeOracle feeOracle;
+    IFeeOracle feeOracle;
     IL2AnchoringManager manager;
     MockL2ScrollMessenger l2Messenger;
 
-    address L1_GATEWAY = address(0x123);
+    address constant L1_GATEWAY = address(0x123);
 
     function setUp() public {
         vm.etch(UniversalTimestampsConstants.UTS, address(new UniversalTimestamps()).code);
-        feeOracle = new MockL1FeeOracle();
+        feeOracle = new MockFeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
 
         L2AnchoringManager impl = new L2AnchoringManager();
@@ -123,15 +119,15 @@ contract L2AnchoringManagerTest is Test {
 }
 
 contract L2AnchoringManagerGasTest is Test {
-    IL1FeeOracle feeOracle;
+    IFeeOracle feeOracle;
     IL2AnchoringManager manager;
     MockL2ScrollMessenger l2Messenger;
 
-    address L1_GATEWAY = address(0x456);
+    address constant L1_GATEWAY = address(0x456);
 
     function setUp() public {
         vm.etch(UniversalTimestampsConstants.UTS, address(new UniversalTimestamps()).code);
-        feeOracle = new MockL1FeeOracle();
+        feeOracle = new MockFeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
 
         L2AnchoringManager impl = new L2AnchoringManager();

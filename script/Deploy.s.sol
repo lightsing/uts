@@ -6,7 +6,7 @@ import {UniversalTimestamps} from "../contracts/core/UniversalTimestamps.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {L2AnchoringManager} from "../contracts/L2/manager/L2AnchoringManager.sol";
 import {IL2AnchoringManager} from "../contracts/L2/manager/IL2AnchoringManager.sol";
-import {L1FeeOracle} from "../contracts/L2/oracle/L1FeeOracle.sol";
+import {FeeOracle} from "../contracts/L2/oracle/L1FeeOracle.sol";
 import {IL1FeeOracle} from "../contracts/L2/oracle/IL1FeeOracle.sol";
 import {L1AnchoringGateway} from "../contracts/L1/L1AnchoringGateway.sol";
 
@@ -26,7 +26,7 @@ contract DeployTimestampCreate2 is Script {
 //         address owner = vm.envAddress("OWNER_ADDRESS");
 
 //         vm.startBroadcast();
-//         L1FeeOracle implementation = new L1FeeOracle(
+//      FeeOraclecle implementation = nFeeOraclecle(
 //             owner,
 //             100_000, // initialGasPerAttestation
 //             0.5e18 // initialDiscountRatio (50%)

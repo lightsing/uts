@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {IL1FeeOracle} from "../oracle/IL1FeeOracle.sol";
+import {IFeeOracle} from "../oracle/IFeeOracle.sol";
 import {L2AnchoringManagerTypes} from "./L2AnchoringManagerTypes.sol";
 import {IUniversalTimestamps} from "../../core/IUniversalTimestamps.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
@@ -19,7 +19,7 @@ library L2AnchoringManagerStorage {
     /// @custom:storage-location erc7201:uts.storage.L2AnchoringManager
     struct Storage {
         IUniversalTimestamps uts;
-        IL1FeeOracle feeOracle;
+        IFeeOracle feeOracle;
         /// @notice Executor for L1 -> L2 messages
         IL2ScrollMessenger l2Messenger;
         /// @notice L1 sender address
@@ -31,6 +31,8 @@ library L2AnchoringManagerStorage {
         L2AnchoringManagerTypes.L1Batch pendingBatch;
         /// @notice Next index of the anchoring item to be confirmed
         uint256 confirmedIndex;
+        /// @notice Mapping to track the L1 block number for each batch start index
+        mapping(uint256 => uint256) batchStartToL1Block;
 
         mapping(uint256 => L2AnchoringManagerTypes.AnchoringItem) items;
         mapping(bytes32 => uint256) roots; // Mapping to track submitted roots for quick lookup

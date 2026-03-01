@@ -85,10 +85,12 @@ interface IL2AnchoringManager {
 
     /// @notice Claim the NFT for a confirmed root by providing the root directly. This is a convenience function
     /// that looks up the index from the root and calls claimNFT(index).
+    // forge-lint: disable-next-line(mixed-case-function)
     function claimNFT(bytes32 root) external;
 
     /// @notice Claim the NFT for a confirmed root by providing the index of the root in the queue. This can be
     /// used if the user already knows the index or wants to save gas by avoiding the root lookup.
+    // forge-lint: disable-next-line(mixed-case-function)
     function claimNFT(uint256 index) external;
 
     /// @notice Returns the current base URI for token metadata
