@@ -7,7 +7,8 @@ import {
   type DetachedTimestamp,
   type DigestHeader,
   type DigestOp,
-  type EthereumUTSAttestation,
+  type EASAttestation,
+  type EASTimestamped,
   type ExecutionStep,
   type ForkStep,
   type Op,
@@ -19,7 +20,8 @@ import {
   ATTESTATION_TAG_LENGTH,
   BITCOIN_ATTESTATION_TAG,
   DIGEST_LENGTHS,
-  ETHEREUM_UTS_ATTESTATION_TAG,
+  EAS_ATTEST_TAG,
+  EAS_TIMESTAMPED_TAG,
   getOpName,
   MAGIC_BYTES,
   MAX_URI_LEN,
@@ -256,50 +258,23 @@ export default class Decoder {
     }
   }
 
-  readEthereumUTSAttestation(): EthereumUTSAttestation {
+  readEASAttestation(): EASAttestation {
     const chain = this.readNumber()
-    const height = this.readNumber()
+    const uid = this.readBytes(32)
 
-    if (this.remaining === 0) {
-      return {
-        kind: 'ethereum-uts',
-        chain,
-        height,
-      }
-    }
-
-    if (this.remaining > 0 && this.remaining < 20) {
-      throw new DecodeError(
-        ErrorCode.INVALID_STRUCTURE,
-        `Invalid extra metadata length for Ethereum UTS attestation: expected 0 or at least 20 bytes, got ${this.remaining}`,
-        { offset: this.offset, context: { remaining: this.remaining } },
-      )
-    }
-    // Extra metadata is optional, only read if there's remaining data
-    const contract = this.readBytes(20)
-    if (this.remaining === 0) {
-      return {
-        kind: 'ethereum-uts',
-        chain,
-        height,
-        metadata: { contract },
-      }
-    }
-
-    if (this.remaining > 0 && this.remaining < 32) {
-      throw new DecodeError(
-        ErrorCode.INVALID_STRUCTURE,
-        `Invalid extra metadata length for Ethereum UTS attestation with contract: expected 0 or 32 bytes, got ${this.remaining}`,
-        { offset: this.offset, context: { remaining: this.remaining } },
-      )
-    }
-
-    const txHash = this.readBytes(32)
     return {
-      kind: 'ethereum-uts',
+      kind: 'eas-attestation',
       chain,
-      height,
-      metadata: { contract, txHash },
+      uid,
+    }
+  }
+
+  readEASTimestamped(): EASTimestamped {
+    const chain = this.readNumber()
+
+    return {
+      kind: 'eas-timestamped',
+      chain,
     }
   }
 
@@ -326,10 +301,12 @@ export default class Decoder {
       const attestation = decoder.readPendingAttestation()
       if (strict) decoder.checkEOF()
       return { op: 'ATTESTATION', attestation }
-    } else if (
-      tag.every((byte, idx) => byte === ETHEREUM_UTS_ATTESTATION_TAG[idx])
-    ) {
-      const attestation = decoder.readEthereumUTSAttestation()
+    } else if (tag.every((byte, idx) => byte === EAS_ATTEST_TAG[idx])) {
+      const attestation = decoder.readEASAttestation()
+      if (strict) decoder.checkEOF()
+      return { op: 'ATTESTATION', attestation }
+    } else if (tag.every((byte, idx) => byte === EAS_TIMESTAMPED_TAG[idx])) {
+      const attestation = decoder.readEASTimestamped()
       if (strict) decoder.checkEOF()
       return { op: 'ATTESTATION', attestation }
     } else {

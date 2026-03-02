@@ -12,10 +12,8 @@ pub const INNER_NODE_PREFIX: u8 = 0x01;
 /// Flat, Fixed-Size, Read only Merkle Tree
 ///
 /// Expects the length of leaves to be equal or near(less) to a power of two.
-///
-/// Leaves are **sorted** starting at index `len`.
 #[derive(Debug, Clone, Default)]
-pub struct UnorderedMerkleTree<D: Digest> {
+pub struct MerkleTree<D: Digest> {
     /// Index 0 is not used, leaves start at index `len`.
     nodes: Box<[Output<D>]>,
     len: usize,
@@ -23,12 +21,12 @@ pub struct UnorderedMerkleTree<D: Digest> {
 
 /// Merkle Tree without hashing the leaves
 #[derive(Debug, Clone)]
-pub struct UnhashedFlatMerkleTree<D: Digest> {
+pub struct UnhashedMerkleTree<D: Digest> {
     buffer: Vec<Output<D>>,
     len: usize,
 }
 
-impl<D: Digest + FixedOutputReset> UnorderedMerkleTree<D>
+impl<D: Digest + FixedOutputReset> MerkleTree<D>
 where
     Output<D>: Pod + Copy,
 {
@@ -38,7 +36,7 @@ where
     }
 
     /// Constructs a new Merkle tree from the given hash leaves, without hashing internal nodes.
-    pub fn new_unhashed(data: &[Output<D>]) -> UnhashedFlatMerkleTree<D> {
+    pub fn new_unhashed(data: &[Output<D>]) -> UnhashedMerkleTree<D> {
         let raw_len = data.len();
         assert_ne!(raw_len, 0, "Cannot create Merkle tree with zero leaves");
 
@@ -67,14 +65,9 @@ where
             maybe_uninit
                 .get_unchecked_mut(len + raw_len..)
                 .write_filled(Output::<D>::default());
-
-            maybe_uninit
-                .get_unchecked_mut(len..)
-                .assume_init_mut()
-                .sort_unstable();
         }
 
-        UnhashedFlatMerkleTree { buffer: nodes, len }
+        UnhashedMerkleTree { buffer: nodes, len }
     }
 
     /// Returns the root hash of the Merkle tree
@@ -93,12 +86,12 @@ where
     /// Checks if the given leaf is contained in the Merkle tree
     #[inline]
     pub fn contains(&self, leaf: &Output<D>) -> bool {
-        self.leaves().binary_search(leaf).is_ok()
+        self.leaves().contains(leaf)
     }
 
     /// Get proof for a given leaf
     pub fn get_proof_iter(&self, leaf: &Output<D>) -> Option<SiblingIter<'_, D>> {
-        let leaf_index_in_slice = self.leaves().binary_search(leaf).ok()?;
+        let leaf_index_in_slice = self.leaves().iter().position(|a| a == leaf)?;
         Some(SiblingIter {
             nodes: &self.nodes,
             current: self.len + leaf_index_in_slice,
@@ -123,12 +116,12 @@ where
     }
 }
 
-impl<D: Digest + FixedOutputReset> UnhashedFlatMerkleTree<D>
+impl<D: Digest + FixedOutputReset> UnhashedMerkleTree<D>
 where
     Output<D>: Pod + Copy,
 {
     /// Finalizes the Merkle tree by hashing internal nodes
-    pub fn finalize(self) -> UnorderedMerkleTree<D> {
+    pub fn finalize(self) -> MerkleTree<D> {
         let mut nodes = self.buffer;
         let len = self.len;
         unsafe {
@@ -152,7 +145,7 @@ where
             // SAFETY: initialized all elements.
             nodes.set_len(2 * len);
         }
-        UnorderedMerkleTree {
+        MerkleTree {
             nodes: nodes.into_boxed_slice(),
             len,
         }
@@ -209,32 +202,35 @@ impl<D: Digest> ExactSizeIterator for SiblingIter<'_, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::{B256, U256};
+    use alloy_sol_types::SolValue;
+    use sha2::Sha256;
+    use sha3::Keccak256;
 
     #[test]
     fn basic() {
-        test_merkle_tree::<sha2::Sha256>();
-        test_merkle_tree::<sha3::Keccak256>();
+        test_merkle_tree::<Sha256>();
+        test_merkle_tree::<Keccak256>();
     }
 
     #[test]
     fn proof() {
-        test_proof::<sha2::Sha256>();
-        test_proof::<sha3::Keccak256>();
+        test_proof::<Sha256>();
+        test_proof::<Keccak256>();
     }
 
     fn test_merkle_tree<D: Digest + FixedOutputReset>()
     where
         Output<D>: Pod + Copy,
     {
-        let mut leaves = vec![
+        let leaves = vec![
             D::digest(b"leaf1"),
             D::digest(b"leaf2"),
             D::digest(b"leaf3"),
             D::digest(b"leaf4"),
         ];
-        leaves.sort_unstable();
 
-        let tree = UnorderedMerkleTree::<D>::new(&leaves);
+        let tree = MerkleTree::<D>::new(&leaves);
 
         // Manually compute the expected root
         let mut hasher = D::new();
@@ -260,15 +256,14 @@ mod tests {
     where
         Output<D>: Pod + Copy,
     {
-        let mut leaves = vec![
+        let leaves = vec![
             D::digest(b"apple"),
             D::digest(b"banana"),
             D::digest(b"cherry"),
             D::digest(b"date"),
         ];
-        leaves.sort_unstable();
 
-        let tree = UnorderedMerkleTree::<D>::new(&leaves);
+        let tree = MerkleTree::<D>::new(&leaves);
 
         for leaf in &leaves {
             let mut iter = tree
@@ -294,6 +289,24 @@ mod tests {
             }
 
             assert_eq!(current_hash.as_slice(), tree.root().as_slice());
+        }
+    }
+
+    #[ignore]
+    #[test]
+    fn generate_sol_test() {
+        let mut leaves = Vec::with_capacity(1024);
+        for i in 0..1024 {
+            let mut hasher = Keccak256::new();
+            let value = U256::from(i).abi_encode_packed();
+            hasher.update(&value);
+            leaves.push(hasher.finalize());
+        }
+
+        for i in 0..=10u32 {
+            let tree = MerkleTree::<Keccak256>::new(&leaves[..2usize.pow(i)]);
+            let root = B256::new(tree.root().0);
+            println!("bytes32({}),", root);
         }
     }
 }

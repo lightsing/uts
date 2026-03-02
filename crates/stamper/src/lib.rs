@@ -20,8 +20,8 @@ use std::{
     time::Duration,
 };
 use tokio::time::{Interval, MissedTickBehavior};
-use uts_bmt::UnorderedMerkleTree;
-use uts_contracts::uts::UniversalTimestamps;
+use uts_bmt::MerkleTree;
+use uts_contracts::eas::IEAS::IEASInstance;
 use uts_core::utils::Hexed;
 use uts_journal::reader::JournalReader;
 
@@ -42,11 +42,11 @@ pub struct Stamper<D: Digest, P, const ENTRY_SIZE: usize> {
     /// Storage for merkle trees and leaf->root mappings
     storage: Arc<DB>,
     /// FIFO cache of recent merkle trees
-    cache: VecDeque<UnorderedMerkleTree<D>>,
+    cache: VecDeque<MerkleTree<D>>,
     /// FIFO cache index of recent merkle trees
     cache_index: HashMap<B256, usize>,
     /// The contract
-    contract: UniversalTimestamps<P>,
+    contract: IEASInstance<P>,
     /// Stamper configuration
     config: StamperConfig,
 }
@@ -81,13 +81,13 @@ pub struct MerkleEntry<'a> {
 
 impl MerkleEntry<'_> {
     /// Get the Merkle tree from the entry
-    pub fn trie<D>(&self) -> UnorderedMerkleTree<D>
+    pub fn trie<D>(&self) -> MerkleTree<D>
     where
         D: Digest + FixedOutputReset,
         Output<D>: Pod + Copy,
     {
         // SAFETY: We trust that the data in the database is valid, and that the trie was serialized correctly.
-        unsafe { UnorderedMerkleTree::from_raw_bytes(&self.trie) }
+        unsafe { MerkleTree::from_raw_bytes(&self.trie) }
     }
 }
 
@@ -155,7 +155,7 @@ where
     pub fn new(
         reader: JournalReader<ENTRY_SIZE>,
         storage: Arc<DB>,
-        contract: UniversalTimestamps<P>,
+        contract: IEASInstance<P>,
         config: StamperConfig,
     ) -> Self {
         Self {
@@ -237,7 +237,7 @@ where
         }
         debug_assert_eq!(buffer.len(), target_size);
 
-        let merkle_tree = UnorderedMerkleTree::<D>::new_unhashed(bytemuck::cast_slice(&buffer));
+        let merkle_tree = MerkleTree::<D>::new_unhashed(bytemuck::cast_slice(&buffer));
         let storage = self.storage.clone();
 
         let merkle_tree = tokio::task::spawn_blocking(move || {
@@ -254,7 +254,7 @@ where
         // commit to blockchain
         let receipt = self
             .contract
-            .attest(root)
+            .timestamp(root)
             .send()
             .await
             .expect("failed to build transaction")

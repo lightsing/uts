@@ -7,8 +7,8 @@ pub mod opcode;
 mod timestamp;
 
 pub use attestation::{
-    Attestation, AttestationTag, BitcoinAttestation, EthereumUTSAttestation, PendingAttestation,
-    RawAttestation,
+    Attestation, AttestationTag, BitcoinAttestation, EASAttestation, EASTimestamped,
+    PendingAttestation, RawAttestation,
 };
 pub use detached_timestamp::DetachedTimestamp;
 pub use digest::DigestHeader;

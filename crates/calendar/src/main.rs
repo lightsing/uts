@@ -10,13 +10,14 @@ use axum::{
     routing::{get, post},
 };
 use digest::{OutputSizeUser, typenum::Unsigned};
+use eyre::ContextCompat;
 use rocksdb::DB;
 use sha3::Keccak256;
 use std::{env, path::PathBuf, sync::Arc};
 use tower_http::{cors, cors::CorsLayer};
 use tracing::info;
 use uts_calendar::{AppState, routes, shutdown_signal, time};
-use uts_contracts::uts::UniversalTimestamps;
+use uts_contracts::eas::{EAS_ADDRESSES, IEAS::IEASInstance};
 use uts_journal::{Journal, JournalConfig, checkpoint::CheckpointConfig};
 use uts_stamper::{Stamper, StamperConfig};
 
@@ -52,9 +53,12 @@ async fn main() -> eyre::Result<()> {
         .wallet(EthereumWallet::new(key))
         .connect("https://sepolia-rpc.scroll.io")
         .await?;
-    provider.get_chain_id().await?; // sanity check
+    let chain_id = provider.get_chain_id().await?; // sanity check
 
-    let contract = UniversalTimestamps::new(uts_contracts::uts::DEFAULT_ADDRESS, provider.clone());
+    let eas_address = *EAS_ADDRESSES
+        .get(&chain_id)
+        .context("eas default address not found")?;
+    let contract = IEASInstance::new(eas_address, provider.clone());
 
     // stamper
     let reader = journal.reader();
