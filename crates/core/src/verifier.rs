@@ -3,10 +3,10 @@ use crate::{
     error::DecodeError,
 };
 
-#[cfg(feature = "ethereum-uts-verifier")]
-mod ethereum_uts;
-#[cfg(feature = "ethereum-uts-verifier")]
-pub use ethereum_uts::EthereumUTSVerifier;
+#[cfg(feature = "eas-verifier")]
+mod eas;
+#[cfg(feature = "eas-verifier")]
+pub use eas::EASVerifier;
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerifyError {
@@ -23,10 +23,10 @@ pub enum VerifyError {
     /// An error occurred while decoding the attestation.
     #[error("error decoding attestation: {0}")]
     Decode(DecodeError),
-    /// An error occurred while verifying the ethereum uts attestation.
-    #[cfg(feature = "ethereum-uts-verifier")]
-    #[error("error verifying ethereum uts attestation: {0}")]
-    EthereumUTS(#[from] ethereum_uts::EthereumUTSVerifierError),
+    /// An error occurred while verifying the eas attestation.
+    #[cfg(feature = "eas-verifier")]
+    #[error("error verifying eas attestation: {0}")]
+    EAS(#[from] eas::EASVerifierError),
 }
 
 pub trait AttestationVerifier<P>

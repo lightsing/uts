@@ -4276,6 +4276,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "phf"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1562dc717473dbaa4c1f85a36410e03c047b2e7df7f45ee938fbef64ae7fadf"
+dependencies = [
+ "phf_macros",
+ "phf_shared",
+ "serde",
+]
+
+[[package]]
+name = "phf_generator"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "135ace3a761e564ec88c03a77317a7c6b80bb7f7135ef2544dbe054243b89737"
+dependencies = [
+ "fastrand",
+ "phf_shared",
+]
+
+[[package]]
+name = "phf_macros"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "812f032b54b1e759ccd5f8b6677695d5268c588701effba24601f6932f8269ef"
+dependencies = [
+ "phf_generator",
+ "phf_shared",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
+dependencies = [
+ "siphasher",
+]
+
+[[package]]
 name = "pin-project"
 version = "1.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5530,6 +5573,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "siphasher"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
+
+[[package]]
 name = "slab"
 version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6281,6 +6330,7 @@ dependencies = [
 name = "uts-calendar"
 version = "0.1.0"
 dependencies = [
+ "alloy-chains",
  "alloy-primitives",
  "alloy-provider",
  "alloy-signer",
@@ -6311,6 +6361,7 @@ dependencies = [
 name = "uts-cli"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
  "alloy-provider",
  "bytemuck",
  "clap",
@@ -6329,6 +6380,7 @@ dependencies = [
  "tracing",
  "url",
  "uts-bmt",
+ "uts-contracts",
  "uts-core",
 ]
 
@@ -6342,6 +6394,7 @@ dependencies = [
  "alloy-sol-types",
  "eyre",
  "futures",
+ "phf",
  "tokio",
 ]
 
@@ -6350,9 +6403,9 @@ name = "uts-core"
 version = "0.1.0"
 dependencies = [
  "alloy-chains",
+ "alloy-contract",
  "alloy-primitives",
  "alloy-provider",
- "alloy-rpc-types-eth",
  "alloy-sol-types",
  "auto_impl",
  "bytes",

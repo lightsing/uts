@@ -12,6 +12,7 @@ version.workspace = true
 alloy-contract = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true, features = ["json"] }
+phf = { workspace = true, features = ["std", "macros"] }
 
 [dev-dependencies]
 alloy = { workspace = true, features = ["full", "node-bindings", "signer-mnemonic"] }
