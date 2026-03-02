@@ -10,3 +10,6 @@
 [submodule "lib/scroll-contracts"]
 	path = lib/scroll-contracts
 	url = https://github.com/scroll-tech/scroll-contracts
+[submodule "lib/eas-contracts"]
+	path = lib/eas-contracts
+	url = https://github.com/ethereum-attestation-service/eas-contracts

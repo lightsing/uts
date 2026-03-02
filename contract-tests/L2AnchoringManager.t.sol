@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity =0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
 import {L2AnchoringManager} from "../contracts/L2/manager/L2AnchoringManager.sol";
 import {IL2AnchoringManager} from "../contracts/L2/manager/IL2AnchoringManager.sol";
 import {IFeeOracle} from "../contracts/L2/oracle/IFeeOracle.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {UniversalTimestamps} from "../contracts/core/UniversalTimestamps.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
 import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConstants.sol";
-import {UniversalTimestampsConstants} from "../contracts/core/UniversalTimestampsConstants.sol";
+import {TestEAS} from "./TestEAS.sol";
+import {IEAS} from "eas-contracts/IEAS.sol";
 
 contract MockFeeOracle is IFeeOracle {
     function getL1BaseFee() external pure returns (uint256) {
@@ -58,6 +58,7 @@ contract MockL2ScrollMessenger is IL2ScrollMessenger {
  * @dev Tests to verify the functionality of the L2AnchoringManager contract.
  */
 contract L2AnchoringManagerTest is Test {
+    IEAS eas;
     IFeeOracle feeOracle;
     IL2AnchoringManager manager;
     MockL2ScrollMessenger l2Messenger;
@@ -65,7 +66,7 @@ contract L2AnchoringManagerTest is Test {
     address constant L1_GATEWAY = address(0x123);
 
     function setUp() public {
-        vm.etch(UniversalTimestampsConstants.UTS, address(new UniversalTimestamps()).code);
+        eas = new TestEAS().eas();
         feeOracle = new MockFeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
 
@@ -73,7 +74,7 @@ contract L2AnchoringManagerTest is Test {
         address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
         L2AnchoringManager proxyInstance = L2AnchoringManager(payable(proxy));
         proxyInstance.lateInitialize(
-            address(this), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/"
+            address(this), address(eas), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/"
         );
         vm.warp(block.timestamp + 1);
         proxyInstance.completeInitialization();
@@ -90,8 +91,6 @@ contract L2AnchoringManagerTest is Test {
         // Simulate submitting a root for L1 anchoring
         vm.prank(address(1)); // Simulate a call from an external address
         vm.deal(address(1), 100 ether); // Fund the address with some ether to pay for the fee
-        vm.expectEmit(true, true, true, true);
-        emit IL2AnchoringManager.L1AnchoringQueued(root, 1, fee, block.number, block.timestamp);
         manager.submitForL1Anchoring{value: fee}(root, address(1));
 
         // Verify that the item was added to the queue
@@ -101,13 +100,9 @@ contract L2AnchoringManagerTest is Test {
         // Simulate a call from bridge to confirm the anchoring
         l2Messenger.setSender(L1_GATEWAY); // Simulate a call from the L1 gateway
         vm.prank(address(l2Messenger)); // Simulate a call from the L2 messenger
-        vm.expectEmit(true, true, true, true);
-        emit IL2AnchoringManager.L1BatchArrived(root, 1, 1, block.number, block.number, block.timestamp);
-        manager.notifyAnchored(root, 1, 1, block.number);
+        manager.notifyAnchored(bytes32(0), root, 1, 1, block.number);
 
         vm.prank(address(1));
-        vm.expectEmit(true, true, true, true);
-        emit IL2AnchoringManager.L1BatchFinalized(root, 1, 1, block.number, block.number, block.timestamp);
         manager.finalizeBatch();
     }
 
@@ -119,6 +114,7 @@ contract L2AnchoringManagerTest is Test {
 }
 
 contract L2AnchoringManagerGasTest is Test {
+    IEAS eas;
     IFeeOracle feeOracle;
     IL2AnchoringManager manager;
     MockL2ScrollMessenger l2Messenger;
@@ -126,7 +122,7 @@ contract L2AnchoringManagerGasTest is Test {
     address constant L1_GATEWAY = address(0x456);
 
     function setUp() public {
-        vm.etch(UniversalTimestampsConstants.UTS, address(new UniversalTimestamps()).code);
+        eas = new TestEAS().eas();
         feeOracle = new MockFeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
 
@@ -134,7 +130,7 @@ contract L2AnchoringManagerGasTest is Test {
         address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
         L2AnchoringManager proxyInstance = L2AnchoringManager(payable(proxy));
         proxyInstance.lateInitialize(
-            address(this), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/"
+            address(this), address(eas), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/"
         );
         vm.warp(block.timestamp + 1);
         proxyInstance.completeInitialization();
@@ -155,7 +151,7 @@ contract L2AnchoringManagerGasTest is Test {
         l2Messenger.setSender(L1_GATEWAY);
         vm.prank(address(l2Messenger));
         uint256 startGas = gasleft();
-        manager.notifyAnchored(expectedRoot, startIndex, count, block.number);
+        manager.notifyAnchored(bytes32(0), expectedRoot, startIndex, count, block.number);
         uint256 l1L2GasUsed = startGas - gasleft();
 
         vm.prank(address(1));

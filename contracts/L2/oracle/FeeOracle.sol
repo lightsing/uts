@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity =0.8.28;
 
 import {IL1GasPriceOracle} from "scroll-contracts/L2/predeploys/IL1GasPriceOracle.sol";
 import {IFeeOracle} from "./IFeeOracle.sol";
@@ -32,10 +32,10 @@ contract FeeOracle is IFeeOracle, AccessControlDefaultAdminRules {
     uint256 public crossDomainGasEstimated = 110_000;
 
     /// @notice scalar for L2 execution gas estimation for each additional batch item.
-    uint256 public l2ExecutionScalar = 3500;
+    uint256 public l2ExecutionScalar = 26_000;
 
     /// @notice overhead for L2 execution gas estimation
-    uint256 public l2ExecutionOverhead = 33_000;
+    uint256 public l2ExecutionOverhead = 0;
 
     /// @notice expected batch size for fee calculation
     uint256 public expectedBatchSize = 256;

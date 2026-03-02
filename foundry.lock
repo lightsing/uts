@@ -1,4 +1,10 @@
 {
+  "lib/eas-contracts": {
+    "tag": {
+      "name": "v1.4.0",
+      "rev": "d223e17208aa110dd5ec694d77324a2321d93201"
+    }
+  },
   "lib/forge-std": {
     "tag": {
       "name": "v1.12.0",

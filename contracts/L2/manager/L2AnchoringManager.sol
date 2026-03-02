@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.29;
+pragma solidity =0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -10,14 +10,14 @@ import {L2AnchoringManagerStorage} from "./L2AnchoringManagerStorage.sol";
 import {IFeeOracle} from "../oracle/IFeeOracle.sol";
 import {L2AnchoringManagerTypes} from "./L2AnchoringManagerTypes.sol";
 import {MerkleTree} from "../../core/MerkleTree.sol";
-import {IUniversalTimestamps} from "../../core/IUniversalTimestamps.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
 import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConstants.sol";
 import {
     AccessControlDefaultAdminRulesUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import {UniversalTimestampsConstants} from "../../core/UniversalTimestampsConstants.sol";
+import {EASHelper} from "../../core/EASHelper.sol";
+import {Attestation, IEAS} from "eas-contracts/IEAS.sol";
 
 contract L2AnchoringManager is
     Initializable,
@@ -40,7 +40,6 @@ contract L2AnchoringManager is
         __ERC721_init("UTS Anchoring Certificate", "UTS");
 
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        $.uts = IUniversalTimestamps(UniversalTimestampsConstants.UTS);
         // Start from 1 to use 0 as a sentinel value
         $.queueIndex = 1;
         $.confirmedIndex = 1;
@@ -50,10 +49,13 @@ contract L2AnchoringManager is
 
     /// @notice For deterministic deployment, we use a separate lateInitialize function to transfer ownership,
     /// and setup any necessary parameters that are not provided at the time of deployment.
-    function lateInitialize(address newAdmin, address feeOracle, address l2Messenger, string memory baseTokenURI)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function lateInitialize(
+        address newAdmin,
+        address eas,
+        address feeOracle,
+        address l2Messenger,
+        string memory baseTokenURI
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newAdmin != address(0), "UTS: Invalid admin address");
         require(feeOracle != address(0), "UTS: Invalid FeeOracle address");
         require(l2Messenger != address(0), "UTS: Invalid L2 Messenger address");
@@ -62,6 +64,7 @@ contract L2AnchoringManager is
         setL2Messenger(l2Messenger);
 
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        $.eas = IEAS(eas);
         $.baseTokenURI = baseTokenURI;
 
         beginDefaultAdminTransfer(newAdmin);
@@ -74,22 +77,27 @@ contract L2AnchoringManager is
     }
 
     /// @inheritdoc IL2AnchoringManager
-    function submitForL1Anchoring(bytes32 root, address refundAddress) external payable nonReentrant {
+    function submitForL1Anchoring(bytes32 root) external payable {
+        submitForL1Anchoring(root, _msgSender());
+    }
+
+    /// @inheritdoc IL2AnchoringManager
+    function submitForL1Anchoring(bytes32 root, address refundAddress) public payable nonReentrant {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
 
-        require(address($.feeOracle) != address(0), "UTS: Oracle not set");
+        require(address($.eas) != address(0), "UTS: Oracle not set");
 
         uint256 requiredFee = $.feeOracle.getFloorFee();
         require(msg.value >= requiredFee, "UTS: Insufficient fee for L1 anchoring");
 
-        // Call core contract to record the L2 timestamp.
-        $.uts.attest(root);
+        bytes32 attestationId = EASHelper.attest($.eas, root);
 
         uint256 currentIndex = $.queueIndex++;
-        $.items[currentIndex] = L2AnchoringManagerTypes.AnchoringItem({root: root, submitter: _msgSender()});
-        $.roots[root] = currentIndex;
+        $.rootToAttestationId[root] = attestationId;
+        $.indexToAttestationId[currentIndex] = attestationId;
+        $.attestationIdToIndex[attestationId] = currentIndex;
 
-        emit L1AnchoringQueued(root, currentIndex, requiredFee, block.number, block.timestamp);
+        emit L1AnchoringQueued(attestationId, root, currentIndex, requiredFee, block.number, block.timestamp);
 
         // refund fee to `refundAddress`
         unchecked {
@@ -104,12 +112,18 @@ contract L2AnchoringManager is
     /// @inheritdoc IL2AnchoringManager
     function isConfirmed(bytes32 root) public view returns (bool) {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        uint256 index = $.roots[root];
+        uint256 index = $.attestationIdToIndex[$.rootToAttestationId[root]];
         return index != 0 && index < $.confirmedIndex;
     }
 
     /// @inheritdoc IL2AnchoringManager
-    function notifyAnchored(bytes32 expectedRoot, uint256 startIndex, uint256 count, uint256 l1BlockNumber) external {
+    function notifyAnchored(
+        bytes32 attestationId,
+        bytes32 expectedRoot,
+        uint256 startIndex,
+        uint256 count,
+        uint256 l1BlockNumber
+    ) external {
         require(count > 0, "UTS: Count must be greater than zero");
 
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
@@ -124,10 +138,16 @@ contract L2AnchoringManager is
 
         // Store the batch details for later finalization
         $.pendingBatch = L2AnchoringManagerTypes.L1Batch({
-            expectedRoot: expectedRoot, startIndex: startIndex, count: count, l1BlockNumber: l1BlockNumber
+            attestationId: attestationId,
+            expectedRoot: expectedRoot,
+            startIndex: startIndex,
+            count: count,
+            l1BlockNumber: l1BlockNumber
         });
 
-        emit L1BatchArrived(expectedRoot, startIndex, count, l1BlockNumber, block.number, block.timestamp);
+        emit L1BatchArrived(
+            attestationId, expectedRoot, startIndex, count, l1BlockNumber, block.number, block.timestamp
+        );
     }
 
     /// @inheritdoc IL2AnchoringManager
@@ -140,8 +160,9 @@ contract L2AnchoringManager is
         bytes32[] memory leaves = new bytes32[](batch.count);
         for (uint256 i = 0; i < batch.count; i++) {
             uint256 index = batch.startIndex + i;
-            L2AnchoringManagerTypes.AnchoringItem storage item = $.items[index];
-            leaves[i] = item.root;
+            Attestation memory request = $.eas.getAttestation($.indexToAttestationId[index]);
+            bytes32 root = abi.decode(request.data, (bytes32));
+            leaves[i] = root;
         }
 
         bytes32 computedRoot = MerkleTree.computeRoot(leaves);
@@ -151,7 +172,13 @@ contract L2AnchoringManager is
         $.batchStartToL1Block[batch.startIndex] = batch.l1BlockNumber;
 
         emit L1BatchFinalized(
-            batch.expectedRoot, batch.startIndex, batch.count, batch.l1BlockNumber, block.number, block.timestamp
+            batch.attestationId,
+            batch.expectedRoot,
+            batch.startIndex,
+            batch.count,
+            batch.l1BlockNumber,
+            block.number,
+            block.timestamp
         );
 
         // Clear the pending batch
@@ -160,30 +187,20 @@ contract L2AnchoringManager is
 
     /// @inheritdoc IL2AnchoringManager
     // forge-lint: disable-next-line(mixed-case-function)
-    function claimNFT(bytes32 root) external {
-        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        uint256 index = $.roots[root];
-        claimNFT(index);
-    }
-
-    /// @inheritdoc IL2AnchoringManager
-    // forge-lint: disable-next-line(mixed-case-function)
-    function claimNFT(uint256 index) public nonReentrant {
+    function claimNFT(bytes32 attestationId) public nonReentrant {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
 
+        uint256 index = $.attestationIdToIndex[attestationId];
         require(index != 0 && index < $.confirmedIndex, "UTS: Invalid or unconfirmed index");
         require(!$.nftClaimed[index], "UTS: NFT already claimed");
 
-        L2AnchoringManagerTypes.AnchoringItem storage item = $.items[index];
-        address submitter = item.submitter;
-
-        require(_msgSender() == submitter, "UTS: Only submitter can claim");
+        Attestation memory request = $.eas.getAttestation(attestationId);
+        bytes32 root = abi.decode(request.data, (bytes32));
 
         $.nftClaimed[index] = true;
 
-        _safeMint(submitter, index, bytes.concat(item.root));
-
-        emit NFTClaimed(submitter, index, item.root, block.timestamp);
+        _safeMint(request.attester, index, bytes.concat(root));
+        emit NFTClaimed(request.attester, index, root, block.timestamp);
     }
 
     /// @inheritdoc IL2AnchoringManager
@@ -193,14 +210,6 @@ contract L2AnchoringManager is
     }
 
     // --- Admin Functions ---
-
-    function setUts(address newUts) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newUts != address(0), "UTS: Invalid UniversalTimestamps address");
-        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        address oldUts = address($.uts);
-        $.uts = IUniversalTimestamps(newUts);
-        emit UtsUpdated(oldUts, newUts);
-    }
 
     function setFeeOracle(address _oracle) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(_oracle) != address(0), "UTS: Invalid Oracle");
