@@ -34,6 +34,8 @@ library L2AnchoringManagerStorage {
         /// @notice Mapping to track the L1 block number for each batch start index
         mapping(uint256 => uint256) batchStartToL1Block;
 
+        // Mapping to reduce external calls
+        mapping(uint256 => bytes32) indexToRoot;
         // Mapping to track attestation id
         mapping(bytes32 => bytes32) rootToAttestationId;
         mapping(uint256 => bytes32) indexToAttestationId;

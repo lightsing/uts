@@ -93,6 +93,7 @@ contract L2AnchoringManager is
         bytes32 attestationId = EASHelper.attest($.eas, root);
 
         uint256 currentIndex = $.queueIndex++;
+        $.indexToRoot[currentIndex] = root;
         $.rootToAttestationId[root] = attestationId;
         $.indexToAttestationId[currentIndex] = attestationId;
         $.attestationIdToIndex[attestationId] = currentIndex;
@@ -160,8 +161,7 @@ contract L2AnchoringManager is
         bytes32[] memory leaves = new bytes32[](batch.count);
         for (uint256 i = 0; i < batch.count; i++) {
             uint256 index = batch.startIndex + i;
-            Attestation memory request = $.eas.getAttestation($.indexToAttestationId[index]);
-            bytes32 root = abi.decode(request.data, (bytes32));
+            bytes32 root = $.indexToRoot[index];
             leaves[i] = root;
         }
 

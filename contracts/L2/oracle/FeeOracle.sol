@@ -32,10 +32,10 @@ contract FeeOracle is IFeeOracle, AccessControlDefaultAdminRules {
     uint256 public crossDomainGasEstimated = 110_000;
 
     /// @notice scalar for L2 execution gas estimation for each additional batch item.
-    uint256 public l2ExecutionScalar = 26_000;
+    uint256 public l2ExecutionScalar = 3500;
 
     /// @notice overhead for L2 execution gas estimation
-    uint256 public l2ExecutionOverhead = 0;
+    uint256 public l2ExecutionOverhead = 35_000;
 
     /// @notice expected batch size for fee calculation
     uint256 public expectedBatchSize = 256;
