@@ -114,8 +114,10 @@ function formatAttestation(a: Attestation): string {
   switch (a.kind) {
     case 'bitcoin':
       return t('Bitcoin @ block {height}', { height: a.height })
-    case 'ethereum-uts':
-      return t('{chain} @ block {height}', { chain: getChainName(a.chain), height: a.height })
+    case 'eas-timestamped':
+      return t('EAS Timestamped on {chain}', { chain: getChainName(a.chain)})
+    case 'eas-attestation':
+      return t('EAS Attestation on {chain}', { chain: getChainName(a.chain)})
     case 'pending':
       return t('Pending → {url}', { url: a.url })
     default:
@@ -135,7 +137,7 @@ function getOpColor(step: Step): string {
       return 'text-neon-purple'
     case 'ATTESTATION':
       if (step.attestation.kind === 'bitcoin') return 'text-pending'
-      if (step.attestation.kind === 'ethereum-uts') return 'text-neon-purple'
+      if (step.attestation.kind.startsWith('eas')) return 'text-neon-purple'
       return 'text-white/50'
     case 'FORK':
       return 'text-neon-orange'
@@ -171,7 +173,7 @@ const currentDepth = props.depth ?? 0
           <span :class="getOpColor(step)">{{ formatOp(step) }}</span>
           <AlertTriangle
             v-if="
-              step.attestation.kind === 'ethereum-uts' &&
+              step.attestation.kind.startsWith('eas') &&
               isTestnetOrUnknown(step.attestation.chain)
             "
             class="h-3 w-3 text-pending"
@@ -201,7 +203,7 @@ const currentDepth = props.depth ?? 0
             </template>
 
             <!-- Ethereum UTS attestation details -->
-            <template v-else-if="step.attestation.kind === 'ethereum-uts'">
+            <template v-else-if="step.attestation.kind.startsWith('eas')">
               <div class="space-y-1 font-mono text-[10px]">
                 <div class="flex items-center justify-between">
                   <span class="text-white/30">{{ t('Type') }}</span>
@@ -212,7 +214,7 @@ const currentDepth = props.depth ?? 0
                       alt="Scroll"
                       class="h-3 w-3"
                     />
-                    {{ t('Ethereum UTS') }}
+                    {{ t('EAS') }}
                   </span>
                 </div>
                 <div class="flex items-center justify-between">
@@ -223,111 +225,6 @@ const currentDepth = props.depth ?? 0
                     }})</span
                   >
                 </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-white/30">{{ t('Block Height') }}</span>
-                  <span class="flex items-center gap-1">
-                    <span class="text-white/70">{{
-                      step.attestation.height
-                    }}</span>
-                    <a
-                      v-if="
-                        getEtherscanBlockUrl(
-                          step.attestation.chain,
-                          step.attestation.height,
-                        )
-                      "
-                      :href="
-                        getEtherscanBlockUrl(
-                          step.attestation.chain,
-                          step.attestation.height,
-                        )!
-                      "
-                      target="_blank"
-                      rel="noopener"
-                      class="text-neon-cyan hover:text-neon-cyan/80"
-                    >
-                      <ExternalLink class="h-2.5 w-2.5" />
-                    </a>
-                  </span>
-                </div>
-                <template v-if="step.attestation.metadata">
-                  <div
-                    v-if="step.attestation.metadata.contract"
-                    class="flex items-center justify-between"
-                  >
-                    <span class="text-white/30">{{ t('Contract') }}</span>
-                    <span class="flex items-center gap-1">
-                      <span class="text-white/50">{{
-                        truncateHex(
-                          hexlify(
-                            step.attestation.metadata.contract as Uint8Array,
-                          ),
-                        )
-                      }}</span>
-                      <a
-                        v-if="
-                          getEtherscanAddressUrl(
-                            step.attestation.chain,
-                            hexlify(
-                              step.attestation.metadata.contract as Uint8Array,
-                            ),
-                          )
-                        "
-                        :href="
-                          getEtherscanAddressUrl(
-                            step.attestation.chain,
-                            hexlify(
-                              step.attestation.metadata.contract as Uint8Array,
-                            ),
-                          )!
-                        "
-                        target="_blank"
-                        rel="noopener"
-                        class="text-neon-cyan hover:text-neon-cyan/80"
-                      >
-                        <ExternalLink class="h-2.5 w-2.5" />
-                      </a>
-                    </span>
-                  </div>
-                  <div
-                    v-if="step.attestation.metadata.txHash"
-                    class="flex items-center justify-between"
-                  >
-                    <span class="text-white/30">{{ t('Tx Hash') }}</span>
-                    <span class="flex items-center gap-1">
-                      <span class="text-white/50">{{
-                        truncateHex(
-                          hexlify(
-                            step.attestation.metadata.txHash as Uint8Array,
-                          ),
-                        )
-                      }}</span>
-                      <a
-                        v-if="
-                          getEtherscanTxUrl(
-                            step.attestation.chain,
-                            hexlify(
-                              step.attestation.metadata.txHash as Uint8Array,
-                            ),
-                          )
-                        "
-                        :href="
-                          getEtherscanTxUrl(
-                            step.attestation.chain,
-                            hexlify(
-                              step.attestation.metadata.txHash as Uint8Array,
-                            ),
-                          )!
-                        "
-                        target="_blank"
-                        rel="noopener"
-                        class="text-neon-cyan hover:text-neon-cyan/80"
-                      >
-                        <ExternalLink class="h-2.5 w-2.5" />
-                      </a>
-                    </span>
-                  </div>
-                </template>
                 <!-- Testnet / unknown network warning -->
                 <div
                   v-if="isTestnetOrUnknown(step.attestation.chain)"

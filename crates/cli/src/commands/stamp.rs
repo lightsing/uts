@@ -6,7 +6,7 @@ use futures::TryFutureExt;
 use std::{collections::HashMap, future::ready, io, path::PathBuf, sync::LazyLock, time::Duration};
 use tokio::{fs, io::AsyncWriteExt};
 use url::Url;
-use uts_bmt::UnorderedMerkleTree;
+use uts_bmt::MerkleTree;
 use uts_core::{
     codec::{
         Decode, Encode, VersionedProof,
@@ -97,7 +97,7 @@ impl Stamp {
             })
             .collect::<Vec<_>>();
 
-        let internal_tire = UnorderedMerkleTree::<D>::new(&nonced_digest);
+        let internal_tire = MerkleTree::<D>::new(&nonced_digest);
         let root = internal_tire.root();
         eprintln!("Internal Merkle root: {}", Hexed(root));
 

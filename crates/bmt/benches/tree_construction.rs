@@ -8,7 +8,7 @@ use digest::{Digest, FixedOutputReset, Output};
 use sha2::Sha256;
 use sha3::Keccak256;
 use std::hint::black_box;
-use uts_bmt::UnorderedMerkleTree;
+use uts_bmt::MerkleTree;
 
 const INPUT_SIZES: &[usize] = &[8, 1024, 65536, 1_048_576];
 
@@ -34,7 +34,7 @@ where
         group.bench_function(BenchmarkId::new(id, size), move |b| {
             // Tree construction is the operation under test.
             b.iter(|| {
-                let tree = UnorderedMerkleTree::<D>::new(black_box(leaves.as_slice()));
+                let tree = MerkleTree::<D>::new(black_box(leaves.as_slice()));
                 black_box(tree);
             });
         });

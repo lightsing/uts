@@ -1,4 +1,5 @@
 use crate::{AppState, time::current_time_sec};
+use alloy_chains::Chain;
 use alloy_primitives::B256;
 use alloy_signer::SignerSync;
 use axum::{
@@ -12,11 +13,11 @@ use bytes::BytesMut;
 use digest::Digest;
 use sha3::Keccak256;
 use std::{cell::RefCell, sync::Arc};
-use uts_bmt::UnorderedMerkleTree;
+use uts_bmt::MerkleTree;
 use uts_core::{
     codec::{
         Encode,
-        v1::{EthereumUTSAttestation, PendingAttestation, Timestamp},
+        v1::{EASTimestamped, PendingAttestation, Timestamp},
     },
     utils::Hexed,
 };
@@ -154,7 +155,7 @@ pub async fn get_timestamp(
         .load_entry(root)
         .expect("DB error")
         .expect("bug: entry not found");
-    let trie: UnorderedMerkleTree<Keccak256> = entry.trie();
+    let trie: MerkleTree<Keccak256> = entry.trie();
 
     let proof = trie
         .get_proof_iter(bytemuck::cast_ref(&*commitment))
@@ -167,11 +168,9 @@ pub async fn get_timestamp(
         builder.merkle_proof(proof);
 
         let timestamp = builder
-            .attest(EthereumUTSAttestation::new(
-                entry.chain_id,
-                entry.height,
-                Default::default(),
-            ))
+            .attest(EASTimestamped {
+                chain: Chain::from_id(entry.chain_id),
+            })
             .unwrap();
 
         // copy data out of bump
