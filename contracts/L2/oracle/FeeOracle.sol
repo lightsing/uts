@@ -26,7 +26,7 @@ contract FeeOracle is IFeeOracle, AccessControlDefaultAdminRules {
     uint256 public l1FeeScalar = 17e14;
 
     /// @notice gas required to attest a batch on L1
-    uint256 public l1GasEstimated = 200_000;
+    uint256 public l1GasEstimated = 350_000;
 
     /// @notice gas required for L1->L2 message to notify L2 manager of new batch submission
     uint256 public crossDomainGasEstimated = 110_000;

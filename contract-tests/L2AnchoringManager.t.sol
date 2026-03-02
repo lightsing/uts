@@ -8,7 +8,7 @@ import {IFeeOracle} from "../contracts/L2/oracle/IFeeOracle.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
 import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConstants.sol";
-import {TestEAS} from "./TestEAS.sol";
+import {TestEASHelper} from "./EAS.t.sol";
 import {IEAS} from "eas-contracts/IEAS.sol";
 
 contract MockFeeOracle is IFeeOracle {
@@ -66,7 +66,7 @@ contract L2AnchoringManagerTest is Test {
     address constant L1_GATEWAY = address(0x123);
 
     function setUp() public {
-        eas = new TestEAS().eas();
+        eas = new TestEASHelper().eas();
         feeOracle = new MockFeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
 
@@ -122,7 +122,7 @@ contract L2AnchoringManagerGasTest is Test {
     address constant L1_GATEWAY = address(0x456);
 
     function setUp() public {
-        eas = new TestEAS().eas();
+        eas = new TestEASHelper().eas();
         feeOracle = new MockFeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
 
