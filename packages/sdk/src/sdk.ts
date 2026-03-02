@@ -17,7 +17,8 @@ import {
   type BitcoinAttestation,
   type DetachedTimestamp,
   type DigestHeader,
-  type EthereumUTSAttestation,
+  type EASAttestation,
+  type EASTimestamped,
   type ExecutionStep,
   type ForkStep,
   type PendingAttestation,
@@ -33,6 +34,11 @@ import Decoder from './codec/decode.ts'
 import { EncodeError, ErrorCode, RemoteError, VerifyError } from './errors.ts'
 import { ripemd160, sha1 } from '@noble/hashes/legacy.js'
 import BitcoinRPC from './rpc/btc.ts'
+import {
+  EAS,
+  NO_EXPIRATION,
+  SchemaEncoder,
+} from '@ethereum-attestation-service/eas-sdk'
 
 export type StampEvent =
   | { phase: 'generating-nonce' }
@@ -83,17 +89,22 @@ export const DEFAULT_CALENDARS = [
   new URL('http://127.0.0.1:3000/'),
 ]
 
-export const UTS_ABI = [
-  'event Attested(bytes32 indexed root, address indexed sender, uint256 timestamp)',
-  'function attest(bytes32 root) external',
-  'function timestamp(bytes32 root) external view returns (uint256)',
-]
+export const DEFAULT_EAS_ADDRESSES: Record<number, string> = {
+  1: '0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587',
+  11155111: '0xC2679fBD37d54388Ce493F1DB75320D236e1815e',
+  543352: '0xC47300428b6AD2c7D03BB76D05A176058b47E6B0',
+  534351: '0xaEF4103A04090071165F78D45D83A0C0782c2B2a',
+}
+
+export const EAS_SCHEMA_ID =
+  '0x5c5b8b295ff43c8e442be11d569e94a4cd5476f5e23df0f71bdd408df6b9649c'
 
 export default class SDK {
   readonly calendars: URL[]
   btcRPC: BitcoinRPC
   ethRPCs: Record<number, AbstractProvider>
   web3Provider: Eip1193Provider | null = null
+  eas: Record<number, EAS>
 
   /**
    * Maximum time to wait for calendar responses in milliseconds.
@@ -122,10 +133,7 @@ export default class SDK {
   private hasher: CHash = keccak_256
 
   private static encoder = new TextEncoder()
-
-  // 0x61cae4201bb8c0117495b22a70f5202410666b349c27302dac280dc054b60f2a
-  static readonly utsLogTopic = id('Attested(bytes32,address,uint256)')
-  static readonly utsInterface = new Interface(UTS_ABI)
+  private static schemaEncoder = new SchemaEncoder('bytes32 contentHash')
 
   constructor(options: SDKOptions = {}) {
     const {
@@ -146,6 +154,7 @@ export default class SDK {
     this.btcRPC = btcRPC
     this.ethRPCs = ethRPCs
     this.web3Provider = web3Provider
+    this.eas = {}
 
     this.timeout = timeout
     this.nonceSize = nonceSize
@@ -185,6 +194,26 @@ export default class SDK {
       return this.ethRPCs[chainId]!
     }
     return null
+  }
+
+  getEAS(chainId: number, easAddress?: string): EAS {
+    if (Object.hasOwn(this.eas, chainId)) {
+      return this.eas[chainId]!
+    }
+    const provider = this.getEthProvider(chainId)
+    if (!provider) {
+      throw new Error(
+        `No RPC provider configured for Ethereum chain ${chainId}, which is required to interact with EAS for that chain`,
+      )
+    }
+    const address = easAddress ?? DEFAULT_EAS_ADDRESSES[chainId]
+    if (!address) {
+      throw new Error(`No EAS address configured for Ethereum chain ${chainId}`)
+    }
+    const eas = new EAS(address)
+    eas.connect(provider)
+    this.eas[chainId] = eas
+    return eas
   }
 
   /**
@@ -616,8 +645,9 @@ export default class SDK {
         }
       case 'bitcoin':
         return this.verifyBitcoinAttestation(input, attestation)
-      case 'ethereum-uts':
-        return this.verifyEthereumUTSAttestation(input, attestation)
+      case 'eas-attestation':
+      case 'eas-timestamped':
+        return this.verifyEAS(input, attestation)
       case 'unknown':
         return {
           attestation,
@@ -672,88 +702,88 @@ export default class SDK {
     }
   }
 
-  async verifyEthereumUTSAttestation(
+  async verifyEAS(
     input: Uint8Array,
-    attestation: EthereumUTSAttestation,
+    attestation: EASAttestation | EASTimestamped,
   ): Promise<AttestationStatus> {
-    // Try web3Provider first (works in browser without CORS issues)
-    let provider: AbstractProvider | null = await this.getWeb3ProviderForChain(
-      attestation.chain,
-    )
+    const eas = this.getEAS(attestation.chain)
 
-    // Fallback to ethRPCs
-    if (!provider) {
-      if (!Object.hasOwn(this.ethRPCs, attestation.chain)) {
-        return {
-          attestation,
-          status: AttestationStatusKind.UNKNOWN,
-          error: new VerifyError(
-            ErrorCode.UNSUPPORTED_ATTESTATION,
-            `No RPC provider configured for Ethereum chain ${attestation.chain}`,
-          ),
-        }
-      }
-      provider = this.ethRPCs[attestation.chain]!
-    }
-
-    try {
-      const logs = await provider.getLogs({
-        fromBlock: attestation.height,
-        toBlock: attestation.height,
-        topics: [
-          SDK.utsLogTopic, // Topic 0: Attested(bytes32,address,uint256)
-          hexlify(input), // Topic 1: digest
-        ],
-      })
-
-      if (logs.length === 0) {
+    if (attestation.kind === 'eas-timestamped') {
+      const time = await eas.getTimestamp(hexlify(input))
+      if (time === 0n) {
         return {
           attestation,
           status: AttestationStatusKind.INVALID,
           error: new VerifyError(
             ErrorCode.ATTESTATION_MISMATCH,
-            `No attestation log found for block ${attestation.height} on chain ${attestation.chain}`,
+            `No EAS timestamp found for the given input on chain ${attestation.chain}`,
           ),
         }
       }
-
-      const log = SDK.utsInterface.parseLog(logs[0])!
-      const root = log.args[0] // root
-      const sender = log.args[1] // sender
-      const timestamp = log.args[2] // timestamp
-
-      // sanity check to ensure the root matches
-      const rootBytes = getBytes(root)
-      if (
-        rootBytes.length !== input.length ||
-        !rootBytes.every((byte: number, i: number) => byte === input[i])
-      ) {
-        return {
-          attestation,
-          status: AttestationStatusKind.INVALID,
-          error: new VerifyError(
-            ErrorCode.ATTESTATION_MISMATCH,
-            `Attestation log found but root does not match expected digest for block ${attestation.height} on chain ${attestation.chain}`,
-          ),
-        }
-      }
-
       return {
         attestation,
         status: AttestationStatusKind.VALID,
-        additionalInfo: { root, sender, timestamp },
+        additionalInfo: { time },
       }
-    } catch (error) {
-      console.error(`Error verifying Ethereum attestation: ${error}`)
+    }
+
+    const onChainAttestation = await eas.getAttestation(
+      hexlify(attestation.uid),
+    )
+
+    if (onChainAttestation.schema !== EAS_SCHEMA_ID) {
       return {
         attestation,
-        status: AttestationStatusKind.UNKNOWN,
+        status: AttestationStatusKind.INVALID,
         error: new VerifyError(
-          ErrorCode.REMOTE_ERROR,
-          `Failed to verify Ethereum attestation for block ${attestation.height} on chain ${attestation.chain}`,
-          { context: { source: error } },
+          ErrorCode.ATTESTATION_MISMATCH,
+          `EAS attestation schema mismatch for UID ${hexlify(attestation.uid)} on chain ${attestation.chain}`,
         ),
       }
+    }
+
+    if (onChainAttestation.expirationTime !== NO_EXPIRATION) {
+      return {
+        attestation,
+        status: AttestationStatusKind.INVALID,
+        error: new VerifyError(
+          ErrorCode.ATTESTATION_MISMATCH,
+          `EAS attestation for UID ${hexlify(attestation.uid)} on chain ${attestation.chain} has expirationTime`,
+        ),
+      }
+    }
+
+    if (onChainAttestation.revocable) {
+      return {
+        attestation,
+        status: AttestationStatusKind.INVALID,
+        error: new VerifyError(
+          ErrorCode.ATTESTATION_MISMATCH,
+          `EAS attestation for UID ${hexlify(attestation.uid)} on chain ${attestation.chain} is revocable`,
+        ),
+      }
+    }
+
+    const decoded = SDK.schemaEncoder.decodeData(onChainAttestation.data)
+    console.debug(
+      `Decoded EAS attestation data for UID ${hexlify(attestation.uid)}:`,
+      decoded,
+    )
+    if (decoded.length !== 1 || decoded[0].type !== 'bytes32') {
+      return {
+        attestation,
+        status: AttestationStatusKind.INVALID,
+        error: new VerifyError(
+          ErrorCode.ATTESTATION_MISMATCH,
+          `EAS attestation for UID ${hexlify(attestation.uid)} on chain ${attestation.chain} has invalid data format`,
+        ),
+      }
+    }
+
+    return {
+      attestation,
+      status: AttestationStatusKind.VALID,
+      additionalInfo: { ...onChainAttestation },
     }
   }
 

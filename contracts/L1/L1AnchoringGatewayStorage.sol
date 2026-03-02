@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity =0.8.28;
 
 import {IL1ScrollMessenger} from "scroll-contracts/L1/IL1ScrollMessenger.sol";
 import {IL2AnchoringManager} from "../L2/manager/IL2AnchoringManager.sol";
-import {IUniversalTimestamps} from "../core/IUniversalTimestamps.sol";
+import {IEAS} from "eas-contracts/IEAS.sol";
 
 /**
  * @dev Library containing the ERC-7201 namespace constant.
@@ -17,8 +17,8 @@ library L1AnchoringGatewayStorage {
 
     /// @custom:storage-location erc7201:uts.storage.L1AnchoringGateway
     struct Storage {
-        /// @notice Reference to the Universal Timestamps contract for recording anchoring events
-        IUniversalTimestamps uts;
+        /// @notice Reference to the EAS contract for attestation management
+        IEAS eas;
         /// @notice Reference to the L1 Scroll Messenger contract
         IL1ScrollMessenger l1Messenger;
         /// @notice Reference to the L2 Anchoring Manager contract

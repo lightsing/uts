@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity =0.8.28;
 
 import {IFeeOracle} from "../oracle/IFeeOracle.sol";
 import {L2AnchoringManagerTypes} from "./L2AnchoringManagerTypes.sol";
-import {IUniversalTimestamps} from "../../core/IUniversalTimestamps.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
+import {IEAS} from "eas-contracts/IEAS.sol";
 
 /**
  * @dev Library containing the ERC-7201 namespace constant.
@@ -18,7 +18,7 @@ library L2AnchoringManagerStorage {
 
     /// @custom:storage-location erc7201:uts.storage.L2AnchoringManager
     struct Storage {
-        IUniversalTimestamps uts;
+        IEAS eas;
         IFeeOracle feeOracle;
         /// @notice Executor for L1 -> L2 messages
         IL2ScrollMessenger l2Messenger;
@@ -34,8 +34,12 @@ library L2AnchoringManagerStorage {
         /// @notice Mapping to track the L1 block number for each batch start index
         mapping(uint256 => uint256) batchStartToL1Block;
 
-        mapping(uint256 => L2AnchoringManagerTypes.AnchoringItem) items;
-        mapping(bytes32 => uint256) roots; // Mapping to track submitted roots for quick lookup
+        // Mapping to reduce external calls
+        mapping(uint256 => bytes32) indexToRoot;
+        // Mapping to track attestation id
+        mapping(bytes32 => bytes32) rootToAttestationId;
+        mapping(uint256 => bytes32) indexToAttestationId;
+        mapping(bytes32 => uint256) attestationIdToIndex;
 
         string baseTokenURI;
         mapping(uint256 => bool) nftClaimed;

@@ -1,47 +1,56 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.29;
+pragma solidity =0.8.28;
 
 interface IL2AnchoringManager {
     /// @notice Emitted when a user pays to have their root anchored to L1.
     event L1AnchoringQueued(
-        bytes32 indexed root, uint256 queueIndex, uint256 fee, uint256 blockNumber, uint256 timestamp
+        bytes32 indexed attestationId,
+        bytes32 indexed root,
+        uint256 queueIndex,
+        uint256 fee,
+        uint256 blockNumber,
+        uint256 timestamp
     );
 
     /**
      * Emitted when L1 notifies that a batch of roots has been anchored on L1.
-     * @param root The Merkle root of the batch being confirmed.
+     * @param claimedRoot The Merkle root claimed to be anchored on L1.
      * @param startIndex The starting index of the batch in the queue.
      * @param count The number of items in the batch.
-     * @param l1BlockNumber The L1 block number at which the batch was anchored.
+     * @param l1BlockAttested The L1 block number at which the batch was anchored. It would be 0 if the root was timestamped before the batch submission.
+     * @param l1TimestampAttested The timestamp at which the batch was anchored on L1.
      * @param l2BlockNumber The L2 block number at which the notification is received.
-     * @param timestamp The timestamp when the notification is received.
+     * @param l2TimestampReceived The timestamp when the notification is received.
      */
     event L1BatchArrived(
-        bytes32 indexed root,
+        bytes32 indexed claimedRoot,
         uint256 indexed startIndex,
         uint256 count,
-        uint256 l1BlockNumber,
+        uint256 l1BlockAttested,
+        uint256 l1TimestampAttested,
         uint256 l2BlockNumber,
-        uint256 timestamp
+        uint256 l2TimestampReceived
     );
 
     /**
      * Emitted when a batch of roots is finalized after L1 confirmation.
-     * @param root The Merkle root of the batch being confirmed.
+     * @param merkleRoot The Merkle root of the batch.
      * @param startIndex The starting index of the batch in the queue.
      * @param count The number of items in the batch.
-     * @param l1BlockNumber The L1 block number at which the batch was anchored.
+     * @param l1BlockAttested The L1 block number at which the batch was anchored. It would be 0 if the root was timestamped before the batch submission.
+     * @param l1TimestampAttested The timestamp at which the batch was anchored on L1.
      * @param l2BlockNumber The L2 block number at which the batch is finalized.
-     * @param timestamp The timestamp when the batch is finalized.
+     * @param l2TimestampFinalized The timestamp when the batch is finalized.
      */
     event L1BatchFinalized(
-        bytes32 indexed root,
+        bytes32 indexed merkleRoot,
         uint256 indexed startIndex,
         uint256 count,
-        uint256 l1BlockNumber,
+        uint256 l1BlockAttested,
+        uint256 l1TimestampAttested,
         uint256 l2BlockNumber,
-        uint256 timestamp
+        uint256 l2TimestampFinalized
     );
 
     /// @notice Emitted when a user claims their NFT after batch confirmation.
@@ -59,6 +68,9 @@ interface IL2AnchoringManager {
     event L2MessengerUpdated(address indexed oldMessenger, address indexed newMessenger);
     /// @notice Emitted when the base URI for token metadata is updated.
     event BaseURIUpdated(string oldBaseURI, string newBaseURI);
+
+    /// @notice see also submitForL1Anchoring(bytes32 root, address refundAddress).
+    function submitForL1Anchoring(bytes32 root) external payable;
 
     /**
      * @notice Submit a root for L2 timestamping + L1 anchoring.
@@ -83,15 +95,9 @@ interface IL2AnchoringManager {
      */
     function isConfirmed(bytes32 root) external view returns (bool);
 
-    /// @notice Claim the NFT for a confirmed root by providing the root directly. This is a convenience function
-    /// that looks up the index from the root and calls claimNFT(index).
+    /// @notice Claim the NFT for a confirmed attestation.
     // forge-lint: disable-next-line(mixed-case-function)
-    function claimNFT(bytes32 root) external;
-
-    /// @notice Claim the NFT for a confirmed root by providing the index of the root in the queue. This can be
-    /// used if the user already knows the index or wants to save gas by avoiding the root lookup.
-    // forge-lint: disable-next-line(mixed-case-function)
-    function claimNFT(uint256 index) external;
+    function claimNFT(bytes32 attestationId) external;
 
     /// @notice Returns the current base URI for token metadata
     function getBaseURI() external view returns (string memory);
@@ -105,9 +111,16 @@ interface IL2AnchoringManager {
      * @param expectedRoot The expected Merkle root of the batch being confirmed.
      * @param startIndex The starting index of the batch in the queue.
      * @param count The number of items in the batch.
-     * @param l1BlockNumber The L1 block number at which the batch was anchored.
+     * @param l1Timestamp The timestamp at which the batch was anchored on L1.
+     * @param l1BlockNumber The L1 block number at which the batch was anchored. It would be 0 if the root was timestamped before the batch submission.
      */
-    function notifyAnchored(bytes32 expectedRoot, uint256 startIndex, uint256 count, uint256 l1BlockNumber) external;
+    function notifyAnchored(
+        bytes32 expectedRoot,
+        uint256 startIndex,
+        uint256 count,
+        uint256 l1Timestamp,
+        uint256 l1BlockNumber
+    ) external;
 
     // --- Admin Functions ---
 

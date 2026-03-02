@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.29;
+pragma solidity =0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -9,11 +9,11 @@ import {L1AnchoringGatewayStorage} from "./L1AnchoringGatewayStorage.sol";
 import {IL1AnchoringGateway} from "./IL1AnchoringGateway.sol";
 import {IL1ScrollMessenger} from "scroll-contracts/L1/IL1ScrollMessenger.sol";
 import {IL2AnchoringManager} from "../L2/manager/IL2AnchoringManager.sol";
-import {IUniversalTimestamps} from "../core/IUniversalTimestamps.sol";
 import {
     AccessControlDefaultAdminRulesUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
-import {UniversalTimestampsConstants} from "../core/UniversalTimestampsConstants.sol";
+import {EASHelper} from "../core/EASHelper.sol";
+import {IEAS} from "eas-contracts/IEAS.sol";
 
 contract L1AnchoringGateway is
     Initializable,
@@ -24,7 +24,6 @@ contract L1AnchoringGateway is
 {
     bytes32 public constant SUBMITTER_ROLE = keccak256("SUBMITTER_ROLE");
 
-    /// finalize a 512 entry batch requires 12.9M Gas, 1024 entries requires 25.8M Gas, which exceeds scroll's current block gas limit.
     uint256 public constant MAX_BATCH_SIZE = 512;
 
     /// @notice Safe bounds for gas limit of the L2 transaction to notify the L2 manager of a new batch submission.
@@ -41,20 +40,22 @@ contract L1AnchoringGateway is
     function initialize() public initializer {
         __AccessControlDefaultAdminRules_init(0, msg.sender);
         _setRoleAdmin(SUBMITTER_ROLE, DEFAULT_ADMIN_ROLE);
-
-        L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
-        $.uts = IUniversalTimestamps(UniversalTimestampsConstants.UTS);
     }
 
     /// @notice For deterministic deployment, we use a separate lateInitialize function to transfer ownership,
     /// and setup any necessary parameters that are not provided at the time of deployment.
-    function lateInitialize(address newAdmin, address l1Messenger, address l2AnchoringManager)
+    function lateInitialize(address newAdmin, address eas, address l1Messenger, address l2AnchoringManager)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         require(newAdmin != address(0), "UTS: Invalid admin address");
+
+        require(eas != address(0), "UTS: Invalid EAS address");
         require(l1Messenger != address(0), "UTS: Invalid L1 Scroll Messenger address");
         require(l2AnchoringManager != address(0), "UTS: Invalid L2 Anchoring Manager address");
+
+        L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
+        $.eas = IEAS(eas);
 
         setL1ScrollMessenger(l1Messenger);
         setL2AnchoringManager(l2AnchoringManager);
@@ -83,16 +84,15 @@ contract L1AnchoringGateway is
         require(count > 0 && count <= MAX_BATCH_SIZE, "UTS: Invalid batch size");
         require(gasLimit >= MIN_GAS_LIMIT && gasLimit <= MAX_GAS_LIMIT, "UTS: Invalid gas limit");
 
-        uint256 attestedBlockNumber;
-        try $.uts.attest(merkleRoot) {
-            attestedBlockNumber = block.number;
-        } catch {
-            (attestedBlockNumber,) = $.uts.blockNumberOf(merkleRoot);
-            require(attestedBlockNumber != 0, "UTS: Merkle root not attested on L1");
+        uint256 blockNumber = 0;
+        uint256 timestamp = $.eas.getTimestamp(merkleRoot);
+        if (timestamp == 0) {
+            timestamp = $.eas.timestamp(merkleRoot);
+            blockNumber = block.number;
         }
 
         bytes memory message =
-            abi.encodeCall(IL2AnchoringManager.notifyAnchored, (merkleRoot, startIndex, count, attestedBlockNumber));
+            abi.encodeCall(IL2AnchoringManager.notifyAnchored, (merkleRoot, startIndex, count, timestamp, blockNumber));
 
         $.l1Messenger.sendMessage{value: msg.value}(
             address($.l2AnchoringManager),
@@ -106,13 +106,6 @@ contract L1AnchoringGateway is
     }
 
     // -- Admin functions --
-    function setUts(address newUts) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newUts != address(0), "UTS: Invalid UniversalTimestamps address");
-        L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
-        address oldUts = address($.uts);
-        $.uts = IUniversalTimestamps(newUts);
-        emit UTSUpdated(oldUts, newUts);
-    }
 
     function setL1ScrollMessenger(address newMessenger) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newMessenger != address(0), "UTS: Invalid L1 Scroll Messenger address");

@@ -16,6 +16,7 @@ name = "uts"
 path = "src/main.rs"
 
 [dependencies]
+alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 bytemuck = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
@@ -34,7 +35,8 @@ tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 url = { workspace = true }
 uts-bmt = { workspace = true }
-uts-core = { workspace = true, features = ["std", "ethereum-uts-verifier", "io-utils"] }
+uts-contracts = { workspace = true }
+uts-core = { workspace = true, features = ["std", "eas-verifier", "io-utils"] }
 
 [features]
 default = ["reqwest-default-tls"]

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity =0.8.28;
 
 interface IFeeOracle {
     /// @notice Emitted when the L1 fee parameters are updated.

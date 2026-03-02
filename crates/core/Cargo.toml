@@ -11,9 +11,9 @@ version.workspace = true
 
 [dependencies]
 alloy-chains = { workspace = true }
+alloy-contract = { workspace = true, optional = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true, optional = true }
-alloy-rpc-types-eth = { workspace = true, optional = true }
 alloy-sol-types = { workspace = true, optional = true }
 auto_impl.workspace = true
 bytes = { workspace = true, optional = true }
@@ -36,7 +36,7 @@ uts-contracts = { workspace = true, optional = true }
 [features]
 bytes = ["dep:bytes"]
 default = ["std"]
-ethereum-uts-verifier = ["verifier", "dep:alloy-provider", "dep:alloy-rpc-types-eth", "dep:alloy-sol-types", "dep:uts-contracts"]
+eas-verifier = ["verifier", "dep:alloy-provider", "dep:alloy-contract", "dep:alloy-sol-types", "dep:uts-contracts"]
 io-utils = ["dep:tokio", "tokio/fs"]
 serde = ["dep:serde", "dep:serde_with", "serde/derive", "serde_with/hex"]
 std = []

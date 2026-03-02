@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.29;
+pragma solidity =0.8.28;
 
 interface IL1AnchoringGateway {
     /// @notice Emitted when a new batch of Merkle roots is submitted to L1 for anchoring.
@@ -26,7 +26,6 @@ interface IL1AnchoringGateway {
     function submitBatch(bytes32 merkleRoot, uint256 startIndex, uint256 count, uint256 gasLimit) external payable;
 
     // -- Admin functions --
-    function setUts(address newUts) external;
     function setL1ScrollMessenger(address newMessenger) external;
     function setL2AnchoringManager(address newManager) external;
 }
