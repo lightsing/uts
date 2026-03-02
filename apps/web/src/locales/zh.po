@@ -311,8 +311,8 @@ msgstr "类型"
 msgid "Bitcoin"
 msgstr "比特币"
 
-msgid "Ethereum UTS"
-msgstr "以太坊 UTS"
+msgid "EAS"
+msgstr "以太坊认证服务"
 
 msgid "Pending"
 msgstr "待处理"
@@ -338,8 +338,11 @@ msgstr "未知证明"
 msgid "Bitcoin block #{height}"
 msgstr "比特币区块 #{height}"
 
-msgid "{chain} block #{height}"
-msgstr "{chain} 区块 #{height}"
+msgid "EAS Timestamped on {chain}"
+msgstr "以太坊认证服务在 {chain} 上的时间戳"
+
+msgid "EAS Attestation on {chain}"
+msgstr "以太坊认证服务在 {chain} 上的证明"
 
 msgid "Pending → {url}"
 msgstr "待处理 → {url}"

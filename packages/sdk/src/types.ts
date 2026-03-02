@@ -41,11 +41,14 @@ export type AttestationKind = 'pending' | 'bitcoin' | 'ethereum-uts' | 'unknown'
 
 export type PendingAttestation = { kind: 'pending'; url: URL }
 export type BitcoinAttestation = { kind: 'bitcoin'; height: number }
-export type EthereumUTSAttestation = {
-  kind: 'ethereum-uts'
+export type EASAttestation = {
+  kind: 'eas-attestation'
   chain: number
-  height: number
-  metadata?: EthereumUTSAttestationExtraMetadata
+  uid: BytesLike
+}
+export type EASTimestamped = {
+  kind: 'eas-timestamped'
+  chain: number
 }
 export type UnknownAttestation = {
   kind: 'unknown'
@@ -56,7 +59,8 @@ export type UnknownAttestation = {
 export type Attestation =
   | PendingAttestation
   | BitcoinAttestation
-  | EthereumUTSAttestation
+  | EASAttestation
+  | EASTimestamped
   | UnknownAttestation
 
 export type AttestationStep = { op: 'ATTESTATION'; attestation: Attestation }
