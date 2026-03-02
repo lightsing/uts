@@ -1,91 +1,35 @@
 //! Solidity contracts for UTS
 
-/// UniversalTimestamps contract
-pub mod uts {
+/// EAS contract
+pub mod eas {
     use alloy_primitives::{Address, address};
+    use alloy_sol_types::sol;
 
-    #[doc(hidden)]
-    pub mod binding {
-        use alloy_sol_types::sol;
-
-        sol!(
-            #[sol(rpc, all_derives)]
-            IUniversalTimestamps,
-            "abi/IUniversalTimestamps.json"
-        );
-        sol!(
-            #[sol(rpc)]
-            UniversalTimestamps,
-            "abi/UniversalTimestamps.json"
-        );
-    }
-
-    pub use binding::IUniversalTimestamps::{
-        Attested, IUniversalTimestampsInstance as UniversalTimestamps,
-    };
-
-    pub use binding::UniversalTimestamps::{BYTECODE, DEPLOYED_BYTECODE, deploy, deploy_builder};
-
-    /// Default address for the UniversalTimestamps contract.
-    pub const DEFAULT_ADDRESS: Address = address!("0xceB7a9E77bd00D0391349B9bC989167cAB5e35e7");
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        use crate::erc1967::ERC1967ProxyInstance;
-        use alloy::{
-            network::EthereumWallet,
-            primitives::{B256, Bytes, U256, b256},
-            providers::ProviderBuilder,
-            signers::local::MnemonicBuilder,
-        };
-        use futures::StreamExt;
-        use std::env;
-
-        const ROOT: B256 =
-            b256!("5cd5c6763b9f2b3fb1cd66a15fe92b7ac913eec295d9927886e175f144ce3308");
-
-        #[tokio::test]
-        async fn test() -> eyre::Result<()> {
-            let provider = ProviderBuilder::new().connect_anvil_with_wallet();
-            let imp = deploy(&provider).await?;
-            let proxy =
-                ERC1967ProxyInstance::deploy(&provider, *imp.address(), Bytes::new()).await?;
-            let uts = UniversalTimestamps::new(*proxy.address(), &provider);
-
-            let attested_log = uts.Attested_filter().watch().await?;
-
-            let _ = uts.attest(ROOT).send().await?.watch().await?;
-
-            let timestamp = uts.timestamp(ROOT).call().await?;
-            assert_ne!(timestamp, U256::ZERO);
-
-            let (attested, _log) = attested_log.into_stream().next().await.unwrap()?;
-            assert_eq!(attested.root, ROOT);
-
-            Ok(())
+    sol! {
+        /// @notice A struct representing the arguments of the attestation request.
+        struct AttestationRequestData {
+            address recipient; // The recipient of the attestation.
+            uint64 expirationTime; // The time when the attestation expires (Unix timestamp).
+            bool revocable; // Whether the attestation is revocable.
+            bytes32 refUID; // The UID of the related attestation.
+            bytes data; // Custom attestation data.
+            uint256 value; // An explicit ETH amount to send to the resolver. This is important to prevent accidental user errors.
         }
 
-        #[tokio::test]
-        #[ignore]
-        async fn deploy_to_sepolia() -> eyre::Result<()> {
-            let signer = MnemonicBuilder::from_phrase(env::var("MNEMONIC")?.as_str())
-                .index(0u32)?
-                .build()?;
+        /// @notice A struct representing the full arguments of the attestation request.
+        struct AttestationRequest {
+            bytes32 schema; // The unique identifier of the schema.
+            AttestationRequestData data; // The arguments of the attestation request.
+        }
 
-            let provider = ProviderBuilder::new()
-                .wallet(EthereumWallet::new(signer))
-                .connect("https://0xrpc.io/sep")
-                .await?;
+        interface IEAS {
+            /// @notice Emitted when an attestation has been made.
+            /// @param recipient The recipient of the attestation.
+            /// @param attester The attesting account.
+            /// @param uid The UID of the new attestation.
+            /// @param schemaUID The UID of the schema.
+            event Attested(address indexed recipient, address indexed attester, bytes32 uid, bytes32 indexed schemaUID);
 
-            let imp = deploy(&provider).await?;
-            println!("Implementation deployed at: {:?}", imp.address());
-
-            let proxy =
-                ERC1967ProxyInstance::deploy(&provider, *imp.address(), Bytes::new()).await?;
-            println!("Proxy deployed at: {:?}", proxy.address());
-
-            Ok(())
         }
     }
 }

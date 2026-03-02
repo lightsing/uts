@@ -84,11 +84,15 @@ contract L1AnchoringGateway is
         require(count > 0 && count <= MAX_BATCH_SIZE, "UTS: Invalid batch size");
         require(gasLimit >= MIN_GAS_LIMIT && gasLimit <= MAX_GAS_LIMIT, "UTS: Invalid gas limit");
 
-        bytes32 attestationId = EASHelper.attest($.eas, merkleRoot);
+        uint256 blockNumber = 0;
+        uint256 timestamp = $.eas.getTimestamp(merkleRoot);
+        if (timestamp == 0) {
+            timestamp = $.eas.timestamp(merkleRoot);
+            blockNumber = block.number;
+        }
 
-        bytes memory message = abi.encodeCall(
-            IL2AnchoringManager.notifyAnchored, (attestationId, merkleRoot, startIndex, count, block.number)
-        );
+        bytes memory message =
+            abi.encodeCall(IL2AnchoringManager.notifyAnchored, (merkleRoot, startIndex, count, timestamp, blockNumber));
 
         $.l1Messenger.sendMessage{value: msg.value}(
             address($.l2AnchoringManager),

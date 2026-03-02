@@ -15,42 +15,42 @@ interface IL2AnchoringManager {
 
     /**
      * Emitted when L1 notifies that a batch of roots has been anchored on L1.
-     * @param attestationId The attestation ID of the batch being confirmed.
-     * @param root The Merkle root of the batch being confirmed.
+     * @param claimedRoot The Merkle root claimed to be anchored on L1.
      * @param startIndex The starting index of the batch in the queue.
      * @param count The number of items in the batch.
-     * @param l1BlockNumber The L1 block number at which the batch was anchored.
+     * @param l1BlockAttested The L1 block number at which the batch was anchored. It would be 0 if the root was timestamped before the batch submission.
+     * @param l1TimestampAttested The timestamp at which the batch was anchored on L1.
      * @param l2BlockNumber The L2 block number at which the notification is received.
-     * @param timestamp The timestamp when the notification is received.
+     * @param l2TimestampReceived The timestamp when the notification is received.
      */
     event L1BatchArrived(
-        bytes32 indexed attestationId,
-        bytes32 indexed root,
+        bytes32 indexed claimedRoot,
         uint256 indexed startIndex,
         uint256 count,
-        uint256 l1BlockNumber,
+        uint256 l1BlockAttested,
+        uint256 l1TimestampAttested,
         uint256 l2BlockNumber,
-        uint256 timestamp
+        uint256 l2TimestampReceived
     );
 
     /**
      * Emitted when a batch of roots is finalized after L1 confirmation.
-     * @param attestationId The attestation ID of the batch being confirmed.
-     * @param root The Merkle root of the batch being confirmed.
+     * @param merkleRoot The Merkle root of the batch.
      * @param startIndex The starting index of the batch in the queue.
      * @param count The number of items in the batch.
-     * @param l1BlockNumber The L1 block number at which the batch was anchored.
+     * @param l1BlockAttested The L1 block number at which the batch was anchored. It would be 0 if the root was timestamped before the batch submission.
+     * @param l1TimestampAttested The timestamp at which the batch was anchored on L1.
      * @param l2BlockNumber The L2 block number at which the batch is finalized.
-     * @param timestamp The timestamp when the batch is finalized.
+     * @param l2TimestampFinalized The timestamp when the batch is finalized.
      */
     event L1BatchFinalized(
-        bytes32 indexed attestationId,
-        bytes32 indexed root,
+        bytes32 indexed merkleRoot,
         uint256 indexed startIndex,
         uint256 count,
-        uint256 l1BlockNumber,
+        uint256 l1BlockAttested,
+        uint256 l1TimestampAttested,
         uint256 l2BlockNumber,
-        uint256 timestamp
+        uint256 l2TimestampFinalized
     );
 
     /// @notice Emitted when a user claims their NFT after batch confirmation.
@@ -108,17 +108,17 @@ interface IL2AnchoringManager {
      * two steps to save cost. The batch details will be stored when notifyAnchored is called, and the actual
      * confirmation will be done in finalizeBatch which can be called by anyone after the notification.
      *
-     * @param attestationId The attestation ID of the batch being confirmed. This is used to link the batch to the corresponding attestation on EAS.
      * @param expectedRoot The expected Merkle root of the batch being confirmed.
      * @param startIndex The starting index of the batch in the queue.
      * @param count The number of items in the batch.
-     * @param l1BlockNumber The L1 block number at which the batch was anchored.
+     * @param l1Timestamp The timestamp at which the batch was anchored on L1.
+     * @param l1BlockNumber The L1 block number at which the batch was anchored. It would be 0 if the root was timestamped before the batch submission.
      */
     function notifyAnchored(
-        bytes32 attestationId,
         bytes32 expectedRoot,
         uint256 startIndex,
         uint256 count,
+        uint256 l1Timestamp,
         uint256 l1BlockNumber
     ) external;
 

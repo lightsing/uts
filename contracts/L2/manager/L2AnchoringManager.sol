@@ -119,10 +119,10 @@ contract L2AnchoringManager is
 
     /// @inheritdoc IL2AnchoringManager
     function notifyAnchored(
-        bytes32 attestationId,
-        bytes32 expectedRoot,
+        bytes32 claimedRoot,
         uint256 startIndex,
         uint256 count,
+        uint256 l1Timestamp,
         uint256 l1BlockNumber
     ) external {
         require(count > 0, "UTS: Count must be greater than zero");
@@ -139,16 +139,14 @@ contract L2AnchoringManager is
 
         // Store the batch details for later finalization
         $.pendingBatch = L2AnchoringManagerTypes.L1Batch({
-            attestationId: attestationId,
-            expectedRoot: expectedRoot,
+            claimedRoot: claimedRoot,
             startIndex: startIndex,
             count: count,
+            l1Timestamp: l1Timestamp,
             l1BlockNumber: l1BlockNumber
         });
 
-        emit L1BatchArrived(
-            attestationId, expectedRoot, startIndex, count, l1BlockNumber, block.number, block.timestamp
-        );
+        emit L1BatchArrived(claimedRoot, startIndex, count, l1Timestamp, l1BlockNumber, block.number, block.timestamp);
     }
 
     /// @inheritdoc IL2AnchoringManager
@@ -166,16 +164,15 @@ contract L2AnchoringManager is
         }
 
         bytes32 computedRoot = MerkleTree.computeRoot(leaves);
-        require(computedRoot == batch.expectedRoot, "UTS: Invalid Merkle Root");
+        require(computedRoot == batch.claimedRoot, "UTS: Invalid Merkle Root");
 
         $.confirmedIndex = batch.startIndex + batch.count;
-        $.batchStartToL1Block[batch.startIndex] = batch.l1BlockNumber;
 
         emit L1BatchFinalized(
-            batch.attestationId,
-            batch.expectedRoot,
+            batch.claimedRoot,
             batch.startIndex,
             batch.count,
+            batch.l1Timestamp,
             batch.l1BlockNumber,
             block.number,
             block.timestamp

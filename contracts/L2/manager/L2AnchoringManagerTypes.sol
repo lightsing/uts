@@ -11,10 +11,10 @@ library L2AnchoringManagerTypes {
 
     /// @notice Struct to hold L1 notification details for batch confirmation
     struct L1Batch {
-        bytes32 attestationId;
-        bytes32 expectedRoot;
+        bytes32 claimedRoot;
         uint256 startIndex;
         uint256 count;
+        uint256 l1Timestamp;
         uint256 l1BlockNumber;
     }
 }
