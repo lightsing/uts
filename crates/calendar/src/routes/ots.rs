@@ -1,4 +1,5 @@
 use crate::{AppState, time::current_time_sec};
+use alloy_chains::Chain;
 use alloy_primitives::B256;
 use alloy_signer::SignerSync;
 use axum::{
@@ -16,7 +17,7 @@ use uts_bmt::MerkleTree;
 use uts_core::{
     codec::{
         Encode,
-        v1::{EthereumUTSAttestation, PendingAttestation, Timestamp},
+        v1::{EASTimestamped, PendingAttestation, Timestamp},
     },
     utils::Hexed,
 };
@@ -167,11 +168,9 @@ pub async fn get_timestamp(
         builder.merkle_proof(proof);
 
         let timestamp = builder
-            .attest(EthereumUTSAttestation::new(
-                entry.chain_id,
-                entry.height,
-                Default::default(),
-            ))
+            .attest(EASTimestamped {
+                chain: Chain::from_id(entry.chain_id),
+            })
             .unwrap();
 
         // copy data out of bump

@@ -122,7 +122,7 @@ function formatTimestamp(ts: bigint | number): string {
         <template v-if="attestation.attestation.kind === 'bitcoin'">
           {{ t('Bitcoin block #{height}', { height: attestation.attestation.height }) }}
         </template>
-        <template v-else-if="attestation.attestation.kind === 'ethereum-uts'">
+        <template v-else-if="attestation.attestation.kind.startsWith('eas')">
           <span class="inline-flex items-center gap-1">
             <img
               v-if="SCROLL_CHAIN_IDS.has(attestation.attestation.chain)"
@@ -140,7 +140,7 @@ function formatTimestamp(ts: bigint | number): string {
       </span>
       <AlertTriangle
         v-if="
-          attestation.attestation.kind === 'ethereum-uts' &&
+          attestation.attestation.kind.startsWith('eas') &&
           isTestnetOrUnknown(attestation.attestation.chain)
         "
         class="h-3.5 w-3.5 shrink-0 text-pending"
@@ -185,7 +185,7 @@ function formatTimestamp(ts: bigint | number): string {
         </template>
 
         <!-- Ethereum UTS attestation details -->
-        <template v-else-if="attestation.attestation.kind === 'ethereum-uts'">
+        <template v-else-if="attestation.attestation.kind.startsWith('eas')">
           <div class="space-y-1.5 font-mono text-[11px]">
             <div class="flex items-center justify-between">
               <span class="text-white/30">{{ t('Type') }}</span>
@@ -196,7 +196,7 @@ function formatTimestamp(ts: bigint | number): string {
                   alt="Scroll"
                   class="h-3.5 w-3.5"
                 />
-                {{ t('Ethereum UTS') }}
+                {{ t('EAS') }}
               </span>
             </div>
             <div class="flex items-center justify-between">
@@ -207,75 +207,18 @@ function formatTimestamp(ts: bigint | number): string {
                 }})</span
               >
             </div>
-            <div class="flex items-center justify-between">
-              <span class="text-white/30">{{ t('Block Height') }}</span>
-              <span class="flex items-center gap-1">
-                <span class="text-white/70">{{
-                  attestation.attestation.height
-                }}</span>
-                <a
-                  v-if="
-                    getEtherscanBlockUrl(
-                      attestation.attestation.chain,
-                      attestation.attestation.height,
-                    )
-                  "
-                  :href="
-                    getEtherscanBlockUrl(
-                      attestation.attestation.chain,
-                      attestation.attestation.height,
-                    )!
-                  "
-                  target="_blank"
-                  rel="noopener"
-                  class="text-neon-cyan hover:text-neon-cyan/80"
-                >
-                  <ExternalLink class="h-3 w-3" />
-                </a>
-              </span>
-            </div>
             <template
               v-if="
                 attestation.status === 'VALID' && attestation.additionalInfo
               "
             >
               <div
-                v-if="attestation.additionalInfo.sender"
-                class="flex items-center justify-between"
-              >
-                <span class="text-white/30">{{ t('Sender') }}</span>
-                <span class="flex items-center gap-1">
-                  <span class="text-white/50">{{
-                    truncateHex(attestation.additionalInfo.sender)
-                  }}</span>
-                  <a
-                    v-if="
-                      getEtherscanAddressUrl(
-                        attestation.attestation.chain,
-                        attestation.additionalInfo.sender,
-                      )
-                    "
-                    :href="
-                      getEtherscanAddressUrl(
-                        attestation.attestation.chain,
-                        attestation.additionalInfo.sender,
-                      )!
-                    "
-                    target="_blank"
-                    rel="noopener"
-                    class="text-neon-cyan hover:text-neon-cyan/80"
-                  >
-                    <ExternalLink class="h-3 w-3" />
-                  </a>
-                </span>
-              </div>
-              <div
-                v-if="attestation.additionalInfo.timestamp"
+                v-if="attestation.additionalInfo.time"
                 class="flex items-center justify-between"
               >
                 <span class="text-white/30">{{ t('Timestamp') }}</span>
                 <span class="text-white/50">{{
-                  formatTimestamp(attestation.additionalInfo.timestamp)
+                  formatTimestamp(attestation.additionalInfo.time)
                 }}</span>
               </div>
               <div
@@ -286,86 +229,6 @@ function formatTimestamp(ts: bigint | number): string {
                 <span class="text-white/50">{{
                   truncateHex(attestation.additionalInfo.root)
                 }}</span>
-              </div>
-            </template>
-            <template v-if="attestation.attestation.metadata">
-              <div
-                v-if="attestation.attestation.metadata.contract"
-                class="flex items-center justify-between"
-              >
-                <span class="text-white/30">{{ t('Contract') }}</span>
-                <span class="flex items-center gap-1">
-                  <span class="text-white/50">{{
-                    truncateHex(
-                      hexlify(
-                        attestation.attestation.metadata.contract as Uint8Array,
-                      ),
-                    )
-                  }}</span>
-                  <a
-                    v-if="
-                      getEtherscanAddressUrl(
-                        attestation.attestation.chain,
-                        hexlify(
-                          attestation.attestation.metadata
-                            .contract as Uint8Array,
-                        ),
-                      )
-                    "
-                    :href="
-                      getEtherscanAddressUrl(
-                        attestation.attestation.chain,
-                        hexlify(
-                          attestation.attestation.metadata
-                            .contract as Uint8Array,
-                        ),
-                      )!
-                    "
-                    target="_blank"
-                    rel="noopener"
-                    class="text-neon-cyan hover:text-neon-cyan/80"
-                  >
-                    <ExternalLink class="h-3 w-3" />
-                  </a>
-                </span>
-              </div>
-              <div
-                v-if="attestation.attestation.metadata.txHash"
-                class="flex items-center justify-between"
-              >
-                <span class="text-white/30">{{ t('Tx Hash') }}</span>
-                <span class="flex items-center gap-1">
-                  <span class="text-white/50">{{
-                    truncateHex(
-                      hexlify(
-                        attestation.attestation.metadata.txHash as Uint8Array,
-                      ),
-                    )
-                  }}</span>
-                  <a
-                    v-if="
-                      getEtherscanTxUrl(
-                        attestation.attestation.chain,
-                        hexlify(
-                          attestation.attestation.metadata.txHash as Uint8Array,
-                        ),
-                      )
-                    "
-                    :href="
-                      getEtherscanTxUrl(
-                        attestation.attestation.chain,
-                        hexlify(
-                          attestation.attestation.metadata.txHash as Uint8Array,
-                        ),
-                      )!
-                    "
-                    target="_blank"
-                    rel="noopener"
-                    class="text-neon-cyan hover:text-neon-cyan/80"
-                  >
-                    <ExternalLink class="h-3 w-3" />
-                  </a>
-                </span>
               </div>
             </template>
             <!-- Testnet / unknown network warning -->

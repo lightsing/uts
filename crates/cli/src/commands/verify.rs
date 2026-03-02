@@ -1,3 +1,4 @@
+use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use clap::Args;
 use digest::{Digest, DynDigest};
@@ -9,15 +10,17 @@ use std::{
     path::PathBuf,
     process,
 };
+use uts_contracts::eas::EAS_ADDRESSES;
 use uts_core::{
     codec::{
         Decode, Reader, VersionedProof,
         v1::{
-            Attestation, DetachedTimestamp, EthereumUTSAttestation, PendingAttestation, opcode::*,
+            Attestation, DetachedTimestamp, EASAttestation, EASTimestamped, PendingAttestation,
+            opcode::*,
         },
     },
     utils::Hexed,
-    verifier::{AttestationVerifier, EthereumUTSVerifier},
+    verifier::{AttestationVerifier, EASVerifier},
 };
 
 #[derive(Debug, Args)]
@@ -28,6 +31,10 @@ pub struct Verify {
     /// If not provided, a default provider will be used based on the chain ID.
     #[arg(long)]
     eth_provider: Option<String>,
+    /// Optional EAS contract address for verifying EAS attestations. If not provided, the default
+    /// EAS contract for the chain will be used.
+    #[arg(long)]
+    eas: Option<Address>,
 }
 
 impl Verify {
@@ -77,68 +84,57 @@ impl Verify {
             if attestation.tag == PendingAttestation::TAG {
                 continue; // skip pending attestations
             }
-
-            if attestation.tag == EthereumUTSAttestation::TAG {
-                let eth_attestation = EthereumUTSAttestation::from_raw(&attestation)?;
-                eprintln!("Attested by {eth_attestation}");
-                let provider_url = if let Some(url) = self.eth_provider.as_deref() {
-                    url
-                } else {
-                    match eth_attestation.chain.id() {
-                        1 => "https://0xrpc.io/eth",
-                        11155111 => "https://0xrpc.io/sep",
-                        534352 => "https://rpc.scroll.io",
-                        534351 => "https://sepolia-rpc.scroll.io",
-                        _ => bail!("Unsupported chain: {}", eth_attestation.chain),
-                    }
-                };
-                let provider = ProviderBuilder::new().connect(provider_url).await?;
-                let verifier = EthereumUTSVerifier::new(provider).await?;
-                let result = verifier
-                    .verify(&eth_attestation, attestation.value().unwrap())
-                    .await?;
-                if let Some(block_number) = result.block_number {
-                    if let Some(block_hash) = result.block_hash {
-                        eprintln!("\tblock: #{block_number} {block_hash}");
-                    } else {
-                        eprintln!("\tblock: {block_number}");
-                    }
-                }
-                if let Some(log_index) = result.log_index {
-                    eprintln!("\tlog index: {log_index}");
-                }
-                if let Some(transaction_hash) = result.transaction_hash {
-                    if let Some((_, etherscan_url)) = eth_attestation.chain.etherscan_urls() {
-                        eprintln!("\ttransaction: {etherscan_url}/tx/{transaction_hash}");
-                    } else {
-                        eprintln!("\ttransaction hash: {transaction_hash}");
-                    }
-                }
-
-                if let Some((_, etherscan_url)) = eth_attestation.chain.etherscan_urls() {
-                    eprintln!(
-                        "\tuts contract: {etherscan_url}/address/{}",
-                        result.inner.address
-                    );
-                } else {
-                    eprintln!("\tuts contract: {}", result.inner.address);
-                }
-                if let Some((_, etherscan_url)) = eth_attestation.chain.etherscan_urls() {
-                    eprintln!(
-                        "\ttx sender: {etherscan_url}/address/{}",
-                        result.inner.sender
-                    );
-                } else {
-                    eprintln!("\ttx sender: {}", result.inner.sender);
-                }
-                let ts = Timestamp::from_second(result.inner.timestamp.to())?;
-                let zdt = ts.to_zoned(TimeZone::system());
-                eprintln!("\ttime attested: {zdt}");
-                eprintln!("\tmerkle root: {}", result.inner.root);
-                continue;
+            if attestation.tag != EASAttestation::TAG || attestation.tag != EASTimestamped::TAG {
+                eprintln!("Unknown attestation type: {}", Hexed(&attestation.tag));
             }
 
-            eprintln!("Unverifiable attestation: {attestation}");
+            let chain = if attestation.tag == EASAttestation::TAG {
+                EASAttestation::from_raw(attestation)?.chain
+            } else {
+                EASTimestamped::from_raw(attestation)?.chain
+            };
+
+            let provider_url = if let Some(url) = self.eth_provider.as_deref() {
+                url
+            } else {
+                match chain.id() {
+                    1 => "https://0xrpc.io/eth",
+                    11155111 => "https://0xrpc.io/sep",
+                    534352 => "https://rpc.scroll.io",
+                    534351 => "https://sepolia-rpc.scroll.io",
+                    _ => bail!("Unsupported chain: {chain}"),
+                }
+            };
+
+            let eas_address = if let Some(addr) = self.eas {
+                addr
+            } else {
+                EAS_ADDRESSES
+                    .get(&chain.id())
+                    .copied()
+                    .ok_or_else(|| eyre::eyre!("No default EAS contract for chain: {chain}"))?
+            };
+
+            let provider = ProviderBuilder::new().connect(provider_url).await?;
+            let verifier = EASVerifier::new(eas_address, provider);
+
+            let time: u64;
+            if attestation.tag == EASAttestation::TAG {
+                let eas_attestation = EASAttestation::from_raw(attestation)?;
+                let result = verifier.verify(&eas_attestation, &expected).await?;
+                eprintln!("EAS Onchain Attestation: {}", result.uid);
+                time = result.time;
+                eprintln!("\tattester: {}", result.attester);
+            } else {
+                let timestamped = EASTimestamped::from_raw(attestation)?;
+                time = verifier.verify(&timestamped, &expected).await?;
+                eprintln!("EAS Timestamped");
+            }
+
+            let ts = Timestamp::from_second(time as i64)?;
+            let zdt = ts.to_zoned(TimeZone::system());
+            eprintln!("\ttime attested: {zdt}");
+            eprintln!("\tmerkle root: {}", Hexed(&expected));
         }
 
         Ok(())
