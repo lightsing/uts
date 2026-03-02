@@ -3,7 +3,8 @@ import {
   MAGIC_BYTES,
   PENDING_ATTESTATION_TAG,
   BITCOIN_ATTESTATION_TAG,
-  ETHEREUM_UTS_ATTESTATION_TAG,
+  EAS_ATTEST_TAG,
+  EAS_TIMESTAMPED_TAG,
   MAX_URI_LEN,
   SAFE_URL_REGEX,
   DIGEST_LENGTHS,
@@ -19,7 +20,8 @@ import type {
   Op,
   PendingAttestation,
   BitcoinAttestation,
-  EthereumUTSAttestation,
+  EASAttestation,
+  EASTimestamped,
 } from '../types.ts'
 import { getBytes, hexlify } from 'ethers/utils'
 import { EncodeError, ErrorCode } from '../errors.ts'
@@ -216,40 +218,10 @@ export default class Encoder {
     return this
   }
 
-  writeEthereumUTSAttestation(attestation: EthereumUTSAttestation): this {
+  writeEAS(attestation: EASAttestation | EASTimestamped): this {
     this.writeU32(attestation.chain)
-    this.writeU32(attestation.height)
-    if (attestation.metadata) {
-      // trailing optional
-      if (attestation.metadata.contract) {
-        const contractBytes = getBytes(attestation.metadata.contract)
-        if (contractBytes.length !== 20) {
-          throw new EncodeError(
-            ErrorCode.LENGTH_MISMATCH,
-            `Invalid contract address in Ethereum UTS attestation: ${attestation.metadata.contract}`,
-            {
-              offset: this.offset,
-              context: { contract: hexlify(attestation.metadata.contract) },
-            },
-          )
-        }
-        this.writeBytes(contractBytes)
-
-        if (attestation.metadata.txHash) {
-          const txHashBytes = getBytes(attestation.metadata.txHash)
-          if (txHashBytes.length !== 32) {
-            throw new EncodeError(
-              ErrorCode.LENGTH_MISMATCH,
-              `Invalid transaction hash in Ethereum UTS attestation: ${attestation.metadata.txHash}`,
-              {
-                offset: this.offset,
-                context: { txHash: hexlify(attestation.metadata.txHash) },
-              },
-            )
-          }
-          this.writeBytes(txHashBytes)
-        }
-      }
+    if ('uid' in attestation) {
+      this.writeBytes(getBytes(attestation.uid))
     }
     return this
   }
@@ -268,9 +240,14 @@ export default class Encoder {
         encoder.writeBitcoinAttestation(step.attestation)
         this.writeLengthPrefixedBytes(encoder.toUint8Array())
         break
-      case 'ethereum-uts':
-        this.writeBytes(ETHEREUM_UTS_ATTESTATION_TAG)
-        encoder.writeEthereumUTSAttestation(step.attestation)
+      case 'eas-attestation':
+        this.writeBytes(EAS_ATTEST_TAG)
+        encoder.writeEAS(step.attestation)
+        this.writeLengthPrefixedBytes(encoder.toUint8Array())
+        break
+      case 'eas-timestamped':
+        this.writeBytes(EAS_TIMESTAMPED_TAG)
+        encoder.writeEAS(step.attestation)
         this.writeLengthPrefixedBytes(encoder.toUint8Array())
         break
       case 'unknown':
