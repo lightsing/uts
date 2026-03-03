@@ -5,25 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {L1AnchoringGateway} from "../contracts/L1/L1AnchoringGateway.sol";
 import {IL1AnchoringGateway} from "../contracts/L1/IL1AnchoringGateway.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-
-contract MockEAS {
-    mapping(bytes32 => uint64) public timestamps;
-
-    function setTimestamp(bytes32 data, uint64 ts) external {
-        timestamps[data] = ts;
-    }
-
-    function getTimestamp(bytes32 data) external view returns (uint64) {
-        return timestamps[data];
-    }
-
-    function timestamp(bytes32 data) external view returns (uint64) {
-        if (timestamps[data] == 0) {
-            return uint64(block.timestamp);
-        }
-        return timestamps[data];
-    }
-}
+import {IEAS} from "eas-contracts/IEAS.sol";
+import {TestEASHelper} from "./EAS.t.sol";
 
 contract MockL1ScrollMessenger {
     struct Message {
@@ -46,7 +29,7 @@ contract MockL1ScrollMessenger {
 
 contract L1AnchoringGatewayTest is Test {
     L1AnchoringGateway gateway;
-    MockEAS mockEAS;
+    IEAS eas;
     MockL1ScrollMessenger mockMessenger;
 
     address admin = address(this);
@@ -55,14 +38,14 @@ contract L1AnchoringGatewayTest is Test {
     address l2Manager = address(0x1212);
 
     function setUp() public {
-        mockEAS = new MockEAS();
+        eas = TestEASHelper(vm.deployCode("TestEASHelper")).eas();
         mockMessenger = new MockL1ScrollMessenger();
 
         L1AnchoringGateway impl = L1AnchoringGateway(payable(vm.deployCode("L1AnchoringGateway")));
         address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, ())));
         gateway = L1AnchoringGateway(payable(proxy));
 
-        gateway.lateInitialize(newAdmin, address(mockEAS), address(mockMessenger), l2Manager);
+        gateway.lateInitialize(newAdmin, address(eas), address(mockMessenger), l2Manager);
         vm.warp(block.timestamp + 1);
         vm.prank(newAdmin);
         gateway.completeInitialization();
@@ -88,7 +71,7 @@ contract L1AnchoringGatewayTest is Test {
         L1AnchoringGateway gw = L1AnchoringGateway(payable(proxy));
 
         address a = address(0xA1);
-        gw.lateInitialize(a, address(mockEAS), address(mockMessenger), l2Manager);
+        gw.lateInitialize(a, address(eas), address(mockMessenger), l2Manager);
 
         vm.warp(block.timestamp + 1);
         vm.prank(a);
@@ -104,7 +87,7 @@ contract L1AnchoringGatewayTest is Test {
         address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, ())));
         L1AnchoringGateway gw = L1AnchoringGateway(payable(proxy));
         vm.expectRevert("UTS: Invalid admin address");
-        gw.lateInitialize(address(0), address(mockEAS), address(mockMessenger), l2Manager);
+        gw.lateInitialize(address(0), address(eas), address(mockMessenger), l2Manager);
 
         // Zero EAS
         vm.expectRevert("UTS: Invalid EAS address");
@@ -112,16 +95,16 @@ contract L1AnchoringGatewayTest is Test {
 
         // Zero messenger
         vm.expectRevert("UTS: Invalid L1 Scroll Messenger address");
-        gw.lateInitialize(newAdmin, address(mockEAS), address(0), l2Manager);
+        gw.lateInitialize(newAdmin, address(eas), address(0), l2Manager);
 
         // Zero manager
         vm.expectRevert("UTS: Invalid L2 Anchoring Manager address");
-        gw.lateInitialize(newAdmin, address(mockEAS), address(mockMessenger), address(0));
+        gw.lateInitialize(newAdmin, address(eas), address(mockMessenger), address(0));
     }
 
-    function test_SubmitBatch() public {
-        bytes32 root = keccak256("test");
-        mockEAS.setTimestamp(root, 12345);
+    function test_SubmitBatch_WithNewTimestamp() public {
+        bytes32 root = keccak256("new-root");
+        // root not yet timestamped in EAS → getTimestamp returns 0 → gateway calls eas.timestamp()
 
         vm.deal(submitter, 1 ether);
         vm.prank(submitter);
@@ -130,6 +113,19 @@ contract L1AnchoringGatewayTest is Test {
         (address to,,, uint256 gasLimit,) = mockMessenger.lastMessage();
         assertEq(to, l2Manager);
         assertEq(gasLimit, 150_000);
+    }
+
+    function test_SubmitBatch_WithExistingTimestamp() public {
+        bytes32 root = keccak256("pre-timestamped");
+        // Pre-timestamp the root via EAS so getTimestamp returns non-zero
+        eas.timestamp(root);
+
+        vm.deal(submitter, 1 ether);
+        vm.prank(submitter);
+        gateway.submitBatch{value: 0.1 ether}(root, 1, 5, 150_000);
+
+        (address to,,,,) = mockMessenger.lastMessage();
+        assertEq(to, l2Manager);
     }
 
     function test_SubmitBatch_RevertNoSubmitterRole() public {
@@ -144,7 +140,6 @@ contract L1AnchoringGatewayTest is Test {
 
     function test_SubmitBatch_RevertInvalidBatchSize() public {
         bytes32 root = keccak256("test");
-        mockEAS.setTimestamp(root, 12345);
         vm.deal(submitter, 1 ether);
 
         // count = 0
@@ -160,7 +155,6 @@ contract L1AnchoringGatewayTest is Test {
 
     function test_SubmitBatch_RevertInvalidGasLimit() public {
         bytes32 root = keccak256("test");
-        mockEAS.setTimestamp(root, 12345);
         vm.deal(submitter, 1 ether);
 
         // too low
@@ -197,31 +191,6 @@ contract L1AnchoringGatewayTest is Test {
         vm.prank(submitter);
         vm.expectRevert("UTS: L2 Anchoring Manager not set");
         gw.submitBatch{value: 0.1 ether}(keccak256("test"), 1, 10, 150_000);
-    }
-
-    function test_SubmitBatch_WithExistingTimestamp() public {
-        bytes32 root = keccak256("existing");
-        mockEAS.setTimestamp(root, 99999);
-
-        vm.deal(submitter, 1 ether);
-        vm.prank(submitter);
-        gateway.submitBatch{value: 0.1 ether}(root, 1, 5, 150_000);
-
-        // Verify message was sent
-        (address to,,,,) = mockMessenger.lastMessage();
-        assertEq(to, l2Manager);
-    }
-
-    function test_SubmitBatch_WithNewTimestamp() public {
-        bytes32 root = keccak256("new");
-        // Don't set timestamp so getTimestamp returns 0
-
-        vm.deal(submitter, 1 ether);
-        vm.prank(submitter);
-        gateway.submitBatch{value: 0.1 ether}(root, 1, 5, 150_000);
-
-        (address to,,,,) = mockMessenger.lastMessage();
-        assertEq(to, l2Manager);
     }
 
     function test_SetL1ScrollMessenger() public {
@@ -262,7 +231,6 @@ contract L1AnchoringGatewayTest is Test {
 
     function test_SubmitBatch_EmitsBatchSubmittedEvent() public {
         bytes32 root = keccak256("event-test");
-        mockEAS.setTimestamp(root, 12345);
 
         vm.deal(submitter, 1 ether);
         vm.prank(submitter);
