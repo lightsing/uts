@@ -10,9 +10,23 @@ library L2AnchoringManagerTypes {
     }
 
     /// @notice Struct to hold L1 notification details for batch confirmation
-    struct L1Batch {
+    struct PendingL1Batch {
         bytes32 claimedRoot;
         uint256 startIndex;
+        uint256 count;
+        uint256 l1Timestamp;
+        uint256 l1BlockNumber;
+    }
+
+    /// @notice Struct to hold an anchoring record for each submitted root.
+    struct AnchoringRecord {
+        bytes32 root;
+        bytes32 attestationId;
+        uint256 blockNumber;
+    }
+
+    /// @notice Struct to hold L1 notification details for nft minting
+    struct L1Batch {
         uint256 count;
         uint256 l1Timestamp;
         uint256 l1BlockNumber;

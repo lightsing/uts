@@ -10,6 +10,7 @@ import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
 import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConstants.sol";
 import {TestEASHelper} from "./EAS.t.sol";
 import {IEAS} from "eas-contracts/IEAS.sol";
+import {INFTGenerator} from "../contracts/L2/nft/INFTGenerator.sol";
 
 contract MockFeeOracle is IFeeOracle {
     function getL1BaseFee() external pure returns (uint256) {
@@ -62,19 +63,21 @@ contract L2AnchoringManagerTest is Test {
     IFeeOracle feeOracle;
     IL2AnchoringManager manager;
     MockL2ScrollMessenger l2Messenger;
+    INFTGenerator nftGenerator;
 
     address constant L1_GATEWAY = address(0x123);
 
     function setUp() public {
-        eas = new TestEASHelper().eas();
+        eas = TestEASHelper(vm.deployCode("TestEASHelper")).eas();
         feeOracle = new MockFeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
+        nftGenerator = INFTGenerator(vm.deployCode("NFTGenerator"));
 
-        L2AnchoringManager impl = new L2AnchoringManager();
+        L2AnchoringManager impl = L2AnchoringManager(payable(vm.deployCode("L2AnchoringManager")));
         address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
         L2AnchoringManager proxyInstance = L2AnchoringManager(payable(proxy));
         proxyInstance.lateInitialize(
-            address(this), address(eas), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/"
+            "Scroll", address(this), address(eas), address(feeOracle), address(l2Messenger), address(nftGenerator)
         );
         vm.warp(block.timestamp + 1);
         proxyInstance.completeInitialization();
@@ -100,7 +103,7 @@ contract L2AnchoringManagerTest is Test {
         // Simulate a call from bridge to confirm the anchoring
         l2Messenger.setSender(L1_GATEWAY); // Simulate a call from the L1 gateway
         vm.prank(address(l2Messenger)); // Simulate a call from the L2 messenger
-        manager.notifyAnchored(bytes32(0), root, 1, 1, block.number);
+        manager.notifyAnchored(root, 1, 1, block.timestamp, block.number);
 
         vm.prank(address(1));
         manager.finalizeBatch();
@@ -118,19 +121,21 @@ contract L2AnchoringManagerGasTest is Test {
     IFeeOracle feeOracle;
     IL2AnchoringManager manager;
     MockL2ScrollMessenger l2Messenger;
+    INFTGenerator nftGenerator;
 
     address constant L1_GATEWAY = address(0x456);
 
     function setUp() public {
-        eas = new TestEASHelper().eas();
+        eas = TestEASHelper(vm.deployCode("TestEASHelper")).eas();
         feeOracle = new MockFeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
+        nftGenerator = INFTGenerator(vm.deployCode("NFTGenerator"));
 
-        L2AnchoringManager impl = new L2AnchoringManager();
+        L2AnchoringManager impl = L2AnchoringManager(payable(vm.deployCode("L2AnchoringManager")));
         address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
         L2AnchoringManager proxyInstance = L2AnchoringManager(payable(proxy));
         proxyInstance.lateInitialize(
-            address(this), address(eas), address(feeOracle), address(l2Messenger), "https://timestamps.now/token/"
+            "Scroll", address(this), address(eas), address(feeOracle), address(l2Messenger), address(nftGenerator)
         );
         vm.warp(block.timestamp + 1);
         proxyInstance.completeInitialization();
@@ -151,7 +156,7 @@ contract L2AnchoringManagerGasTest is Test {
         l2Messenger.setSender(L1_GATEWAY);
         vm.prank(address(l2Messenger));
         uint256 startGas = gasleft();
-        manager.notifyAnchored(bytes32(0), expectedRoot, startIndex, count, block.number);
+        manager.notifyAnchored(expectedRoot, startIndex, count, block.timestamp, block.number);
         uint256 l1L2GasUsed = startGas - gasleft();
 
         vm.prank(address(1));

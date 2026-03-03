@@ -18,6 +18,7 @@ import {
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {EASHelper} from "../../core/EASHelper.sol";
 import {Attestation, IEAS} from "eas-contracts/IEAS.sol";
+import {INFTGenerator} from "../nft/INFTGenerator.sol";
 
 contract L2AnchoringManager is
     Initializable,
@@ -28,6 +29,29 @@ contract L2AnchoringManager is
     IL2AnchoringManager
 {
     bytes32 public constant FEE_COLLECTOR_ROLE = keccak256("FEE_COLLECTOR_ROLE");
+
+    error AlreadyInitialized();
+    error InvalidAddress();
+
+    error InsufficientFee();
+    error RefundFailed();
+
+    error InvalidBatchCount();
+    error InvalidL2Messenger();
+    error InvalidL1Sender();
+    error BatchAlreadyExists();
+    error InvalidBatchOrder();
+
+    error MerkleRootMismatch();
+
+    error InvalidAttestationId();
+    error NoPendingBatch();
+
+    error InvalidBatchIndexHint();
+    error NFTAlreadyClaimed();
+
+    error InvalidAmount();
+    error WithdrawalFailed();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -50,22 +74,30 @@ contract L2AnchoringManager is
     /// @notice For deterministic deployment, we use a separate lateInitialize function to transfer ownership,
     /// and setup any necessary parameters that are not provided at the time of deployment.
     function lateInitialize(
+        string memory l2Name,
         address newAdmin,
         address eas,
         address feeOracle,
         address l2Messenger,
-        string memory baseTokenURI
+        address nftGeneratorProxy
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newAdmin != address(0), "UTS: Invalid admin address");
-        require(feeOracle != address(0), "UTS: Invalid FeeOracle address");
-        require(l2Messenger != address(0), "UTS: Invalid L2 Messenger address");
+        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
+        if ($.initialized) revert AlreadyInitialized();
+        $.initialized = true;
+        $.l2Name = l2Name;
+
+        if (
+            newAdmin == address(0) || eas == address(0) || feeOracle == address(0) || l2Messenger == address(0)
+                || nftGeneratorProxy == address(0)
+        ) {
+            revert InvalidAddress();
+        }
 
         setFeeOracle(feeOracle);
         setL2Messenger(l2Messenger);
 
-        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         $.eas = IEAS(eas);
-        $.baseTokenURI = baseTokenURI;
+        $.nftGeneratorProxy = INFTGenerator(nftGeneratorProxy);
 
         beginDefaultAdminTransfer(newAdmin);
     }
@@ -85,17 +117,18 @@ contract L2AnchoringManager is
     function submitForL1Anchoring(bytes32 root, address refundAddress) public payable nonReentrant {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
 
-        require(address($.eas) != address(0), "UTS: Oracle not set");
+        if (address($.eas) == address(0)) revert InvalidAddress();
 
         uint256 requiredFee = $.feeOracle.getFloorFee();
-        require(msg.value >= requiredFee, "UTS: Insufficient fee for L1 anchoring");
+        if (msg.value < requiredFee) revert InsufficientFee();
 
         bytes32 attestationId = EASHelper.attest($.eas, root);
 
         uint256 currentIndex = $.queueIndex++;
-        $.indexToRoot[currentIndex] = root;
+        $.indexToRecords[currentIndex] = L2AnchoringManagerTypes.AnchoringRecord({
+            root: root, attestationId: attestationId, blockNumber: block.number
+        });
         $.rootToAttestationId[root] = attestationId;
-        $.indexToAttestationId[currentIndex] = attestationId;
         $.attestationIdToIndex[attestationId] = currentIndex;
 
         emit L1AnchoringQueued(attestationId, root, currentIndex, requiredFee, block.number, block.timestamp);
@@ -105,7 +138,7 @@ contract L2AnchoringManager is
             uint256 _refund = msg.value - requiredFee;
             if (_refund > 0) {
                 (bool _success,) = refundAddress.call{value: _refund}("");
-                require(_success, "Failed to refund the fee");
+                if (!_success) revert RefundFailed();
             }
         }
     }
@@ -125,20 +158,22 @@ contract L2AnchoringManager is
         uint256 l1Timestamp,
         uint256 l1BlockNumber
     ) external {
-        require(count > 0, "UTS: Count must be greater than zero");
+        if (count == 0) revert InvalidBatchCount();
 
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        require(address($.l1Gateway) != address(0), "UTS: L1 Gateway not set");
+        if (address($.l1Gateway) == address(0)) revert InvalidAddress();
 
-        require(msg.sender == address($.l2Messenger), "UTS: Unauthorized caller");
+        if (msg.sender != address($.l2Messenger)) revert InvalidL2Messenger();
         address l1Sender = $.l2Messenger.xDomainMessageSender();
-        require(l1Sender == $.l1Gateway, "UTS: Invalid L1 sender");
+        if (l1Sender != $.l1Gateway) revert InvalidL1Sender();
 
         /// Require there's no pending batch to prevent overlapping batches which can cause state inconsistency
-        require($.pendingBatch.count == 0, "UTS: Pending batch already exists");
+        if ($.pendingBatch.count != 0) revert BatchAlreadyExists();
+        /// Require the batch to be in order to prevent skipping or reordering batches which can cause state inconsistency
+        if (startIndex != $.confirmedIndex) revert InvalidBatchOrder();
 
         // Store the batch details for later finalization
-        $.pendingBatch = L2AnchoringManagerTypes.L1Batch({
+        $.pendingBatch = L2AnchoringManagerTypes.PendingL1Batch({
             claimedRoot: claimedRoot,
             startIndex: startIndex,
             count: count,
@@ -152,19 +187,19 @@ contract L2AnchoringManager is
     /// @inheritdoc IL2AnchoringManager
     function finalizeBatch() external {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        L2AnchoringManagerTypes.L1Batch memory batch = $.pendingBatch;
+        L2AnchoringManagerTypes.PendingL1Batch memory batch = $.pendingBatch;
 
-        require(batch.count > 0, "UTS: No pending batch");
+        if (batch.count == 0) revert NoPendingBatch();
 
         bytes32[] memory leaves = new bytes32[](batch.count);
         for (uint256 i = 0; i < batch.count; i++) {
             uint256 index = batch.startIndex + i;
-            bytes32 root = $.indexToRoot[index];
+            bytes32 root = $.indexToRecords[index].root;
             leaves[i] = root;
         }
 
         bytes32 computedRoot = MerkleTree.computeRoot(leaves);
-        require(computedRoot == batch.claimedRoot, "UTS: Invalid Merkle Root");
+        if (computedRoot != batch.claimedRoot) revert MerkleRootMismatch();
 
         $.confirmedIndex = batch.startIndex + batch.count;
 
@@ -178,46 +213,70 @@ contract L2AnchoringManager is
             block.timestamp
         );
 
+        $.batches[batch.startIndex] = L2AnchoringManagerTypes.L1Batch({
+            count: batch.count, l1Timestamp: batch.l1Timestamp, l1BlockNumber: batch.l1BlockNumber
+        });
+
         // Clear the pending batch
         delete $.pendingBatch;
     }
 
     /// @inheritdoc IL2AnchoringManager
     // forge-lint: disable-next-line(mixed-case-function)
-    function claimNFT(bytes32 attestationId) public nonReentrant {
+    function claimNFT(bytes32 attestationId, uint256 batchStartIndexHint) public nonReentrant {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
 
         uint256 index = $.attestationIdToIndex[attestationId];
-        require(index != 0 && index < $.confirmedIndex, "UTS: Invalid or unconfirmed index");
-        require(!$.nftClaimed[index], "UTS: NFT already claimed");
+        if (index == 0) revert InvalidAttestationId();
+        if ($.nftClaimedAndHint[index] != 0) revert NFTAlreadyClaimed();
+
+        L2AnchoringManagerTypes.L1Batch memory batch = $.batches[batchStartIndexHint];
+
+        // check if the batch details exist
+        if (batch.count == 0) revert InvalidBatchIndexHint();
+        // check in range of the batch
+        if (!(index >= batchStartIndexHint && index < batchStartIndexHint + batch.count)) {
+            revert InvalidBatchIndexHint();
+        }
 
         Attestation memory request = $.eas.getAttestation(attestationId);
         bytes32 root = abi.decode(request.data, (bytes32));
 
-        $.nftClaimed[index] = true;
+        $.nftClaimedAndHint[index] = batchStartIndexHint;
 
         _safeMint(request.attester, index, bytes.concat(root));
         emit NFTClaimed(request.attester, index, root, block.timestamp);
     }
 
-    /// @inheritdoc IL2AnchoringManager
-    function getBaseURI() external view returns (string memory) {
+    // forge-lint: disable-next-line(mixed-case-function)
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+        _requireOwned(tokenId);
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        return $.baseTokenURI;
+
+        L2AnchoringManagerTypes.AnchoringRecord memory record = $.indexToRecords[tokenId];
+
+        uint256 batchStartIndexHint = $.nftClaimedAndHint[tokenId];
+        L2AnchoringManagerTypes.L1Batch memory batch = $.batches[batchStartIndexHint];
+        if (batch.count == 0) revert InvalidBatchIndexHint();
+
+        return $.nftGeneratorProxy
+            .generateTokenURI(
+                tokenId, record.root, record.blockNumber, batch.l1BlockNumber, batch.l1Timestamp, $.l2Name
+            );
     }
 
     // --- Admin Functions ---
 
-    function setFeeOracle(address _oracle) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(address(_oracle) != address(0), "UTS: Invalid Oracle");
+    function setFeeOracle(address oracle) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (oracle == address(0)) revert InvalidAddress();
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         address oldOracle = address($.feeOracle);
-        $.feeOracle = IFeeOracle(_oracle);
-        emit FeeOracleUpdated(oldOracle, _oracle);
+        $.feeOracle = IFeeOracle(oracle);
+        emit FeeOracleUpdated(oldOracle, oracle);
     }
 
     function setL1Gateway(address l1Gateway) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(l1Gateway != address(0), "UTS: Invalid L1 Gateway address");
+        if (l1Gateway == address(0)) revert InvalidAddress();
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         address oldGateway = $.l1Gateway;
         $.l1Gateway = l1Gateway;
@@ -225,7 +284,7 @@ contract L2AnchoringManager is
     }
 
     function setL2Messenger(address l2Messenger) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(l2Messenger != address(0), "UTS: Invalid L2 Messenger address");
+        if (l2Messenger == address(0)) revert InvalidAddress();
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         IL2ScrollMessenger messenger = IL2ScrollMessenger(l2Messenger);
         // Sanity check to ensure it's a valid messenger
@@ -237,12 +296,6 @@ contract L2AnchoringManager is
         emit L2MessengerUpdated(address($.l2Messenger), l2Messenger);
     }
 
-    function setURI(string memory baseTokenURI) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        $.baseTokenURI = baseTokenURI;
-        emit BaseURIUpdated($.baseTokenURI, baseTokenURI);
-    }
-
     /// @inheritdoc IL2AnchoringManager
     function clearBatch() external onlyRole(DEFAULT_ADMIN_ROLE) {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
@@ -251,22 +304,16 @@ contract L2AnchoringManager is
 
     /// @inheritdoc IL2AnchoringManager
     function withdrawFees(address to, uint256 amount) external nonReentrant onlyRole(FEE_COLLECTOR_ROLE) {
-        require(to != address(0), "UTS: Invalid address");
-        require(amount > 0 && amount <= address(this).balance, "UTS: Invalid amount");
+        if (to == address(0)) revert InvalidAddress();
+        if (amount == 0 || amount > address(this).balance) revert InvalidAmount();
 
         (bool success,) = payable(to).call{value: amount}("");
-        require(success, "UTS: Withdrawal failed");
+        if (!success) revert WithdrawalFailed();
 
         emit FeesWithdrawn(to, amount);
     }
 
     // --- Others ---
-
-    // forge-lint: disable-next-line(mixed-case-function)
-    function _baseURI() internal view virtual override returns (string memory) {
-        L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        return $.baseTokenURI;
-    }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 

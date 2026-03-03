@@ -3,7 +3,7 @@ ast = true
 build_info = true
 extra_output = ["storageLayout"]
 ffi = true
-fs_permissions = [{ access = "read", path = "target/foundry" }]
+fs_permissions = [{ access = "read-write", path = "target/foundry" }]
 ignored_error_codes = [
   2018, # Function state mutability can be restricted to pure
   2394, # Transient storage as defined by EIP-1153 can break the composability of smart contracts
@@ -14,6 +14,7 @@ script = "contract-scripts"
 solc_version = "0.8.28"
 src = "contracts"
 test = "contract-tests"
+via_ir = true
 
 # Set EVM version explicitly (must match across environments)
 evm_version = "cancun"
@@ -25,6 +26,9 @@ cbor_metadata = false
 # If using optimizer, keep settings consistent
 optimizer = true
 optimizer_runs = 200
+
+[profile.test]
+ignored_error_codes = [3860, 5574]
 
 [rpc_endpoints]
 l1_sepolia = "https://0xrpc.io/sep/"

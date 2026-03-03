@@ -66,8 +66,6 @@ interface IL2AnchoringManager {
     event L1GatewayUpdated(address indexed oldGateway, address indexed newGateway);
     /// @notice Emitted when the L2 Messenger address is updated.
     event L2MessengerUpdated(address indexed oldMessenger, address indexed newMessenger);
-    /// @notice Emitted when the base URI for token metadata is updated.
-    event BaseURIUpdated(string oldBaseURI, string newBaseURI);
 
     /// @notice see also submitForL1Anchoring(bytes32 root, address refundAddress).
     function submitForL1Anchoring(bytes32 root) external payable;
@@ -97,10 +95,7 @@ interface IL2AnchoringManager {
 
     /// @notice Claim the NFT for a confirmed attestation.
     // forge-lint: disable-next-line(mixed-case-function)
-    function claimNFT(bytes32 attestationId) external;
-
-    /// @notice Returns the current base URI for token metadata
-    function getBaseURI() external view returns (string memory);
+    function claimNFT(bytes32 attestationId, uint256 batchStartIndexHint) external;
 
     /**
      * @notice Called by the L1AnchoringGateway to notify that a batch of roots has been anchored on L1.

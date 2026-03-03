@@ -12,7 +12,6 @@ import {IL2AnchoringManager} from "../L2/manager/IL2AnchoringManager.sol";
 import {
     AccessControlDefaultAdminRulesUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
-import {EASHelper} from "../core/EASHelper.sol";
 import {IEAS} from "eas-contracts/IEAS.sol";
 
 contract L1AnchoringGateway is
