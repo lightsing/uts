@@ -292,8 +292,9 @@ contract L2AnchoringManager is
             messenger.xDomainMessageSender() == ScrollConstants.DEFAULT_XDOMAIN_MESSAGE_SENDER,
             "UTS: Invalid L2 Messenger"
         );
+        address oldMessenger = address($.l2Messenger);
         $.l2Messenger = messenger;
-        emit L2MessengerUpdated(address($.l2Messenger), l2Messenger);
+        emit L2MessengerUpdated(oldMessenger, l2Messenger);
     }
 
     /// @inheritdoc IL2AnchoringManager
