@@ -14,6 +14,17 @@ import {INFTGenerator} from "../contracts/L2/nft/INFTGenerator.sol";
 import {MerkleTree} from "../contracts/core/MerkleTree.sol";
 import {MockFeeOracle, MockL2ScrollMessenger} from "./L2AnchoringManager.t.sol";
 
+contract MockNFTGenerator is INFTGenerator {
+    function generateTokenURI(uint256, bytes32, uint256, uint256, uint256, string memory)
+        external
+        pure
+        override
+        returns (string memory)
+    {
+        return "mock://token";
+    }
+}
+
 contract L2AnchoringManagerExtendedTest is Test {
     IEAS eas;
     MockFeeOracle feeOracle;
@@ -29,7 +40,7 @@ contract L2AnchoringManagerExtendedTest is Test {
         eas = TestEASHelper(vm.deployCode("TestEASHelper")).eas();
         feeOracle = new MockFeeOracle();
         l2Messenger = new MockL2ScrollMessenger();
-        nftGenerator = INFTGenerator(vm.deployCode("NFTGenerator"));
+        nftGenerator = new MockNFTGenerator();
 
         L2AnchoringManager impl = L2AnchoringManager(payable(vm.deployCode("L2AnchoringManager")));
         address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
