@@ -5,6 +5,7 @@ import {IFeeOracle} from "../oracle/IFeeOracle.sol";
 import {L2AnchoringManagerTypes} from "./L2AnchoringManagerTypes.sol";
 import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
 import {IEAS} from "eas-contracts/IEAS.sol";
+import {INFTGenerator} from "../nft/INFTGenerator.sol";
 
 /**
  * @dev Library containing the ERC-7201 namespace constant.
@@ -18,6 +19,9 @@ library L2AnchoringManagerStorage {
 
     /// @custom:storage-location erc7201:uts.storage.L2AnchoringManager
     struct Storage {
+        bool initialized;
+        string l2Name;
+
         IEAS eas;
         IFeeOracle feeOracle;
         /// @notice Executor for L1 -> L2 messages
@@ -28,21 +32,21 @@ library L2AnchoringManagerStorage {
         uint256 queueIndex;
 
         /// @notice Storage for pending L1 batch confirmation
-        L2AnchoringManagerTypes.L1Batch pendingBatch;
+        L2AnchoringManagerTypes.PendingL1Batch pendingBatch;
         /// @notice Next index of the anchoring item to be confirmed
         uint256 confirmedIndex;
-        /// @notice Mapping to track the L1 block number for each batch start index
-        mapping(uint256 => uint256) batchStartToL1Block;
+        /// @notice Mapping to track the L1 batch details for each batch start index
+        mapping(uint256 => L2AnchoringManagerTypes.L1Batch) batches;
 
         // Mapping to reduce external calls
-        mapping(uint256 => bytes32) indexToRoot;
+        mapping(uint256 => L2AnchoringManagerTypes.AnchoringRecord) indexToRecords;
         // Mapping to track attestation id
         mapping(bytes32 => bytes32) rootToAttestationId;
-        mapping(uint256 => bytes32) indexToAttestationId;
         mapping(bytes32 => uint256) attestationIdToIndex;
 
-        string baseTokenURI;
-        mapping(uint256 => bool) nftClaimed;
+        INFTGenerator nftGeneratorProxy;
+        /// @notice Mapping to track claimed status and batch index hint for each NFT.
+        mapping(uint256 => uint256) nftClaimedAndHint;
     }
 
     function get() internal pure returns (L2AnchoringManagerStorage.Storage storage $) {
