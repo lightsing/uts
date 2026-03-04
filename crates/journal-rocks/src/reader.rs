@@ -108,6 +108,24 @@ impl JournalReader {
             }
         }
 
+        // handle cancellation by clearing the wait slot if the future is dropped while pending.
+        impl Drop for WaitForBatch<'_> {
+            fn drop(&mut self) {
+                let mut guard = self
+                    .reader
+                    .journal
+                    .consumer_wait
+                    .lock()
+                    .expect("Mutex poisoned");
+                if let Some(wait) = guard.as_ref() {
+                    debug_assert_eq!(wait.target_index, self.target_index);
+                    // At the same time, only one JournalReader can wait, so if there's a wait
+                    // registered, it must be ours.
+                    guard.take();
+                }
+            }
+        }
+
         WaitForBatch {
             reader: self,
             target_index,

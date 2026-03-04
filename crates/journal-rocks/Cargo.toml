@@ -10,6 +10,7 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
+futures = { workspace = true }
 rocksdb = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
