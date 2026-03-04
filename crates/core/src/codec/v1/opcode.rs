@@ -3,25 +3,33 @@
 //! It contains opcode information and utilities to work with opcodes.
 
 use crate::{
-    codec::{Decode, Decoder, Encode, Encoder},
+    codec::{Decode, DecodeIn, Decoder, Encode, Encoder},
     error::{DecodeError, EncodeError},
 };
-use digest::{Digest, OutputSizeUser, typenum::Unsigned};
+use alloc::{alloc::Allocator, vec::Vec};
+use core::{fmt, hint::unreachable_unchecked};
+use digest::Digest;
 use ripemd::Ripemd160;
 use sha1::Sha1;
 use sha2::Sha256;
 use sha3::Keccak256;
-use smallvec::ToSmallVec;
-use std::{fmt, hint::unreachable_unchecked};
-
-pub(crate) type OperationBuffer = smallvec::SmallVec<[u8; 64]>;
 
 /// An OpenTimestamps opcode.
 ///
 /// This is always a valid opcode.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_with::SerializeDisplay, serde_with::DeserializeFromStr)
+)]
 #[repr(transparent)]
 pub struct OpCode(u8);
+
+impl fmt::Debug for OpCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
 
 impl fmt::Display for OpCode {
     /// Formats the opcode as a string.
@@ -32,15 +40,15 @@ impl fmt::Display for OpCode {
 
 impl Encode for OpCode {
     #[inline]
-    fn encode(&self, mut writer: impl Encoder) -> Result<(), EncodeError> {
-        writer.encode_byte(self.tag())
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
+        encoder.encode_byte(self.tag())
     }
 }
 
 impl Decode for OpCode {
     #[inline]
-    fn decode(mut reader: impl Decoder) -> Result<Self, DecodeError> {
-        let byte = reader.decode_byte()?;
+    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
+        let byte = decoder.decode_byte()?;
         OpCode::new(byte).ok_or(DecodeError::BadOpCode(byte))
     }
 }
@@ -55,19 +63,13 @@ impl OpCode {
     /// Returns `true` when the opcode requires an immediate operand.
     #[inline]
     pub const fn has_immediate(&self) -> bool {
-        match *self {
-            Self::APPEND | Self::PREPEND => true,
-            _ => false,
-        }
+        matches!(*self, Self::APPEND | Self::PREPEND)
     }
 
     /// Returns `true` for control opcodes.
     #[inline]
     pub const fn is_control(&self) -> bool {
-        match *self {
-            Self::ATTESTATION | Self::FORK => true,
-            _ => false,
-        }
+        matches!(*self, Self::ATTESTATION | Self::FORK)
     }
 
     /// Returns `true` for digest opcodes.
@@ -91,26 +93,45 @@ impl OpCode {
     ///
     /// Panics if the opcode is a control opcode.
     #[inline]
-    pub fn execute(&self, input: impl AsRef<[u8]>, immediate: impl AsRef<[u8]>) -> OperationBuffer {
+    pub fn execute(&self, input: impl AsRef<[u8]>, immediate: impl AsRef<[u8]>) -> Vec<u8> {
+        self.execute_in(input, immediate, alloc::alloc::Global)
+    }
+
+    /// Executes the opcode on the given input data, with an optional immediate value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the opcode is a control opcode.
+    #[inline]
+    pub fn execute_in<A: Allocator>(
+        &self,
+        input: impl AsRef<[u8]>,
+        immediate: impl AsRef<[u8]>,
+        alloc: A,
+    ) -> Vec<u8, A> {
         if let Some(digest_op) = self.as_digest() {
-            return digest_op.execute(input);
+            return digest_op.execute_in(input, alloc);
         }
 
         let input = input.as_ref();
         match *self {
             Self::APPEND => {
-                let mut out = OperationBuffer::from_slice(input);
-                out.extend_from_slice(immediate.as_ref());
+                let immediate = immediate.as_ref();
+                let mut out = Vec::with_capacity_in(input.len() + immediate.len(), alloc);
+                out.extend_from_slice(input);
+                out.extend_from_slice(immediate);
                 out
             }
             Self::PREPEND => {
-                let mut out = OperationBuffer::from_slice(immediate.as_ref());
+                let immediate = immediate.as_ref();
+                let mut out = Vec::with_capacity_in(input.len() + immediate.len(), alloc);
+                out.extend_from_slice(immediate);
                 out.extend_from_slice(input);
                 out
             }
             Self::REVERSE => {
                 let len = input.len();
-                let mut out = OperationBuffer::with_capacity(len);
+                let mut out = Vec::<u8, A>::with_capacity_in(len, alloc);
 
                 unsafe {
                     // SAFETY: The vector capacity is set to len, so setting the length to len is valid.
@@ -128,7 +149,7 @@ impl OpCode {
             }
             Self::HEXLIFY => {
                 let hex_len = input.len() * 2;
-                let mut out = OperationBuffer::with_capacity(hex_len);
+                let mut out = Vec::<u8, A>::with_capacity_in(hex_len, alloc);
                 // SAFETY: that the vector is actually the specified size.
                 unsafe {
                     out.set_len(hex_len);
@@ -153,9 +174,16 @@ impl PartialEq<u8> for OpCode {
 /// An OpenTimestamps digest opcode.
 ///
 /// This is always a valid opcode.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(transparent)]
 pub struct DigestOp(OpCode);
+
+impl fmt::Debug for DigestOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.name())
+    }
+}
 
 impl fmt::Display for DigestOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -177,15 +205,15 @@ impl PartialEq<u8> for DigestOp {
 
 impl Encode for DigestOp {
     #[inline]
-    fn encode(&self, writer: impl Encoder) -> Result<(), EncodeError> {
-        self.0.encode(writer)
+    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
+        self.0.encode(encoder)
     }
 }
 
-impl Decode for DigestOp {
+impl<A: Allocator> DecodeIn<A> for DigestOp {
     #[inline]
-    fn decode(mut reader: impl Decoder) -> Result<Self, DecodeError> {
-        let opcode = OpCode::decode(&mut reader)?;
+    fn decode_in(decoder: &mut impl Decoder, _alloc: A) -> Result<Self, DecodeError> {
+        let opcode = OpCode::decode(decoder)?;
         opcode
             .as_digest()
             .ok_or(DecodeError::ExpectedDigestOp(opcode))
@@ -204,6 +232,13 @@ impl DigestOp {
     pub const fn tag(&self) -> u8 {
         self.0.tag()
     }
+}
+
+/// Extension trait for `Digest` implementors to get the corresponding `DigestOp`.
+pub trait DigestOpExt: Digest {
+    const OPCODE: DigestOp;
+
+    fn opcode() -> DigestOp;
 }
 
 macro_rules! define_opcodes {
@@ -238,6 +273,31 @@ macro_rules! define_opcodes {
                 }
             }
         }
+
+        /// Error returned when parsing an invalid opcode from a string.
+        #[derive(Debug)]
+        pub struct OpCodeFromStrError;
+
+        impl core::fmt::Display for OpCodeFromStrError {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                write!(f, "invalid opcode string")
+            }
+        }
+
+        #[cfg(feature = "std")]
+        impl std::error::Error for OpCodeFromStrError {}
+
+        impl core::str::FromStr for OpCode {
+            type Err = OpCodeFromStrError;
+
+            #[inline]
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $( stringify!($variant) => Ok(Self::$variant), )*
+                    _ => Err(OpCodeFromStrError),
+                }
+            }
+         }
     };
 }
 
@@ -254,9 +314,10 @@ macro_rules! define_digest_opcodes {
             /// Returns the output length of the digest in bytes.
             #[inline]
             pub const fn output_size(&self) -> usize {
+                use digest::typenum::Unsigned;
                 paste::paste! {
                     match *self {
-                        $( Self::$variant => <[<$variant:camel>] as OutputSizeUser>::OutputSize::USIZE, )*
+                        $( Self::$variant => <[<$variant:camel>] as ::digest::OutputSizeUser>::OutputSize::USIZE, )*
                         // SAFETY: unreachable as all variants are covered.
                         _ => unsafe { unreachable_unchecked() }
                     }
@@ -264,13 +325,18 @@ macro_rules! define_digest_opcodes {
             }
 
             /// Executes the digest operation on the input data.
-            pub fn execute(&self, input: impl AsRef<[u8]>) -> OperationBuffer {
+            pub fn execute(&self, input: impl AsRef<[u8]>) -> ::alloc::vec::Vec<u8> {
+                self.execute_in(input, ::alloc::alloc::Global)
+            }
+
+            /// Executes the digest operation on the input data.
+            pub fn execute_in<A: Allocator>(&self, input: impl AsRef<[u8]>, alloc: A) -> ::alloc::vec::Vec<u8, A> {
                 match *self {
                     $( Self::$variant => {
                         paste::paste! {
                             let mut hasher = [<$variant:camel>]::new();
                             hasher.update(input);
-                            hasher.finalize().to_smallvec()
+                            hasher.finalize().to_vec_in(alloc)
                         }
                     }, )*
                     // SAFETY: unreachable as all variants are covered.
@@ -278,6 +344,50 @@ macro_rules! define_digest_opcodes {
                 }
             }
         }
+        paste::paste! {
+            $(
+                impl DigestOpExt for [<$variant:camel>] {
+                    const OPCODE: DigestOp = DigestOp::$variant;
+
+                    #[inline]
+                    fn opcode() -> DigestOp {
+                        DigestOp::$variant
+                    }
+                }
+            )*
+        }
+    };
+}
+
+macro_rules! impl_simple_step {
+    ($variant:ident) => {paste::paste! {
+        impl<A: Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
+            #[doc = concat!("Push the `", stringify!($variant), "` opcode.")]
+            pub fn [< $variant:lower >](&mut self) -> &mut Self {
+                self.push_step(OpCode::[<$variant>])
+            }
+        }
+    }};
+    ($($variant:ident),* $(,)?) => {
+        $(
+            impl_simple_step! { $variant }
+        )*
+    };
+}
+
+macro_rules! impl_step_with_data {
+    ($variant:ident) => {paste::paste! {
+        impl<A: Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
+            #[doc = concat!("Push the `", stringify!($variant), "` opcode.")]
+            pub fn [< $variant:lower >](&mut self, data: ::alloc::vec::Vec<u8, A>) -> &mut Self {
+                self.push_immediate_step(OpCode::[<$variant>], data)
+            }
+        }
+    }};
+    ($($variant:ident),* $(,)?) => {
+        $(
+            impl_step_with_data! { $variant }
+        )*
     };
 }
 
@@ -301,6 +411,20 @@ define_digest_opcodes! {
     0x67 => KECCAK256,
 }
 
+impl_simple_step! {
+    SHA1,
+    RIPEMD160,
+    SHA256,
+    KECCAK256,
+    REVERSE,
+    HEXLIFY,
+}
+
+impl_step_with_data! {
+    APPEND,
+    PREPEND,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,5 +435,21 @@ mod tests {
         assert_eq!(DigestOp::RIPEMD160.output_size(), 20);
         assert_eq!(DigestOp::SHA256.output_size(), 32);
         assert_eq!(DigestOp::KECCAK256.output_size(), 32);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_opcode() {
+        let opcode = OpCode::SHA256;
+        let serialized = serde_json::to_string(&opcode).unwrap();
+        assert_eq!(serialized, "\"SHA256\"");
+        let deserialized: OpCode = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, opcode);
+
+        let digest_op = DigestOp::SHA256;
+        let serialized = serde_json::to_string(&digest_op).unwrap();
+        assert_eq!(serialized, "\"SHA256\"");
+        let deserialized: DigestOp = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, digest_op);
     }
 }

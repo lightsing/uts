@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - esbuild
+  - unrs-resolver
+  - wasm-pack

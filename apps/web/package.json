@@ -1,0 +1,40 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --cache --fix",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@lingui/core": "^5.9.2",
+    "@lingui/message-utils": "^5.9.2",
+    "@noble/hashes": "^2.0.1",
+    "@uts/sdk": "workspace:*",
+    "@vueuse/core": "^14.2.1",
+    "date-fns": "^4.1.0",
+    "ethers": "^6.16.0",
+    "jszip": "^3.10.1",
+    "lucide-vue-next": "^0.575.0",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.24"
+  },
+  "devDependencies": {
+    "@lingui/cli": "^5.9.2",
+    "@lingui/format-po": "^5.9.2",
+    "@lingui/vite-plugin": "^5.9.2",
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/jszip": "^3.4.1",
+    "@types/node": "^24.10.1",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/tsconfig": "^0.8.1",
+    "tailwindcss": "^4.2.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vue-tsc": "^3.1.4"
+  }
+}

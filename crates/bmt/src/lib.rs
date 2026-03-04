@@ -1,10 +1,13 @@
-#![feature(maybe_uninit_slice)]
 #![feature(maybe_uninit_fill)]
 #![feature(likely_unlikely)]
 //! High performance binary Merkle tree implementation in Rust.
 
+use bytemuck::Pod;
 use digest::{Digest, FixedOutputReset, Output};
 use std::hint::unlikely;
+
+/// Prefix byte to distinguish internal nodes from leaves when hashing.
+pub const INNER_NODE_PREFIX: u8 = 0x01;
 
 /// Flat, Fixed-Size, Read only Merkle Tree
 ///
@@ -12,25 +15,32 @@ use std::hint::unlikely;
 ///
 /// Leaves are **sorted** starting at index `len`.
 #[derive(Debug, Clone, Default)]
-pub struct FlatMerkleTree<D: Digest> {
+pub struct UnorderedMerkleTree<D: Digest> {
     /// Index 0 is not used, leaves start at index `len`.
     nodes: Box<[Output<D>]>,
     len: usize,
 }
 
-impl<D: Digest + FixedOutputReset> FlatMerkleTree<D>
+/// Merkle Tree without hashing the leaves
+#[derive(Debug, Clone)]
+pub struct UnhashedFlatMerkleTree<D: Digest> {
+    buffer: Vec<Output<D>>,
+    len: usize,
+}
+
+impl<D: Digest + FixedOutputReset> UnorderedMerkleTree<D>
 where
-    Output<D>: Copy,
+    Output<D>: Pod + Copy,
 {
     /// Constructs a new Merkle tree from the given hash leaves.
     pub fn new(data: &[Output<D>]) -> Self {
+        Self::new_unhashed(data).finalize()
+    }
+
+    /// Constructs a new Merkle tree from the given hash leaves, without hashing internal nodes.
+    pub fn new_unhashed(data: &[Output<D>]) -> UnhashedFlatMerkleTree<D> {
         let raw_len = data.len();
-        if unlikely(raw_len == 0) {
-            return Self {
-                nodes: Box::new([Output::<D>::default(); 2]),
-                len: 1,
-            };
-        }
+        assert_ne!(raw_len, 0, "Cannot create Merkle tree with zero leaves");
 
         let len = raw_len.next_power_of_two();
         let mut nodes = Vec::<Output<D>>::with_capacity(2 * len);
@@ -62,29 +72,9 @@ where
                 .get_unchecked_mut(len..)
                 .assume_init_mut()
                 .sort_unstable();
-
-            // Build the tree
-            let mut hasher = D::new();
-            for i in (1..len).rev() {
-                // SAFETY: in bounds due to loop range and initialization above
-                let left = maybe_uninit.get_unchecked(2 * i).assume_init_ref();
-                let right = maybe_uninit.get_unchecked(2 * i + 1).assume_init_ref();
-
-                Digest::update(&mut hasher, left);
-                Digest::update(&mut hasher, right);
-                let parent_hash = hasher.finalize_reset();
-
-                maybe_uninit.get_unchecked_mut(i).write(parent_hash);
-            }
-
-            // SAFETY: initialized all elements.
-            nodes.set_len(2 * len);
         }
 
-        Self {
-            nodes: nodes.into_boxed_slice(),
-            len,
-        }
+        UnhashedFlatMerkleTree { buffer: nodes, len }
     }
 
     /// Returns the root hash of the Merkle tree
@@ -113,6 +103,59 @@ where
             nodes: &self.nodes,
             current: self.len + leaf_index_in_slice,
         })
+    }
+
+    /// Returns the raw bytes of the Merkle tree nodes
+    #[inline]
+    pub fn as_raw_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.nodes)
+    }
+
+    /// From raw bytes, reconstruct the Merkle tree
+    #[inline]
+    pub unsafe fn from_raw_bytes(bytes: &[u8]) -> Self {
+        let nodes: &[Output<D>] = bytemuck::cast_slice(bytes);
+        let len = nodes.len() / 2;
+        Self {
+            nodes: nodes.to_vec().into_boxed_slice(),
+            len,
+        }
+    }
+}
+
+impl<D: Digest + FixedOutputReset> UnhashedFlatMerkleTree<D>
+where
+    Output<D>: Pod + Copy,
+{
+    /// Finalizes the Merkle tree by hashing internal nodes
+    pub fn finalize(self) -> UnorderedMerkleTree<D> {
+        let mut nodes = self.buffer;
+        let len = self.len;
+        unsafe {
+            let maybe_uninit = nodes.spare_capacity_mut();
+
+            // Build the tree
+            let mut hasher = D::new();
+            for i in (1..len).rev() {
+                // SAFETY: in bounds due to loop range and initialization above
+                let left = maybe_uninit.get_unchecked(2 * i).assume_init_ref();
+                let right = maybe_uninit.get_unchecked(2 * i + 1).assume_init_ref();
+
+                Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
+                Digest::update(&mut hasher, left);
+                Digest::update(&mut hasher, right);
+                let parent_hash = hasher.finalize_reset();
+
+                maybe_uninit.get_unchecked_mut(i).write(parent_hash);
+            }
+
+            // SAFETY: initialized all elements.
+            nodes.set_len(2 * len);
+        }
+        UnorderedMerkleTree {
+            nodes: nodes.into_boxed_slice(),
+            len,
+        }
     }
 }
 
@@ -181,7 +224,7 @@ mod tests {
 
     fn test_merkle_tree<D: Digest + FixedOutputReset>()
     where
-        Output<D>: Copy,
+        Output<D>: Pod + Copy,
     {
         let mut leaves = vec![
             D::digest(b"leaf1"),
@@ -191,18 +234,21 @@ mod tests {
         ];
         leaves.sort_unstable();
 
-        let tree = FlatMerkleTree::<D>::new(&leaves);
+        let tree = UnorderedMerkleTree::<D>::new(&leaves);
 
         // Manually compute the expected root
         let mut hasher = D::new();
+        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
         Digest::update(&mut hasher, &leaves[0]);
         Digest::update(&mut hasher, &leaves[1]);
         let left_hash = hasher.finalize_reset();
 
+        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
         Digest::update(&mut hasher, &leaves[2]);
         Digest::update(&mut hasher, &leaves[3]);
         let right_hash = hasher.finalize_reset();
 
+        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
         Digest::update(&mut hasher, &left_hash);
         Digest::update(&mut hasher, &right_hash);
         let expected_root = hasher.finalize();
@@ -212,7 +258,7 @@ mod tests {
 
     fn test_proof<D: Digest + FixedOutputReset>()
     where
-        Output<D>: Copy,
+        Output<D>: Pod + Copy,
     {
         let mut leaves = vec![
             D::digest(b"apple"),
@@ -222,7 +268,7 @@ mod tests {
         ];
         leaves.sort_unstable();
 
-        let tree = FlatMerkleTree::<D>::new(&leaves);
+        let tree = UnorderedMerkleTree::<D>::new(&leaves);
 
         for leaf in &leaves {
             let mut iter = tree
@@ -234,10 +280,12 @@ mod tests {
             while let Some((side, sibling_hash)) = iter.next() {
                 match side {
                     NodePosition::Left => {
+                        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
                         Digest::update(&mut hasher, &current_hash);
                         Digest::update(&mut hasher, sibling_hash);
                     }
                     NodePosition::Right => {
+                        Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
                         Digest::update(&mut hasher, sibling_hash);
                         Digest::update(&mut hasher, &current_hash);
                     }

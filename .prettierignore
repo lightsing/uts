@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+
+**/*.toml
+**/*.sol
+
+crates/*
+lib/*
+target/*

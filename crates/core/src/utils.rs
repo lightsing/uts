@@ -1,19 +1,10 @@
-use std::fmt;
+mod hex;
+pub use hex::Hexed;
 
-/// Zero-allocation wrapper that displays byte slices as lowercase hex.
-pub struct Hexed<'a, T: ?Sized>(pub &'a T);
+mod sync;
+pub use sync::OnceLock;
 
-impl<'a, T: ?Sized + AsRef<[u8]>> fmt::Display for Hexed<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for b in self.0.as_ref() {
-            write!(f, "{:02x}", b)?;
-        }
-        Ok(())
-    }
-}
-
-impl<'a, T: ?Sized + AsRef<[u8]>> fmt::Debug for Hexed<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, f)
-    }
-}
+mod hash;
+#[cfg(feature = "io-utils")]
+pub use hash::HashAsyncFsExt;
+pub use hash::HashFsExt;

@@ -13,4 +13,14 @@ repos:
         language: system
         types: [toml]
         pass_filenames: true
-
+      - id: forge-fmt
+        name: forge fmt
+        entry: forge fmt
+        language: system
+        files: \.sol$
+      - id: prettier
+        name: prettier
+        entry: npx prettier --write
+        language: system
+        files: \.(js|jsx|ts|tsx|json|css|scss|md|html|toml)$
+        pass_filenames: true

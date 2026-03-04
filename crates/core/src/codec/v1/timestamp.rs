@@ -1,18 +1,19 @@
 //! ** The implementation here is subject to change as this is a read-only version. **
-use crate::codec::{
-    Proof, Version,
-    v1::{Attestation, opcode::OpCode},
+
+use crate::{
+    codec::v1::{
+        Attestation, FinalizationError, MayHaveInput, PendingAttestation,
+        attestation::RawAttestation, opcode::OpCode,
+    },
+    utils::{Hexed, OnceLock},
 };
-use std::num::NonZeroU32;
+use alloc::{alloc::Global, vec::Vec};
+use core::{alloc::Allocator, fmt::Debug};
 
-type StepPtr = Option<NonZeroU32>;
-
+pub(crate) mod builder;
 mod decode;
 mod encode;
-pub(crate) mod fmt;
-
-const RECURSION_LIMIT: usize = 256;
-const MAX_OP_LENGTH: usize = 4096;
+mod fmt;
 
 /// Proof that that one or more attestations commit to a message.
 ///
@@ -31,125 +32,326 @@ const MAX_OP_LENGTH: usize = 4096;
 /// execute APPEND 0ef41e45bb5534b3
 /// result attested by Pending: update URI https://alice.btc.calendar.opentimestamps.org
 /// ```
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Timestamp {
-    steps: Vec<Step>,
-    data: Vec<u8>,
-    attestations: Vec<Attestation>,
+#[derive(Clone, Debug)]
+pub enum Timestamp<A: Allocator = Global> {
+    Step(Step<A>),
+    Attestation(RawAttestation<A>),
 }
 
-/// An OpenTimestamps step.
-#[derive(Clone, PartialEq, Eq, Debug)]
-#[repr(C)]
-struct Step {
-    opcode: OpCode,
-    _padding: u8,
-    data_len: u16,
-    data_offset: u32,
-    // LCRS tree structure
-    first_child: StepPtr,
-    next_sibling: StepPtr,
+/// An execution Step.
+#[derive(Clone)]
+pub struct Step<A: Allocator = Global> {
+    op: OpCode,
+    data: Vec<u8, A>,
+    input: OnceLock<Vec<u8, A>>,
+    next: Vec<Timestamp<A>, A>,
 }
-// cache line aligned
-const _: () = assert!(size_of::<Step>() == 16);
 
-impl Default for Step {
-    fn default() -> Self {
-        Step {
-            opcode: OpCode::ATTESTATION,
-            _padding: 0,
-            data_len: 0,
-            data_offset: 0,
-            first_child: None,
-            next_sibling: None,
+impl<A: Allocator> PartialEq for Timestamp<A> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Timestamp::Step(s1), Timestamp::Step(s2)) => s1 == s2,
+            (Timestamp::Attestation(a1), Timestamp::Attestation(a2)) => a1 == a2,
+            _ => false,
         }
     }
 }
+impl<A: Allocator> Eq for Timestamp<A> {}
 
-impl Proof for Timestamp {
-    const VERSION: Version = 1;
+impl<A: Allocator> PartialEq for Step<A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.op == other.op && self.data == other.data && self.next == other.next
+    }
+}
+impl<A: Allocator> Eq for Step<A> {}
+
+impl<A: Allocator + Debug> Debug for Step<A> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut f = f.debug_struct("Step");
+        f.field("op", &self.op);
+        if self.op.has_immediate() {
+            f.field("data", &Hexed(&self.data));
+        }
+        f.field("next", &self.next).finish()
+    }
 }
 
 impl Timestamp {
-    /// Returns the data slice associated with a step.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the step was constructed from this timestamp's data buffer.
-    #[inline]
-    unsafe fn get_step_data(&self, step: &Step) -> &[u8] {
-        if step.data_len == 0 {
-            return &[];
-        }
-        let start = step.data_offset as usize;
-        debug_assert!(start < self.data.len());
-        let end = start + step.data_len as usize;
-        debug_assert!(end <= self.data.len());
-        // SAFETY: bounds checked above
-        unsafe { self.data.get_unchecked(start..end) }
+    /// Creates a new timestamp builder.
+    pub fn builder() -> builder::TimestampBuilder<Global> {
+        builder::TimestampBuilder::new_in(Global)
     }
 
-    /// Returns the attestation index encoded by an attestation step.
+    /// Merges multiple timestamps into a single FORK timestamp.
     ///
-    /// # Safety
+    /// # Panics
     ///
-    /// The caller must ensure that the step is an attestation step and that the
-    /// safety requirements of [`Self::get_step_data`] also hold.
-    #[inline]
-    unsafe fn get_attest_idx(&self, step: &Step) -> u32 {
-        debug_assert!(step.opcode == OpCode::ATTESTATION);
-        debug_assert_eq!(step.data_len as usize, size_of::<u32>());
-        let data = unsafe { self.get_step_data(step) };
-        u32::from_le_bytes(data.try_into().unwrap())
+    /// This will panic if there are conflicting inputs when finalizing unfinalized timestamps.
+    pub fn merge(timestamps: Vec<Timestamp, Global>) -> Timestamp {
+        Self::merge_in(timestamps, Global)
     }
 
-    #[inline]
-    fn push_to_heap(heap: &mut Vec<u8>, data: &[u8]) -> (u32, u16) {
-        if data.is_empty() {
-            return (0, 0);
-        }
-
-        let offset = heap.len();
-        let len = data.len();
-
-        assert!(offset <= u32::MAX as usize, "Data heap overflow (max 4GB)");
-        assert!(len <= u16::MAX as usize, "Ref data too large (max 65KB)");
-
-        heap.extend_from_slice(data);
-
-        (offset as u32, len as u16)
-    }
-
-    /// Returns a mutable buffer from the heap.
+    /// Try to merge multiple timestamps into a single FORK timestamp.
     ///
-    /// # Safety
-    ///
-    /// The caller must write exactly `len` bytes into the returned buffer.
-    #[inline]
-    unsafe fn get_buffer_from_heap(heap: &mut Vec<u8>, len: usize) -> (u32, u16, &mut [u8]) {
-        let offset = heap.len();
-        assert!(offset <= u32::MAX as usize, "Data heap overflow (max 4GB)");
-        assert!(len <= u16::MAX as usize, "Ref data too large (max 65KB)");
-
-        heap.reserve(len);
-
-        // SAFETY: we just reserved enough space
-        let buffer = unsafe {
-            heap.set_len(offset + len);
-            heap.get_unchecked_mut(offset..offset + len)
-        };
-
-        (offset as u32, len as u16, buffer)
+    /// Returns an error if there are conflicting inputs when finalizing unfinalized timestamps.
+    pub fn try_merge(timestamps: Vec<Timestamp, Global>) -> Result<Timestamp, FinalizationError> {
+        Self::try_merge_in(timestamps, Global)
     }
 }
 
-#[inline]
-fn make_ptr(idx: usize) -> StepPtr {
-    assert!(idx < u32::MAX as usize);
-    NonZeroU32::new((idx + 1) as u32)
+impl<A: Allocator> Timestamp<A> {
+    /// Returns the opcode of this timestamp node.
+    pub fn op(&self) -> OpCode {
+        match self {
+            Timestamp::Step(step) => {
+                debug_assert_ne!(
+                    step.op,
+                    OpCode::ATTESTATION,
+                    "sanity check failed: Step with ATTESTATION opcode"
+                );
+                step.op
+            }
+            Timestamp::Attestation(_) => OpCode::ATTESTATION,
+        }
+    }
+
+    /// Returns this timestamp as a step, if it is one.
+    #[inline]
+    pub fn as_step(&self) -> Option<&Step<A>> {
+        match self {
+            Timestamp::Step(step) => Some(step),
+            Timestamp::Attestation(_) => None,
+        }
+    }
+
+    /// Returns this timestamp as an attestation, if it is one.
+    #[inline]
+    pub fn as_attestation(&self) -> Option<&RawAttestation<A>> {
+        match self {
+            Timestamp::Attestation(attestation) => Some(attestation),
+            Timestamp::Step(_) => None,
+        }
+    }
+
+    /// Returns the allocator used by this timestamp node.
+    #[inline]
+    pub fn allocator(&self) -> &A {
+        match self {
+            Self::Attestation(attestation) => attestation.allocator(),
+            Self::Step(step) => step.allocator(),
+        }
+    }
+
+    /// Returns true if this timestamp is finalized.
+    #[inline]
+    pub fn is_finalized(&self) -> bool {
+        self.input().is_some()
+    }
+
+    /// Iterates over all attestations in this timestamp.
+    #[inline]
+    pub fn attestations(&self) -> AttestationIter<'_, A> {
+        AttestationIter { stack: vec![self] }
+    }
+
+    /// Iterates over all pending attestation steps in this timestamp.
+    ///
+    /// # Note
+    ///
+    /// This iterator will yield `Timestamp` instead of `RawAttestation`.
+    #[inline]
+    pub fn pending_attestations_mut(&mut self) -> PendingAttestationIterMut<'_, A> {
+        PendingAttestationIterMut { stack: vec![self] }
+    }
 }
 
-#[inline]
-fn resolve_ptr(ptr: StepPtr) -> Option<usize> {
-    ptr.map(|nz| (nz.get() - 1) as usize)
+impl<A: Allocator + Clone> Timestamp<A> {
+    /// Creates a new timestamp builder with the given allocator.
+    pub fn builder_in(alloc: A) -> builder::TimestampBuilder<A> {
+        builder::TimestampBuilder::new_in(alloc)
+    }
+
+    /// Finalizes the timestamp with the given input data.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timestamp is already finalized with different input data.
+    #[inline]
+    pub fn finalize(&self, input: &[u8]) {
+        self.try_finalize(input)
+            .expect("conflicting inputs when finalizing timestamp")
+    }
+
+    /// Try finalizes the timestamp with the given input data.
+    ///
+    /// Returns an error if the timestamp is already finalized with different input data.
+    pub fn try_finalize(&self, input: &[u8]) -> Result<(), FinalizationError> {
+        let init_fn = || input.to_vec_in(self.allocator().clone());
+        match self {
+            Self::Attestation(attestation) => {
+                if let Some(already) = attestation.value.get() {
+                    return if &input != already {
+                        Err(FinalizationError)
+                    } else {
+                        Ok(())
+                    };
+                }
+                let _ = attestation.value.get_or_init(init_fn);
+            }
+            Self::Step(step) => {
+                if let Some(already) = step.input.get() {
+                    return if &input != already {
+                        Err(FinalizationError)
+                    } else {
+                        Ok(())
+                    };
+                }
+                let input = step.input.get_or_init(init_fn);
+
+                match step.op {
+                    OpCode::FORK => {
+                        debug_assert!(step.next.len() >= 2, "FORK must have at least two children");
+                        for child in &step.next {
+                            child.try_finalize(input)?;
+                        }
+                    }
+                    OpCode::ATTESTATION => unreachable!("should not happen"),
+                    op => {
+                        let output = op.execute_in(input, &step.data, step.allocator().clone());
+                        debug_assert!(step.next.len() == 1, "non-FORK must have exactly one child");
+                        step.next[0].try_finalize(&output)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Merges multiple timestamps into a single FORK timestamp.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if there are conflicting inputs when finalizing unfinalized timestamps.
+    pub fn merge_in(timestamps: Vec<Timestamp<A>, A>, alloc: A) -> Timestamp<A> {
+        Self::try_merge_in(timestamps, alloc).expect("conflicting inputs when merging timestamps")
+    }
+
+    /// Merges multiple timestamps into a single FORK timestamp.
+    ///
+    /// This will attempt to finalize unfinalized timestamps if any of the input timestamps are finalized.
+    ///
+    /// Returns an error if there are conflicting inputs when finalizing unfinalized timestamps.
+    pub fn try_merge_in(
+        timestamps: Vec<Timestamp<A>, A>,
+        alloc: A,
+    ) -> Result<Timestamp<A>, FinalizationError> {
+        // if any timestamp is finalized, ensure they are with the same input,
+        // finalize unfinalized timestamps with that input
+        let finalized_input = timestamps.iter().find_map(|ts| ts.input());
+        if let Some(ref input) = finalized_input {
+            for ts in timestamps.iter().filter(|ts| !ts.is_finalized()) {
+                ts.try_finalize(input)?;
+            }
+        }
+
+        Ok(Timestamp::Step(Step {
+            op: OpCode::FORK,
+            data: Vec::new_in(alloc.clone()),
+            input: OnceLock::new(),
+            next: timestamps,
+        }))
+    }
+}
+
+impl<A: Allocator> MayHaveInput for Timestamp<A> {
+    #[inline]
+    fn input(&self) -> Option<&[u8]> {
+        match self {
+            Timestamp::Step(step) => step.input(),
+            Timestamp::Attestation(attestation) => attestation.input(),
+        }
+    }
+}
+
+impl<A: Allocator> Step<A> {
+    /// Returns the opcode of this step.
+    pub fn op(&self) -> OpCode {
+        self.op
+    }
+
+    /// Returns the immediate data of this step.
+    pub fn data(&self) -> &[u8] {
+        self.data.as_slice()
+    }
+
+    /// Returns the next timestamps of this step.
+    pub fn next(&self) -> &[Timestamp<A>] {
+        self.next.as_slice()
+    }
+
+    /// Returns the next timestamps of this step.
+    pub fn next_mut(&mut self) -> &mut [Timestamp<A>] {
+        self.next.as_mut_slice()
+    }
+
+    /// Returns the allocator used by this step.
+    pub fn allocator(&self) -> &A {
+        self.data.allocator()
+    }
+}
+
+impl<A: Allocator> MayHaveInput for Step<A> {
+    #[inline]
+    fn input(&self) -> Option<&[u8]> {
+        self.input.get().map(|v| v.as_slice())
+    }
+}
+
+#[must_use = "AttestationIter is an iterator, it does nothing unless consumed"]
+pub struct AttestationIter<'a, A: Allocator> {
+    stack: Vec<&'a Timestamp<A>>,
+}
+
+impl<'a, A: Allocator> Iterator for AttestationIter<'a, A> {
+    type Item = &'a RawAttestation<A>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(ts) = self.stack.pop() {
+            match ts {
+                Timestamp::Step(step) => {
+                    for next in step.next().iter().rev() {
+                        self.stack.push(next);
+                    }
+                }
+                Timestamp::Attestation(attestation) => return Some(attestation),
+            }
+        }
+        None
+    }
+}
+
+pub struct PendingAttestationIterMut<'a, A: Allocator> {
+    stack: Vec<&'a mut Timestamp<A>>,
+}
+
+impl<'a, A: Allocator> Iterator for PendingAttestationIterMut<'a, A> {
+    type Item = &'a mut Timestamp<A>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(ts) = self.stack.pop() {
+            match ts {
+                Timestamp::Step(step) => {
+                    for next in step.next_mut().iter_mut().rev() {
+                        self.stack.push(next);
+                    }
+                }
+                Timestamp::Attestation(attestation) => {
+                    if attestation.tag == PendingAttestation::TAG {
+                        return Some(ts);
+                    }
+                }
+            }
+        }
+        None
+    }
 }

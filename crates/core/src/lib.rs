@@ -1,5 +1,10 @@
 #![feature(exact_bitshifts)]
+#![feature(allocator_api)]
+#![cfg_attr(not(feature = "std"), no_std)]
 //! # Universal Timestamps Core Library
+
+extern crate alloc;
+extern crate core;
 
 mod tracing;
 
@@ -10,4 +15,6 @@ pub mod fixtures;
 pub mod codec;
 /// Error types raised by codec operations.
 pub mod error;
-mod utils;
+pub mod utils;
+#[cfg(feature = "verifier")]
+pub mod verifier;

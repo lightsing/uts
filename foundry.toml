@@ -1,0 +1,26 @@
+[profile.default]
+ast = true
+build_info = true
+extra_output = ["storageLayout"]
+ffi = true
+fs_permissions = [{ access = "read", path = "target/foundry" }]
+ignored_error_codes = [
+  2018, # Function state mutability can be restricted to pure
+]
+libs = ["lib"]
+out = "target/foundry"
+script = "contract-scripts"
+solc_version = "0.8.24"
+src = "contracts"
+test = "contract-tests"
+
+# Set EVM version explicitly (must match across environments)
+evm_version = "cancun"
+
+# Disable metadata hash for deterministic bytecode
+bytecode_hash = "none"
+cbor_metadata = false
+
+# If using optimizer, keep settings consistent
+optimizer = true
+optimizer_runs = 200

@@ -1,0 +1,28 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-stamper"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["serde"] }
+alloy-provider = { workspace = true }
+bitcode = { workspace = true, features = ["serde"] }
+bytemuck = { workspace = true }
+digest = { workspace = true }
+rocksdb = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["time", "macros"] }
+tracing = { workspace = true }
+uts-bmt = { workspace = true }
+uts-contracts = { workspace = true }
+uts-core = { workspace = true }
+uts-journal = { workspace = true }
+
+[lints]
+workspace = true

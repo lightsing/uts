@@ -1,0 +1,52 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-calendar"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
+alloy-signer = { workspace = true }
+alloy-signer-local = { workspace = true, features = ["mnemonic"] }
+axum = { workspace = true, default-features = false, features = [
+  "macros",
+  "http2",
+  "tokio",
+] } # http2 only
+bump-scope.workspace = true
+bytemuck = { workspace = true }
+bytes = { workspace = true }
+digest = { workspace = true }
+eyre = { workspace = true }
+hashbrown = { version = "0.15.5", features = ["nightly"] } # why?
+itoa = { workspace = true }
+rocksdb = { workspace = true }
+sha3 = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tower-http = { workspace = true, features = ["cors"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uts-bmt = { workspace = true }
+uts-contracts = { workspace = true }
+uts-core = { workspace = true, features = ["bytes"] }
+uts-journal = { workspace = true }
+uts-stamper = { workspace = true }
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+harness = false
+name = "submit_digest"
+
+[lints]
+workspace = true
+
+[features]
+dev = ["axum/http1"] # for easier testing
+performance = ["tracing/release_max_level_info"]
