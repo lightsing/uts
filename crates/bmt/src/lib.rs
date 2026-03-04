@@ -106,7 +106,7 @@ where
 
     /// From raw bytes, reconstruct the Merkle tree
     #[inline]
-    pub unsafe fn from_raw_bytes(bytes: &[u8]) -> Self {
+    pub fn from_raw_bytes(bytes: &[u8]) -> Self {
         let nodes: &[Output<D>] = bytemuck::cast_slice(bytes);
         let len = nodes.len() / 2;
         Self {

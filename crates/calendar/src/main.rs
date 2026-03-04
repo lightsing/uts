@@ -10,12 +10,17 @@ use axum::{
     routing::{get, post},
 };
 use digest::{OutputSizeUser, typenum::Unsigned};
-use eyre::ContextCompat;
+use eyre::{Context, ContextCompat};
 use rocksdb::DB;
 use sha3::Keccak256;
+use sqlx::{
+    SqlitePool, migrate,
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+};
 use std::{env, path::PathBuf, sync::Arc};
+use tokio_util::sync::CancellationToken;
 use tower_http::{cors, cors::CorsLayer};
-use tracing::info;
+use tracing::{info, log::error};
 use uts_calendar::{AppState, routes, shutdown_signal, time};
 use uts_contracts::eas::{EAS, EAS_ADDRESSES};
 use uts_journal::{Journal, JournalConfig, checkpoint::CheckpointConfig};
@@ -29,9 +34,12 @@ async fn main() -> eyre::Result<()> {
 
     tokio::spawn(time::async_updater());
 
+    // FIXME: This signer needs to be replaced when deploying to production, as the private key is hard coded here for demonstration purposes.
     let signer = LocalSigner::from_bytes(&b256!(
         "9ba9926331eb5f4995f1e358f57ba1faab8b005b51928d2fdaea16e69a6ad225"
     ))?;
+
+    let token = CancellationToken::new();
 
     // journal
     let journal = Journal::with_capacity_and_config(
@@ -63,10 +71,24 @@ async fn main() -> eyre::Result<()> {
     // stamper
     let reader = journal.reader();
     let db = Arc::new(DB::open_default("./.db/tries")?);
+    let sql = SqlitePoolOptions::new()
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename("./.db/calendar.sqlite")
+                .create_if_missing(true)
+                .foreign_keys(true),
+        )
+        .await?;
+    migrate!("../../migrations")
+        .run(&sql)
+        .await
+        .context("failed to run database migrations")?;
+
     let mut stamper =
         Stamper::<Keccak256, _, { <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>::new(
             reader,
             db.clone(),
+            sql.clone(),
             contract,
             // TODO: tune configuration
             StamperConfig {
@@ -76,10 +98,16 @@ async fn main() -> eyre::Result<()> {
                 max_cache_size: 256,
             },
         );
-    // TODO: graceful shutdown
-    tokio::spawn(async move {
-        stamper.run().await;
-    });
+
+    {
+        let token = token.clone();
+        tokio::spawn(async move {
+            if let Err(e) = stamper.run(token.clone()).await {
+                error!("stamper fatal error: {e}");
+                token.cancel();
+            }
+        });
+    }
 
     let app = Router::new()
         .route(
@@ -91,7 +119,8 @@ async fn main() -> eyre::Result<()> {
         .with_state(Arc::new(AppState {
             signer,
             journal: journal.clone(),
-            db,
+            kv_db: db,
+            sql_pool: sql,
         }))
         .layer(
             CorsLayer::new()
@@ -102,7 +131,10 @@ async fn main() -> eyre::Result<()> {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(async move {
+            token.cancelled().await;
+            error!("fatal error signal received, shutting down");
+        }))
         .await?;
 
     // this will join the journal's background task and ensure flush of all pending commits

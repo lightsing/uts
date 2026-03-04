@@ -11,4 +11,5 @@ pub mod gateway;
 /// but only includes the events and functions that are relevant to the server/backend.
 pub mod manager;
 
+/// Solidity interfaces for the Fee Oracle.
 pub mod fee_oracle;

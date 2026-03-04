@@ -8,21 +8,27 @@ name = "uts-stamper"
 repository.workspace = true
 version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-provider = { workspace = true }
 bitcode = { workspace = true, features = ["serde"] }
 bytemuck = { workspace = true }
 digest = { workspace = true }
+eyre = { workspace = true }
 rocksdb = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "migrate"] }
+strum = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["time", "macros"] }
+tokio-util = { workspace = true }
 tracing = { workspace = true }
 uts-bmt = { workspace = true }
 uts-contracts = { workspace = true }
 uts-core = { workspace = true }
 uts-journal = { workspace = true }
 
-[lints]
-workspace = true
+[features]
