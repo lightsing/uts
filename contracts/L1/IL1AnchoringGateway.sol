@@ -8,8 +8,6 @@ interface IL1AnchoringGateway {
         bytes32 indexed merkleRoot, uint256 indexed startIndex, uint256 count, address indexed submitter
     );
 
-    /// @notice Emitted when the UniversalTimestamps contract address is updated.
-    event UTSUpdated(address indexed oldUts, address indexed newUts);
     /// @notice Emitted when the L1 Scroll Messenger contract address is updated.
     event L1ScrollMessengerUpdated(address indexed oldMessenger, address indexed newMessenger);
     /// @notice Emitted when the L2 Anchoring Manager contract address is updated.

@@ -2,7 +2,8 @@
 
 pragma solidity =0.8.28;
 
-import {IEAS, AttestationRequest, AttestationRequestData} from "eas-contracts/IEAS.sol";
+import {IEAS, AttestationRequest, AttestationRequestData, DelegatedAttestationRequest} from "eas-contracts/IEAS.sol";
+import {Signature} from "eas-contracts/Common.sol";
 
 library EASHelper {
     /// @notice Schema ID for content hash attestation, un-revokable, with no extra data, schema: bytes32 contentHash
