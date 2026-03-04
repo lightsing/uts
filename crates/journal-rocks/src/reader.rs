@@ -12,15 +12,15 @@ use std::{
 /// Reader **WON'T** advance the shared consumed boundary until `commit()` is
 /// called.  Entries are fetched from RocksDB into an internal buffer on each
 /// [`read`](JournalReader::read) call.
-pub struct JournalReader<const ENTRY_SIZE: usize> {
-    journal: Arc<JournalInner<ENTRY_SIZE>>,
+pub struct JournalReader {
+    journal: Arc<JournalInner>,
     /// Local consumed cursor – how far this reader has read.
     consumed: u64,
     /// Internal buffer populated by [`read`](JournalReader::read).
-    read_buf: Vec<[u8; ENTRY_SIZE]>,
+    read_buf: Vec<Box<[u8]>>,
 }
 
-impl<const ENTRY_SIZE: usize> fmt::Debug for JournalReader<ENTRY_SIZE> {
+impl fmt::Debug for JournalReader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("JournalReader")
             .field("consumed", &self.consumed)
@@ -28,14 +28,14 @@ impl<const ENTRY_SIZE: usize> fmt::Debug for JournalReader<ENTRY_SIZE> {
     }
 }
 
-impl<const ENTRY_SIZE: usize> Drop for JournalReader<ENTRY_SIZE> {
+impl Drop for JournalReader {
     fn drop(&mut self) {
         self.journal.reader_taken.store(false, Ordering::Release);
     }
 }
 
-impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
-    pub(super) fn new(journal: Arc<JournalInner<ENTRY_SIZE>>) -> Self {
+impl JournalReader {
+    pub(super) fn new(journal: Arc<JournalInner>) -> Self {
         let consumed = journal.consumed_index();
         Self {
             journal,
@@ -74,12 +74,12 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
         }
 
         // Slow path – register a waker and park until the writer catches up.
-        struct WaitForBatch<'a, const ENTRY_SIZE: usize> {
-            reader: &'a JournalReader<ENTRY_SIZE>,
+        struct WaitForBatch<'a> {
+            reader: &'a JournalReader,
             target_index: u64,
         }
 
-        impl<const ENTRY_SIZE: usize> Future for WaitForBatch<'_, ENTRY_SIZE> {
+        impl Future for WaitForBatch<'_> {
             type Output = Result<(), Error>;
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 if self.reader.journal.fatal_error.load(Ordering::Acquire) {
@@ -120,7 +120,7 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
     /// Bumps the internal consumed cursor by the number of entries yielded.
     /// Caller is responsible for calling [`commit`](JournalReader::commit)
     /// after processing the entries.
-    pub fn read(&mut self, max: usize) -> Result<&[[u8; ENTRY_SIZE]], Error> {
+    pub fn read(&mut self, max: usize) -> Result<&[Box<[u8]>], Error> {
         if self.journal.fatal_error.load(Ordering::Acquire) {
             return Err(Error::Fatal);
         }
@@ -134,7 +134,11 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
         self.read_buf.clear();
 
         let start_key = self.consumed.to_be_bytes();
-        let end_key = (self.consumed + count as u64).to_be_bytes();
+        let end_key = self
+            .consumed
+            .checked_add(count as u64)
+            .expect("let's handle overflow 10000 years later")
+            .to_be_bytes();
 
         let mut options = ReadOptions::default();
         options.set_iterate_lower_bound(start_key);
@@ -149,13 +153,15 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
         for (idx, data) in iter.enumerate() {
             let (_key, value) = data.stop_if_error(&self.journal)?;
             debug_assert_eq!((self.consumed + idx as u64).to_be_bytes(), _key.as_ref(),);
-            if value.len() != ENTRY_SIZE {
-                error!("entry at index {idx} has wrong size");
-                return Err(Error::Fatal);
-            }
-            let mut entry = [0u8; ENTRY_SIZE];
-            entry.copy_from_slice(&value);
-            self.read_buf.push(entry);
+            self.read_buf.push(value);
+        }
+
+        let read = self.read_buf.len();
+        if read != count {
+            error!(
+                "journal reader short read: expected {count} entries, got {read}; treating as fatal"
+            );
+            return Err(Error::Fatal);
         }
 
         self.consumed += count as u64;
@@ -175,11 +181,12 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
         self.journal
             .write_consumed_index_batched(&mut batch, self.consumed);
         // Garbage-collect consumed entries.
-        batch.delete_range(old_consumed.to_be_bytes(), self.consumed.to_be_bytes());
-        if let Err(e) = self.journal.db.write(batch) {
-            error!("failed to commit consumed and run gc RocksDB: {e}");
-            return Err(Error::Fatal);
-        }
+        batch.delete_range_cf(
+            self.journal.cf_entries(),
+            old_consumed.to_be_bytes(),
+            self.consumed.to_be_bytes(),
+        );
+        self.journal.db.write(batch).stop_if_error(&self.journal)?;
 
         self.journal
             .consumed_index
@@ -255,7 +262,7 @@ mod tests {
             journal_clone.commit(&TEST_DATA[0]);
         });
 
-        reader.wait_at_least(1).await;
+        reader.wait_at_least(1).await?;
         assert_eq!(reader.available(), 1);
 
         task.await?;
@@ -275,7 +282,7 @@ mod tests {
             }
         });
 
-        timeout(Duration::from_secs(10), reader.wait_at_least(3)).await?;
+        timeout(Duration::from_secs(10), reader.wait_at_least(3)).await??;
         assert!(reader.available() >= 3);
 
         task.await?;
@@ -292,6 +299,7 @@ mod tests {
 
         timeout(Duration::from_secs(1), reader.wait_at_least(5))
             .await
+            .unwrap()
             .unwrap();
     }
 
@@ -308,6 +316,7 @@ mod tests {
 
         timeout(Duration::from_secs(1), reader.wait_at_least(4))
             .await
+            .unwrap()
             .unwrap();
     }
 }

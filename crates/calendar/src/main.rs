@@ -80,20 +80,19 @@ async fn main() -> eyre::Result<()> {
         .await
         .context("failed to run database migrations")?;
 
-    let mut stamper =
-        Stamper::<Keccak256, _, { <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>::new(
-            reader,
-            db.clone(),
-            sql.clone(),
-            contract,
-            // TODO: tune configuration
-            StamperConfig {
-                max_interval_seconds: 10,
-                max_entries_per_timestamp: 1 << 10, // 1024 entries
-                min_leaves: 1 << 4,
-                max_cache_size: 256,
-            },
-        );
+    let mut stamper = Stamper::<Keccak256, _>::new(
+        reader,
+        db.clone(),
+        sql.clone(),
+        contract,
+        // TODO: tune configuration
+        StamperConfig {
+            max_interval_seconds: 10,
+            max_entries_per_timestamp: 1 << 10, // 1024 entries
+            min_leaves: 1 << 4,
+            max_cache_size: 256,
+        },
+    );
 
     {
         let token = token.clone();

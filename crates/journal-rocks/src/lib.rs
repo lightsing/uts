@@ -3,13 +3,6 @@
 //! This crate provides the same functionality as `uts-journal` but uses RocksDB
 //! for persistence instead of a custom WAL, providing better reliability and
 //! crash recovery guarantees.
-//!
-//! **Design**: Entries are written directly to RocksDB on commit (synchronous,
-//! immediately durable). No in-memory ring buffer or background worker thread is
-//! needed. The reader fetches entries from RocksDB into an internal buffer.
-//!
-//! It is designed as a drop-in replacement for `uts-journal` — only the
-//! dependency in `Cargo.toml` and the journal construction need to change.
 
 #[macro_use]
 extern crate tracing;
@@ -70,11 +63,11 @@ impl Default for JournalConfig {
 /// Writes go directly to RocksDB (synchronous and durable), so there is no
 /// separate "persisted" boundary — `write_index` **is** the persisted boundary.
 #[derive(Clone)]
-pub struct Journal<const ENTRY_SIZE: usize> {
-    inner: Arc<JournalInner<ENTRY_SIZE>>,
+pub struct Journal {
+    inner: Arc<JournalInner>,
 }
 
-pub(crate) struct JournalInner<const ENTRY_SIZE: usize> {
+pub(crate) struct JournalInner {
     /// The RocksDB instance storing entries and metadata.
     db: DB,
     /// Maximum number of in-flight (written but not yet consumed) entries.
@@ -90,18 +83,18 @@ pub(crate) struct JournalInner<const ENTRY_SIZE: usize> {
     reader_taken: AtomicBool,
     /// Waker for the consumer waiting for new entries.
     consumer_wait: Mutex<Option<ConsumerWait>>,
-    /// Whether the journal is in a fatal error state. If true, all operations will fail and the j
+    /// Whether the journal is in a fatal error state. If true, all operations will fail and the
     /// journal should be dropped.
     fatal_error: AtomicBool,
 }
 
-impl<const ENTRY_SIZE: usize> fmt::Debug for Journal<ENTRY_SIZE> {
+impl fmt::Debug for Journal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Journal").finish()
     }
 }
 
-impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
+impl Journal {
     /// Create a new journal with the specified capacity and default configuration.
     pub fn with_capacity(capacity: usize) -> Result<Self, Error> {
         Self::with_capacity_and_config(capacity, JournalConfig::default())
@@ -154,14 +147,14 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
     /// # Panics
     ///
     /// Panics if a reader is already taken.
-    pub fn reader(&self) -> JournalReader<ENTRY_SIZE> {
+    pub fn reader(&self) -> JournalReader {
         self.try_reader().expect("Journal reader already taken")
     }
 
     /// Try acquires a reader for this journal.
     ///
     /// If a reader is already taken, returns None.
-    pub fn try_reader(&self) -> Option<JournalReader<ENTRY_SIZE>> {
+    pub fn try_reader(&self) -> Option<JournalReader> {
         if self.inner.reader_taken.swap(true, Ordering::AcqRel) {
             return None;
         }
@@ -174,15 +167,15 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
     ///
     /// # Panics
     ///
-    /// Panics if the journal is full or shut down.
-    pub fn commit(&self, data: &[u8; ENTRY_SIZE]) {
+    /// Panics if the journal is full or has encountered a fatal error.
+    pub fn commit(&self, data: &[u8]) {
         self.try_commit(data).expect("Journal is unavailable")
     }
 
     /// Try commit a new entry to the journal.
     ///
     /// The entry is written to RocksDB synchronously.
-    pub fn try_commit(&self, data: &[u8; ENTRY_SIZE]) -> Result<(), Error> {
+    pub fn try_commit(&self, data: &[u8]) -> Result<(), Error> {
         if self.inner.fatal_error.load(Ordering::Acquire) {
             return Err(Error::Fatal);
         }
@@ -218,7 +211,7 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
     }
 }
 
-impl<const ENTRY_SIZE: usize> JournalInner<ENTRY_SIZE> {
+impl JournalInner {
     const META_WRITE_INDEX_KEY: &[u8] = &[0x00];
     const META_CONSUMED_INDEX_KEY: &[u8] = &[0x01];
 
@@ -327,7 +320,7 @@ pub(crate) mod tests {
         [8u8; ENTRY_SIZE],
         [9u8; ENTRY_SIZE],
     ];
-    pub type Journal = crate::Journal<ENTRY_SIZE>;
+    pub type Journal = crate::Journal;
 
     /// Create a journal with an isolated temporary directory for the RocksDB database.
     /// Returns the journal and the temp dir guard (must be kept alive for the test duration).
@@ -372,8 +365,8 @@ pub(crate) mod tests {
         {
             let entries = reader.read(2)?;
             assert_eq!(entries.len(), 2);
-            assert_eq!(entries[0], TEST_DATA[0]);
-            assert_eq!(entries[1], TEST_DATA[1]);
+            assert_eq!(*entries[0], TEST_DATA[0]);
+            assert_eq!(*entries[1], TEST_DATA[1]);
         }
 
         reader.commit()?;
@@ -410,8 +403,8 @@ pub(crate) mod tests {
         {
             let entries = reader.read(2)?;
             assert_eq!(entries.len(), 2);
-            assert_eq!(entries[0], TEST_DATA[0]);
-            assert_eq!(entries[1], TEST_DATA[1]);
+            assert_eq!(*entries[0], TEST_DATA[0]);
+            assert_eq!(*entries[1], TEST_DATA[1]);
         }
         reader.commit()?;
 
@@ -422,10 +415,10 @@ pub(crate) mod tests {
         {
             let entries = reader.read(4)?;
             assert_eq!(entries.len(), 4);
-            assert_eq!(entries[0], TEST_DATA[2]);
-            assert_eq!(entries[1], TEST_DATA[3]);
-            assert_eq!(entries[2], TEST_DATA[4]);
-            assert_eq!(entries[3], TEST_DATA[5]);
+            assert_eq!(*entries[0], TEST_DATA[2]);
+            assert_eq!(*entries[1], TEST_DATA[3]);
+            assert_eq!(*entries[2], TEST_DATA[4]);
+            assert_eq!(*entries[3], TEST_DATA[5]);
         }
 
         reader.commit()?;

@@ -8,9 +8,7 @@ extern crate tracing;
 
 use alloy_signer::k256::ecdsa::SigningKey;
 use alloy_signer_local::LocalSigner;
-use digest::{OutputSizeUser, typenum::Unsigned};
 use rocksdb::DB;
-use sha3::Keccak256;
 use std::sync::Arc;
 use uts_journal::Journal;
 
@@ -25,7 +23,7 @@ pub struct AppState {
     /// Local signer for signing OTS timestamps.
     pub signer: LocalSigner<SigningKey>,
     /// Journal
-    pub journal: Journal<{ <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>,
+    pub journal: Journal,
     /// RocksDB
     pub kv_db: Arc<DB>,
     /// Sqlite pool
