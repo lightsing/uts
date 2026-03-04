@@ -63,7 +63,7 @@ phf = { version = "0.13.1", default-features = false }
 rand = "0.10"
 regex = "1.12"
 reqwest = { version = "0.13", default-features = false }
-rocksdb = "0.24"
+rocksdb = { version = "0.24", default-features = false, features = ["bindgen-runtime"] }
 serde = "1.0"
 serde_json = "1.0"
 serde_with = "3.16"

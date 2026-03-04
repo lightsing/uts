@@ -10,7 +10,7 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
-rocksdb = { workspace = true, default-features = false }
+rocksdb = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
