@@ -14,10 +14,10 @@
 #[macro_use]
 extern crate tracing;
 
-use crate::{error::JournalUnavailable, reader::JournalReader};
-use rocksdb::{DB, Options, WriteBatch};
+use crate::reader::JournalReader;
+use rocksdb::{ColumnFamily, DB, Options, WriteBatch};
 use std::{
-    fmt, io,
+    fmt,
     path::PathBuf,
     sync::{
         Arc, Mutex,
@@ -26,23 +26,30 @@ use std::{
     task::Waker,
 };
 
-/// Error types.
-pub mod error;
 /// Journal reader.
 pub mod reader;
 
-const META_WRITE_INDEX_KEY: &[u8] = b"\x00";
-const META_CONSUMED_INDEX_KEY: &[u8] = b"\x01";
-
-/// Read a u64 from a meta key in RocksDB, returning 0 if absent.
-fn read_meta(db: &DB, key: &[u8]) -> u64 {
-    db.get(key)
-        .ok()
-        .flatten()
-        .and_then(|v| <[u8; 8]>::try_from(v.as_slice()).ok())
-        .map(u64::from_le_bytes)
-        .unwrap_or(0)
+/// Error indicating that the journal buffer is not available now.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    /// The journal is in a fatal state, caller should stop using it and drop it as soon as possible.
+    #[error("fatal error happened")]
+    Fatal,
+    /// The journal buffer is full, new entries cannot be accepted until some entries are consumed
+    /// and the buffer has space.
+    #[error("journal buffer is full")]
+    Full,
 }
+
+impl From<rocksdb::Error> for Error {
+    fn from(e: rocksdb::Error) -> Self {
+        error!("RocksDB error: {e}");
+        Error::Fatal
+    }
+}
+
+const CF_ENTRIES: &str = "entries";
+const CF_META: &str = "meta";
 
 /// Configuration for the journal.
 #[derive(Debug, Clone)]
@@ -89,8 +96,6 @@ pub(crate) struct JournalInner<const ENTRY_SIZE: usize> {
     reader_taken: AtomicBool,
     /// Waker for the consumer waiting for new entries.
     consumer_wait: Mutex<Option<ConsumerWait>>,
-    /// Shutdown flag.
-    shutdown: AtomicBool,
 }
 
 impl<const ENTRY_SIZE: usize> fmt::Debug for Journal<ENTRY_SIZE> {
@@ -101,44 +106,41 @@ impl<const ENTRY_SIZE: usize> fmt::Debug for Journal<ENTRY_SIZE> {
 
 impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
     /// Create a new journal with the specified capacity and default configuration.
-    pub fn with_capacity(capacity: usize) -> io::Result<Self> {
+    pub fn with_capacity(capacity: usize) -> Result<Self, Error> {
         Self::with_capacity_and_config(capacity, JournalConfig::default())
     }
 
     /// Create a new journal with the specified capacity and configuration.
-    pub fn with_capacity_and_config(capacity: usize, config: JournalConfig) -> io::Result<Self> {
+    pub fn with_capacity_and_config(capacity: usize, config: JournalConfig) -> Result<Self, Error> {
         let capacity = capacity as u64;
 
-        // Open RocksDB
-        let mut opts = Options::default();
-        opts.create_if_missing(true);
-        let db = DB::open(&opts, &config.db_path)
-            .map_err(|e| io::Error::other(format!("failed to open RocksDB: {e}")))?;
+        let mut global_options = Options::default();
+        global_options.create_if_missing(true);
+        global_options.create_missing_column_families(true);
 
-        // Recover state
-        let write_index = read_meta(&db, META_WRITE_INDEX_KEY);
-        let consumed_index = read_meta(&db, META_CONSUMED_INDEX_KEY);
-
-        if consumed_index > write_index {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Consumed index {consumed_index} is greater than write index {write_index}"
-                ),
-            ));
-        }
-        info!("Journal recovered: write_index={write_index}, consumed_index={consumed_index}");
+        let db = DB::open_cf(&global_options, &config.db_path, [CF_ENTRIES, CF_META])?;
 
         let inner = Arc::new(JournalInner {
             db,
             capacity,
-            write_index: AtomicU64::new(write_index),
-            consumed_index: AtomicU64::new(consumed_index),
+            write_index: AtomicU64::new(0),
+            consumed_index: AtomicU64::new(0),
             write_lock: Mutex::new(()),
             reader_taken: AtomicBool::new(false),
             consumer_wait: Mutex::new(None),
-            shutdown: AtomicBool::new(false),
         });
+
+        // Recover state
+        let write_index = inner.read_write_index_from_db()?;
+        let consumed_index = inner.read_consumed_index_from_db()?;
+        if consumed_index > write_index {
+            error!("Consumed index {consumed_index} is greater than write index {write_index}");
+            return Err(Error::Fatal);
+        }
+        info!("Journal recovered: write_index={write_index}, consumed_index={consumed_index}");
+
+        inner.set_write_index(write_index);
+        inner.set_consumed_index(consumed_index);
 
         Ok(Self { inner })
     }
@@ -176,31 +178,27 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
     /// Try commit a new entry to the journal.
     ///
     /// The entry is written to RocksDB synchronously.
-    pub fn try_commit(&self, data: &[u8; ENTRY_SIZE]) -> Result<(), JournalUnavailable> {
-        if self.inner.shutdown.load(Ordering::Acquire) {
-            return Err(JournalUnavailable::Shutdown);
-        }
-
-        // Serialise writes so indices are strictly consecutive.
+    pub fn try_commit(&self, data: &[u8; ENTRY_SIZE]) -> Result<(), Error> {
+        // Serialize writes so indices are strictly consecutive.
         let _guard = self.inner.write_lock.lock().unwrap();
 
-        let write_idx = self.inner.write_index.load(Ordering::Acquire);
-        let consumed = self.inner.consumed_index.load(Ordering::Acquire);
+        let write_idx = self.inner.write_index();
+        let consumed = self.inner.consumed_index();
 
         if write_idx.wrapping_sub(consumed) >= self.inner.capacity {
-            return Err(JournalUnavailable::Full);
+            return Err(Error::Full);
         }
 
+        let cf_entries = self.inner.cf_entries();
         // Write entry + updated write_index atomically via WriteBatch.
         let new_write_idx = write_idx.wrapping_add(1);
         let mut batch = WriteBatch::default();
-        batch.put(write_idx.to_le_bytes(), data);
-        batch.put(META_WRITE_INDEX_KEY, new_write_idx.to_le_bytes());
-        self.inner.db.write(batch).expect("RocksDB write failed");
-
+        batch.put_cf(cf_entries, write_idx.to_be_bytes(), data);
         self.inner
-            .write_index
-            .store(new_write_idx, Ordering::Release);
+            .write_write_index_batched(&mut batch, new_write_idx);
+        self.inner.db.write(batch)?;
+
+        self.inner.set_write_index(new_write_idx);
 
         // drop write_lock before notifying consumer
         drop(_guard);
@@ -210,27 +208,93 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
 
         Ok(())
     }
-
-    /// Shut down the journal.
-    pub fn shutdown(&self) -> io::Result<()> {
-        self.inner.shutdown.store(true, Ordering::SeqCst);
-        self.inner
-            .db
-            .flush()
-            .map_err(|e| io::Error::other(e.to_string()))?;
-        Ok(())
-    }
 }
 
 impl<const ENTRY_SIZE: usize> JournalInner<ENTRY_SIZE> {
+    const META_WRITE_INDEX_KEY: &[u8] = &[0x00];
+    const META_CONSUMED_INDEX_KEY: &[u8] = &[0x01];
+
     /// Wake the consumer waker if the write index has reached its target.
     fn notify_consumer(&self) {
         let mut guard = self.consumer_wait.lock().unwrap();
-        if let Some(wait) = guard.as_ref() {
-            if self.write_index.load(Ordering::Acquire) >= wait.target_index {
-                guard.take().unwrap().waker.wake();
-            }
+        if let Some(wait) = guard.as_ref()
+            && self.write_index() >= wait.target_index
+        {
+            guard.take().unwrap().waker.wake();
         }
+    }
+
+    #[inline]
+    pub(crate) fn consumed_index(&self) -> u64 {
+        self.consumed_index.load(Ordering::Acquire)
+    }
+
+    #[inline]
+    pub(crate) fn set_consumed_index(&self, idx: u64) {
+        self.consumed_index.store(idx, Ordering::Release);
+    }
+
+    #[inline]
+    pub(crate) fn write_index(&self) -> u64 {
+        self.write_index.load(Ordering::Acquire)
+    }
+
+    #[inline]
+    pub(crate) fn set_write_index(&self, idx: u64) {
+        self.write_index.store(idx, Ordering::Release);
+    }
+
+    #[inline]
+    pub(crate) fn cf_entries(&self) -> &ColumnFamily {
+        self.db.cf_handle(CF_ENTRIES).expect("missing entries CF")
+    }
+
+    #[inline]
+    pub(crate) fn cf_meta(&self) -> &ColumnFamily {
+        self.db.cf_handle(CF_META).expect("missing meta CF")
+    }
+
+    #[inline]
+    pub(crate) fn read_consumed_index_from_db(&self) -> Result<u64, Error> {
+        self.read_meta(Self::META_CONSUMED_INDEX_KEY)
+    }
+
+    #[inline]
+    pub(crate) fn read_write_index_from_db(&self) -> Result<u64, Error> {
+        self.read_meta(Self::META_WRITE_INDEX_KEY)
+    }
+
+    #[inline]
+    fn read_meta(&self, key: &[u8]) -> Result<u64, Error> {
+        let cf = self.cf_meta();
+        let Some(value) = self.db.get_cf(cf, key)? else {
+            // If the key is missing, assume index 0 (fresh journal).
+            return Ok(0);
+        };
+        if value.len() != 8 {
+            error!(
+                "Invalid meta value for key {:?}: expected 8 bytes, got {}",
+                key,
+                value.len()
+            );
+            return Err(Error::Fatal);
+        }
+        Ok(u64::from_le_bytes(value.as_slice().try_into().unwrap()))
+    }
+
+    #[inline]
+    pub(crate) fn write_consumed_index_batched(&self, batch: &mut WriteBatch, new: u64) {
+        self.write_meta_batched(Self::META_CONSUMED_INDEX_KEY, batch, new)
+    }
+
+    #[inline]
+    pub(crate) fn write_write_index_batched(&self, batch: &mut WriteBatch, new: u64) {
+        self.write_meta_batched(Self::META_WRITE_INDEX_KEY, batch, new)
+    }
+
+    #[inline]
+    fn write_meta_batched(&self, key: &[u8], batch: &mut WriteBatch, new: u64) {
+        batch.put_cf(self.cf_meta(), key, new.to_le_bytes())
     }
 }
 
@@ -286,7 +350,6 @@ pub(crate) mod tests {
             "reader acquisition should succeed after drop"
         );
 
-        journal.shutdown()?;
         Ok(())
     }
 
@@ -299,7 +362,7 @@ pub(crate) mod tests {
         journal.commit(&TEST_DATA[1]);
 
         {
-            let entries = reader.read(2);
+            let entries = reader.read(2)?;
             assert_eq!(entries.len(), 2);
             assert_eq!(entries[0], TEST_DATA[0]);
             assert_eq!(entries[1], TEST_DATA[1]);
@@ -307,7 +370,6 @@ pub(crate) mod tests {
 
         reader.commit()?;
         assert_eq!(reader.available(), 0);
-        journal.shutdown()?;
         Ok(())
     }
 
@@ -322,10 +384,9 @@ pub(crate) mod tests {
             .try_commit(&TEST_DATA[3])
             .expect_err("buffer should report full on third commit");
         assert!(
-            matches!(err, crate::error::JournalUnavailable::Full),
+            matches!(err, crate::Error::Full),
             "expected Full, got {err:?}"
         );
-        journal.shutdown()?;
         Ok(())
     }
 
@@ -339,7 +400,7 @@ pub(crate) mod tests {
         }
 
         {
-            let entries = reader.read(2);
+            let entries = reader.read(2)?;
             assert_eq!(entries.len(), 2);
             assert_eq!(entries[0], TEST_DATA[0]);
             assert_eq!(entries[1], TEST_DATA[1]);
@@ -351,7 +412,7 @@ pub(crate) mod tests {
         }
 
         {
-            let entries = reader.read(4);
+            let entries = reader.read(4)?;
             assert_eq!(entries.len(), 4);
             assert_eq!(entries[0], TEST_DATA[2]);
             assert_eq!(entries[1], TEST_DATA[3]);
@@ -361,7 +422,6 @@ pub(crate) mod tests {
 
         reader.commit()?;
         assert_eq!(reader.available(), 0);
-        journal.shutdown()?;
         Ok(())
     }
 }

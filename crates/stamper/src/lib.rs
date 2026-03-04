@@ -178,11 +178,7 @@ where
 
         // Read entries, could need two reads if wrapping around
         buffer.clear();
-        buffer.extend_from_slice(self.reader.read(target_size));
-        let remaining = target_size - buffer.len();
-        if remaining > 0 {
-            buffer.extend_from_slice(self.reader.read(remaining));
-        }
+        buffer.extend_from_slice(self.reader.read(target_size)?);
         debug_assert_eq!(buffer.len(), target_size);
 
         let merkle_tree = MerkleTree::<D>::new_unhashed(bytemuck::cast_slice(buffer));

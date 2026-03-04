@@ -45,7 +45,7 @@ async fn main() -> eyre::Result<()> {
     let journal = Journal::with_capacity_and_config(
         RING_BUFFER_CAPACITY,
         JournalConfig {
-            db_path: PathBuf::from("./.journal"),
+            db_path: PathBuf::from("./.db/journal"),
         },
     )?;
 
@@ -132,9 +132,6 @@ async fn main() -> eyre::Result<()> {
             error!("fatal error signal received, shutting down");
         }))
         .await?;
-
-    // this will join the journal's background task and ensure flush of all pending commits
-    journal.shutdown()?;
 
     Ok(())
 }
