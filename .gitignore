@@ -38,3 +38,9 @@ dist
 
 # Project files
 .db
+
+# WAL artifacts
+.journal
+*.wal
+checkpoint.meta
+checkpoint.meta.tmp
