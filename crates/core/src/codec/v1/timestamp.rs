@@ -190,7 +190,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
         match self {
             Self::Attestation(attestation) => {
                 if let Some(already) = attestation.value.get() {
-                    return if &input != already {
+                    return if input != already {
                         Err(FinalizationError)
                     } else {
                         Ok(())
@@ -200,7 +200,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
             }
             Self::Step(step) => {
                 if let Some(already) = step.input.get() {
-                    return if &input != already {
+                    return if input != already {
                         Err(FinalizationError)
                     } else {
                         Ok(())
@@ -248,7 +248,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
         // if any timestamp is finalized, ensure they are with the same input,
         // finalize unfinalized timestamps with that input
         let finalized_input = timestamps.iter().find_map(|ts| ts.input());
-        if let Some(ref input) = finalized_input {
+        if let Some(input) = finalized_input {
             for ts in timestamps.iter().filter(|ts| !ts.is_finalized()) {
                 ts.try_finalize(input)?;
             }

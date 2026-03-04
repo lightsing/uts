@@ -185,7 +185,7 @@ where
         }
         debug_assert_eq!(buffer.len(), target_size);
 
-        let merkle_tree = MerkleTree::<D>::new_unhashed(bytemuck::cast_slice(&buffer));
+        let merkle_tree = MerkleTree::<D>::new_unhashed(bytemuck::cast_slice(buffer));
 
         let merkle_tree = tokio::task::spawn_blocking(move || {
             let merkle_tree = merkle_tree.finalize(); // CPU intensive

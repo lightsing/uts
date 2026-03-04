@@ -110,7 +110,7 @@ where
     ///
     /// - If the length of `bytes` is not a multiple of the hash output size.
     /// - If the number of nodes implied by `bytes` is not consistent with a valid
-    /// Merkle tree structure.
+    ///   Merkle tree structure.
     #[inline]
     pub fn from_raw_bytes(bytes: &[u8]) -> Self {
         let nodes: &[Output<D>] = bytemuck::cast_slice(bytes);
@@ -243,18 +243,18 @@ mod tests {
         // Manually compute the expected root
         let mut hasher = D::new();
         Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
-        Digest::update(&mut hasher, &leaves[0]);
-        Digest::update(&mut hasher, &leaves[1]);
+        Digest::update(&mut hasher, leaves[0]);
+        Digest::update(&mut hasher, leaves[1]);
         let left_hash = hasher.finalize_reset();
 
         Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
-        Digest::update(&mut hasher, &leaves[2]);
-        Digest::update(&mut hasher, &leaves[3]);
+        Digest::update(&mut hasher, leaves[2]);
+        Digest::update(&mut hasher, leaves[3]);
         let right_hash = hasher.finalize_reset();
 
         Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
-        Digest::update(&mut hasher, &left_hash);
-        Digest::update(&mut hasher, &right_hash);
+        Digest::update(&mut hasher, left_hash);
+        Digest::update(&mut hasher, right_hash);
         let expected_root = hasher.finalize();
 
         assert_eq!(tree.root().as_slice(), expected_root.as_slice());
@@ -274,23 +274,23 @@ mod tests {
         let tree = MerkleTree::<D>::new(&leaves);
 
         for leaf in &leaves {
-            let mut iter = tree
+            let iter = tree
                 .get_proof_iter(leaf)
                 .expect("Leaf should be in the tree");
             let mut current_hash = *leaf;
 
             let mut hasher = D::new();
-            while let Some((side, sibling_hash)) = iter.next() {
+            for (side, sibling_hash) in iter {
                 match side {
                     NodePosition::Left => {
                         Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
-                        Digest::update(&mut hasher, &current_hash);
+                        Digest::update(&mut hasher, current_hash);
                         Digest::update(&mut hasher, sibling_hash);
                     }
                     NodePosition::Right => {
                         Digest::update(&mut hasher, [INNER_NODE_PREFIX]);
                         Digest::update(&mut hasher, sibling_hash);
-                        Digest::update(&mut hasher, &current_hash);
+                        Digest::update(&mut hasher, current_hash);
                     }
                 }
                 current_hash = hasher.finalize_reset();
@@ -314,7 +314,7 @@ mod tests {
         for i in 0..=10u32 {
             let tree = MerkleTree::<Keccak256>::new(&leaves[..2usize.pow(i)]);
             let root = B256::new(tree.root().0);
-            println!("bytes32({}),", root);
+            println!("bytes32({root}),");
         }
     }
 }

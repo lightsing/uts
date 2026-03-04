@@ -156,7 +156,7 @@ impl CheckpointInner {
         let should_flush = new_index - self.persisted_index >= config.min_advance;
         let timeouts = now.duration_since(self.last_flush_time) >= config.min_interval;
         if forced || should_flush || timeouts {
-            fs::write(&self.temp_path, &new_index.to_le_bytes())?;
+            fs::write(&self.temp_path, new_index.to_le_bytes())?;
             fs::rename(&self.temp_path, &config.path)?;
             self.persisted_index = new_index;
             self.last_flush_time = now;
@@ -166,7 +166,7 @@ impl CheckpointInner {
 }
 
 fn recover_from_disk(path: &Path) -> io::Result<u64> {
-    let mut file = File::open(&path)?;
+    let mut file = File::open(path)?;
     let metadata = file.metadata()?;
     if metadata.len() != 8 {
         return Err(io::Error::new(

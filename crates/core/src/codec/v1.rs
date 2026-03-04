@@ -61,7 +61,7 @@ pub trait ConsistentWith<T: ToInput + ?Sized>: MayHaveInput {
     fn is_consistent_with(&self, other: &T) -> bool {
         self.input()
             .zip(other.to_input())
-            .map_or(true, |(a, b)| a == b)
+            .is_none_or(|(a, b)| a == b)
     }
 
     /// Checks if self is consistent with the given input.

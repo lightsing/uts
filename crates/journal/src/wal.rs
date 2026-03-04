@@ -42,10 +42,10 @@ impl<const ENTRY_SIZE: usize> Drop for WalInner<ENTRY_SIZE> {
     fn drop(&mut self) {
         // Signal the WAL worker to exit if it hasn't been shut down yet.
         // This prevents orphaned worker threads from spinning after the journal is dropped.
-        if !self.shutdown_flag.swap(true, Ordering::AcqRel) {
-            if let Some(worker) = self.worker.lock().unwrap().as_ref() {
-                worker.thread().unpark();
-            }
+        if !self.shutdown_flag.swap(true, Ordering::AcqRel)
+            && let Some(worker) = self.worker.lock().unwrap().as_ref()
+        {
+            worker.thread().unpark();
         }
     }
 }
@@ -76,16 +76,13 @@ impl<const ENTRY_SIZE: usize> Wal<ENTRY_SIZE> {
         let base_dir = base_dir.as_ref();
         fs::create_dir_all(base_dir)?;
         if !base_dir.is_dir() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Base path is not a directory",
-            ));
+            return Err(io::Error::other("Base path is not a directory"));
         }
 
         let shutdown_flag = Arc::new(AtomicBool::new(false));
 
         let current_segment_id = recover(base_dir, &journal)?;
-        let mut current_file = open_segment_file(base_dir, current_segment_id)?;
+        let mut current_file = open_segment_file(base_dir, current_segment_id, false)?;
         current_file.seek(SeekFrom::End(0))?;
 
         let worker = WalWorker {
@@ -227,7 +224,7 @@ impl<const ENTRY_SIZE: usize> WalWorker<ENTRY_SIZE> {
             if seg_id != self.current_segment_id {
                 // rotate to new segment file
                 self.current_segment_id = seg_id;
-                let new_file = open_segment_file(&self.base_dir, seg_id)?;
+                let new_file = open_segment_file(&self.base_dir, seg_id, true)?;
                 self.current_file = BufWriter::new(new_file);
                 let base_dir = self.base_dir.clone();
                 thread::spawn(move || truncate_old_segments(base_dir, seg_id));
@@ -330,14 +327,14 @@ fn recover<const ENTRY_SIZE: usize>(
     info!("WAL Recovered: write_index={write_index}, consumed_index={consumed_index}");
 
     // replay data to ring buffer
-    replay_data(&base_dir, journal)?;
+    replay_data(base_dir, journal)?;
     Ok(last_segment_id)
 }
 
 fn scan_segments(base_dir: &Path) -> io::Result<Vec<u64>> {
     let mut segments: Vec<u64> = Vec::new();
 
-    let entries = fs::read_dir(&base_dir)?;
+    let entries = fs::read_dir(base_dir)?;
 
     for entry in entries {
         let entry = entry?;
@@ -381,7 +378,7 @@ fn replay_data<const ENTRY_SIZE: usize>(
         let seg_id = idx / segment_size;
 
         if seg_id != current_seg_id {
-            current_file = Some(open_segment_file(&base_dir, seg_id)?);
+            current_file = Some(open_segment_file(base_dir, seg_id, false)?);
             current_seg_id = seg_id;
         }
 
@@ -402,12 +399,13 @@ fn format_segment_file_name(segment_id: u64) -> String {
     format!("{segment_id:012}.wal")
 }
 
-fn open_segment_file(base_dir: &Path, segment_id: u64) -> io::Result<File> {
+fn open_segment_file(base_dir: &Path, segment_id: u64, truncate: bool) -> io::Result<File> {
     let path = base_dir.join(format_segment_file_name(segment_id));
     OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
+        .truncate(truncate)
         .open(path)
 }
 
@@ -462,7 +460,7 @@ mod tests {
     #[test]
     fn open_segment_file_creates_file() -> io::Result<()> {
         let tmp = tempfile::tempdir()?;
-        let f = open_segment_file(tmp.path(), 0)?;
+        let f = open_segment_file(tmp.path(), 0, true)?;
         assert!(tmp.path().join("000000000000.wal").exists());
         drop(f);
         Ok(())
@@ -715,10 +713,10 @@ mod tests {
         // For capacity 4, a full segment should be 4 * ENTRY_SIZE bytes.
         fs::write(
             wal_dir.join(format_segment_file_name(0)),
-            &[0u8; ENTRY_SIZE * 2],
+            [0u8; ENTRY_SIZE * 2],
         )
         .unwrap();
-        fs::write(wal_dir.join(format_segment_file_name(1)), &[0u8; 0]).unwrap();
+        fs::write(wal_dir.join(format_segment_file_name(1)), [0u8; 0]).unwrap();
 
         let config = test_config(tmp.path());
         let err = Journal::with_capacity_and_config(4, config).unwrap_err();
@@ -733,7 +731,7 @@ mod tests {
 
         // Write a checkpoint claiming index 10 consumed...
         let checkpoint_path = tmp.path().join("checkpoint.meta");
-        fs::write(&checkpoint_path, &10u64.to_le_bytes()).unwrap();
+        fs::write(&checkpoint_path, 10u64.to_le_bytes()).unwrap();
 
         // ...but WAL only has 2 entries.
         let mut data = Vec::new();
@@ -801,8 +799,8 @@ mod tests {
     async fn multiple_commits_advance_persisted_index() -> eyre::Result<()> {
         let (journal, _tmp) = test_journal(4);
 
-        for i in 0..4 {
-            journal.commit(&TEST_DATA[i]).await;
+        for data in TEST_DATA.iter().take(4) {
+            journal.commit(data).await;
         }
 
         assert_eq!(journal.inner.persisted_index.load(Ordering::Acquire), 4);

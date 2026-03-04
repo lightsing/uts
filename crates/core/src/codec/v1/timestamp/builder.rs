@@ -64,9 +64,9 @@ impl<A: Allocator + Clone> TimestampBuilder<A> {
     }
 
     /// Pushes the steps corresponding to the given Merkle proof to the timestamp.
-    pub fn merkle_proof<D: DigestOpExt>(&mut self, mut proof: SiblingIter<'_, D>) -> &mut Self {
+    pub fn merkle_proof<D: DigestOpExt>(&mut self, proof: SiblingIter<'_, D>) -> &mut Self {
         let alloc = self.allocator().clone();
-        while let Some((side, sibling_hash)) = proof.next() {
+        for (side, sibling_hash) in proof {
             match side {
                 NodePosition::Left => self
                     .prepend([uts_bmt::INNER_NODE_PREFIX].to_vec_in(alloc.clone()))

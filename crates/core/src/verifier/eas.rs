@@ -86,8 +86,7 @@ impl<P: Provider> EASVerifier<P> {
             return Err(EASVerifierError::Mismatched {
                 expected: hash,
                 actual: attested_hash,
-            }
-            .into());
+            });
         }
 
         Ok(attestation)

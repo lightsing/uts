@@ -29,7 +29,7 @@ impl Upgrade {
         let files = self
             .files
             .iter()
-            .map(|path| fs::read(path))
+            .map(fs::read)
             .collect::<Result<Vec<_>, _>>()?;
 
         let results = futures::future::join_all(
@@ -37,7 +37,6 @@ impl Upgrade {
                 .iter()
                 .cloned()
                 .zip(files)
-                .into_iter()
                 .map(|(path, file)| upgrade_one(path, file, self.timeout)),
         )
         .await
