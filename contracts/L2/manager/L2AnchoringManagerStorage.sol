@@ -41,7 +41,6 @@ library L2AnchoringManagerStorage {
         // Mapping to reduce external calls
         mapping(uint256 => L2AnchoringManagerTypes.AnchoringRecord) indexToRecords;
         // Mapping to track attestation id
-        mapping(bytes32 => bytes32) rootToAttestationId;
         mapping(bytes32 => uint256) attestationIdToIndex;
 
         INFTGenerator nftGeneratorProxy;

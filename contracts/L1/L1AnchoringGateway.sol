@@ -30,14 +30,18 @@ contract L1AnchoringGateway is
     uint256 public constant MIN_GAS_LIMIT = 110_000;
     uint256 public constant MAX_GAS_LIMIT = 200_000;
 
+    error InvalidBatchSize();
+    error InvalidGasLimit();
+    error InvalidAddress();
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
     /// @notice For deterministic deployment, we use a separate initialize function instead of the constructor.
-    function initialize() public initializer {
-        __AccessControlDefaultAdminRules_init(0, msg.sender);
+    function initialize(address owner) public initializer {
+        __AccessControlDefaultAdminRules_init(0, owner);
         _setRoleAdmin(SUBMITTER_ROLE, DEFAULT_ADMIN_ROLE);
     }
 
@@ -47,14 +51,14 @@ contract L1AnchoringGateway is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newAdmin != address(0), "UTS: Invalid admin address");
-
-        require(eas != address(0), "UTS: Invalid EAS address");
-        require(l1Messenger != address(0), "UTS: Invalid L1 Scroll Messenger address");
-        require(l2AnchoringManager != address(0), "UTS: Invalid L2 Anchoring Manager address");
+        if (newAdmin == address(0)) revert InvalidAddress();
+        if (eas == address(0)) revert InvalidAddress();
+        if (l1Messenger == address(0)) revert InvalidAddress();
+        if (l2AnchoringManager == address(0)) revert InvalidAddress();
 
         L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
         $.eas = IEAS(eas);
+        $.eas.getTimestamp(bytes32(0)); // sanity check that the EAS contract is correct
 
         setL1ScrollMessenger(l1Messenger);
         setL2AnchoringManager(l2AnchoringManager);
@@ -77,11 +81,11 @@ contract L1AnchoringGateway is
     {
         L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
 
-        require(address($.l1Messenger) != address(0), "UTS: L1 Scroll Messenger not set");
-        require(address($.l2AnchoringManager) != address(0), "UTS: L2 Anchoring Manager not set");
+        if (address($.l1Messenger) == address(0)) revert InvalidAddress();
+        if (address($.l2AnchoringManager) == address(0)) revert InvalidAddress();
 
-        require(count > 0 && count <= MAX_BATCH_SIZE, "UTS: Invalid batch size");
-        require(gasLimit >= MIN_GAS_LIMIT && gasLimit <= MAX_GAS_LIMIT, "UTS: Invalid gas limit");
+        if (count == 0 || count > MAX_BATCH_SIZE) revert InvalidBatchSize();
+        if (gasLimit < MIN_GAS_LIMIT || gasLimit > MAX_GAS_LIMIT) revert InvalidGasLimit();
 
         uint256 blockNumber = 0;
         uint256 timestamp = $.eas.getTimestamp(merkleRoot);
@@ -107,7 +111,12 @@ contract L1AnchoringGateway is
     // -- Admin functions --
 
     function setL1ScrollMessenger(address newMessenger) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newMessenger != address(0), "UTS: Invalid L1 Scroll Messenger address");
+        if (newMessenger == address(0)) revert InvalidAddress();
+        // sanity check that the new messenger is correct by calling a public view function
+        //     address public immutable rollup;
+        (bool success,) = newMessenger.staticcall(abi.encodeWithSignature("rollup()"));
+        if (!success) revert InvalidAddress();
+
         L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
         address oldMessenger = address($.l1Messenger);
         $.l1Messenger = IL1ScrollMessenger(newMessenger);
@@ -115,7 +124,7 @@ contract L1AnchoringGateway is
     }
 
     function setL2AnchoringManager(address newManager) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newManager != address(0), "UTS: Invalid L2 Anchoring Manager address");
+        if (newManager == address(0)) revert InvalidAddress();
         L1AnchoringGatewayStorage.Storage storage $ = L1AnchoringGatewayStorage.get();
         address oldManager = address($.l2AnchoringManager);
         $.l2AnchoringManager = IL2AnchoringManager(newManager);

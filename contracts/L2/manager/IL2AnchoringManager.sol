@@ -72,12 +72,12 @@ interface IL2AnchoringManager {
 
     /**
      * @notice Submit a root for L2 timestamping + L1 anchoring.
-     * @param root The Merkle root to be anchored on L1.
+     * @param attestationId The attestation ID returned by the EAS contract when the attestation for the root is created.
      * @param refundAddress The address to refund any excess fee after covering the required fee for L1 anchoring.
      * This allows users to get a refund if they overpay.
      * @dev Requires msg.value >= Oracle calculated fee.
      */
-    function submitForL1Anchoring(bytes32 root, address refundAddress) external payable;
+    function submitForL1Anchoring(bytes32 attestationId, address refundAddress) external payable;
 
     /**
      * @notice Finalize the batch confirmation after receiving the L1 notification. This will verify the Merkle root

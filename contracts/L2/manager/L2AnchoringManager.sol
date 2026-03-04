@@ -44,7 +44,8 @@ contract L2AnchoringManager is
 
     error MerkleRootMismatch();
 
-    error InvalidAttestationId();
+    error AlreadySubmitted();
+    error InvalidAttestation();
     error NoPendingBatch();
 
     error InvalidBatchIndexHint();
@@ -59,8 +60,8 @@ contract L2AnchoringManager is
     }
 
     /// @notice For deterministic deployment, we use a separate initialize function instead of the constructor.
-    function initialize() public initializer {
-        __AccessControlDefaultAdminRules_init(0, msg.sender);
+    function initialize(address owner) public initializer {
+        __AccessControlDefaultAdminRules_init(0, owner);
         __ERC721_init("UTS Anchoring Certificate", "UTS");
 
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
@@ -97,6 +98,8 @@ contract L2AnchoringManager is
         setL2Messenger(l2Messenger);
 
         $.eas = IEAS(eas);
+        $.eas.getTimestamp(bytes32(0)); // sanity check that the EAS contract is correct
+
         $.nftGeneratorProxy = INFTGenerator(nftGeneratorProxy);
 
         beginDefaultAdminTransfer(newAdmin);
@@ -114,21 +117,24 @@ contract L2AnchoringManager is
     }
 
     /// @inheritdoc IL2AnchoringManager
-    function submitForL1Anchoring(bytes32 root, address refundAddress) public payable nonReentrant {
+    function submitForL1Anchoring(bytes32 attestationId, address refundAddress) public payable nonReentrant {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
 
         if (address($.eas) == address(0)) revert InvalidAddress();
+        if ($.attestationIdToIndex[attestationId] != 0) revert AlreadySubmitted();
 
         uint256 requiredFee = $.feeOracle.getFloorFee();
         if (msg.value < requiredFee) revert InsufficientFee();
 
-        bytes32 attestationId = EASHelper.attest($.eas, root);
+        Attestation memory request = $.eas.getAttestation(attestationId);
+        if (request.schema != EASHelper.CONTENT_HASH_SCHEMA) revert InvalidAttestation();
+        if (request.expirationTime != 0 || request.revocable) revert InvalidAttestation();
+        bytes32 root = abi.decode(request.data, (bytes32));
 
         uint256 currentIndex = $.queueIndex++;
         $.indexToRecords[currentIndex] = L2AnchoringManagerTypes.AnchoringRecord({
             root: root, attestationId: attestationId, blockNumber: block.number
         });
-        $.rootToAttestationId[root] = attestationId;
         $.attestationIdToIndex[attestationId] = currentIndex;
 
         emit L1AnchoringQueued(attestationId, root, currentIndex, requiredFee, block.number, block.timestamp);
@@ -144,9 +150,9 @@ contract L2AnchoringManager is
     }
 
     /// @inheritdoc IL2AnchoringManager
-    function isConfirmed(bytes32 root) public view returns (bool) {
+    function isConfirmed(bytes32 attestationId) public view returns (bool) {
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
-        uint256 index = $.attestationIdToIndex[$.rootToAttestationId[root]];
+        uint256 index = $.attestationIdToIndex[attestationId];
         return index != 0 && index < $.confirmedIndex;
     }
 
@@ -227,7 +233,7 @@ contract L2AnchoringManager is
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
 
         uint256 index = $.attestationIdToIndex[attestationId];
-        if (index == 0) revert InvalidAttestationId();
+        if (index == 0) revert InvalidAttestation();
         if ($.nftClaimedAndHint[index] != 0) revert NFTAlreadyClaimed();
 
         L2AnchoringManagerTypes.L1Batch memory batch = $.batches[batchStartIndexHint];
@@ -269,6 +275,9 @@ contract L2AnchoringManager is
 
     function setFeeOracle(address oracle) public onlyRole(DEFAULT_ADMIN_ROLE) {
         if (oracle == address(0)) revert InvalidAddress();
+        IFeeOracle oracleContract = IFeeOracle(oracle);
+        // sanity check that the oracle is correct by calling a public view function
+        oracleContract.getFloorFee();
         L2AnchoringManagerStorage.Storage storage $ = L2AnchoringManagerStorage.get();
         address oldOracle = address($.feeOracle);
         $.feeOracle = IFeeOracle(oracle);
