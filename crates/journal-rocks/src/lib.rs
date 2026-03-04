@@ -14,7 +14,7 @@
 #[macro_use]
 extern crate tracing;
 
-use crate::reader::JournalReader;
+use crate::{helper::FatalErrorExt, reader::JournalReader};
 use rocksdb::{ColumnFamily, DB, Options, WriteBatch};
 use std::{
     fmt,
@@ -29,6 +29,7 @@ use std::{
 /// Journal reader.
 pub mod reader;
 
+mod helper;
 /// Error indicating that the journal buffer is not available now.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -39,13 +40,6 @@ pub enum Error {
     /// and the buffer has space.
     #[error("journal buffer is full")]
     Full,
-}
-
-impl From<rocksdb::Error> for Error {
-    fn from(e: rocksdb::Error) -> Self {
-        error!("RocksDB error: {e}");
-        Error::Fatal
-    }
 }
 
 const CF_ENTRIES: &str = "entries";
@@ -90,12 +84,15 @@ pub(crate) struct JournalInner<const ENTRY_SIZE: usize> {
     write_index: AtomicU64,
     /// Last consumed index, updated by the reader's `commit()`.
     consumed_index: AtomicU64,
-    /// Serialises the write path so entries are numbered consecutively.
+    /// Serializes the write path so entries are numbered consecutively.
     write_lock: Mutex<()>,
     /// Whether a reader has been acquired.
     reader_taken: AtomicBool,
     /// Waker for the consumer waiting for new entries.
     consumer_wait: Mutex<Option<ConsumerWait>>,
+    /// Whether the journal is in a fatal error state. If true, all operations will fail and the j
+    /// journal should be dropped.
+    fatal_error: AtomicBool,
 }
 
 impl<const ENTRY_SIZE: usize> fmt::Debug for Journal<ENTRY_SIZE> {
@@ -118,7 +115,13 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
         global_options.create_if_missing(true);
         global_options.create_missing_column_families(true);
 
-        let db = DB::open_cf(&global_options, &config.db_path, [CF_ENTRIES, CF_META])?;
+        let db = match DB::open_cf(&global_options, &config.db_path, [CF_ENTRIES, CF_META]) {
+            Ok(db) => db,
+            Err(e) => {
+                error!("Failed to open RocksDB at {:?}: {e}", config.db_path);
+                return Err(Error::Fatal);
+            }
+        };
 
         let inner = Arc::new(JournalInner {
             db,
@@ -128,6 +131,7 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
             write_lock: Mutex::new(()),
             reader_taken: AtomicBool::new(false),
             consumer_wait: Mutex::new(None),
+            fatal_error: AtomicBool::new(false),
         });
 
         // Recover state
@@ -179,6 +183,10 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
     ///
     /// The entry is written to RocksDB synchronously.
     pub fn try_commit(&self, data: &[u8; ENTRY_SIZE]) -> Result<(), Error> {
+        if self.inner.fatal_error.load(Ordering::Acquire) {
+            return Err(Error::Fatal);
+        }
+
         // Serialize writes so indices are strictly consecutive.
         let _guard = self.inner.write_lock.lock().unwrap();
 
@@ -196,7 +204,7 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
         batch.put_cf(cf_entries, write_idx.to_be_bytes(), data);
         self.inner
             .write_write_index_batched(&mut batch, new_write_idx);
-        self.inner.db.write(batch)?;
+        self.inner.db.write(batch).stop_if_error(&self.inner)?;
 
         self.inner.set_write_index(new_write_idx);
 
@@ -267,7 +275,7 @@ impl<const ENTRY_SIZE: usize> JournalInner<ENTRY_SIZE> {
     #[inline]
     fn read_meta(&self, key: &[u8]) -> Result<u64, Error> {
         let cf = self.cf_meta();
-        let Some(value) = self.db.get_cf(cf, key)? else {
+        let Some(value) = self.db.get_cf(cf, key).stop_if_error(self)? else {
             // If the key is missing, assume index 0 (fresh journal).
             return Ok(0);
         };

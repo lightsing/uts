@@ -1,4 +1,4 @@
-use crate::{ConsumerWait, Error, JournalInner};
+use crate::{ConsumerWait, Error, JournalInner, helper::FatalErrorExt};
 use rocksdb::{Direction, IteratorMode, ReadOptions, WriteBatch};
 use std::{
     fmt,
@@ -53,9 +53,12 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
     }
 
     /// Wait until at least `min` entries are available.
-    pub async fn wait_at_least(&mut self, min: usize) {
+    pub async fn wait_at_least(&mut self, min: usize) -> Result<(), Error> {
+        if self.journal.fatal_error.load(Ordering::Acquire) {
+            return Err(Error::Fatal);
+        }
         if self.available() >= min {
-            return;
+            return Ok(());
         }
 
         let target_index = self.consumed.wrapping_add(min as u64);
@@ -77,10 +80,14 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
         }
 
         impl<const ENTRY_SIZE: usize> Future for WaitForBatch<'_, ENTRY_SIZE> {
-            type Output = ();
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            type Output = Result<(), Error>;
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                if self.reader.journal.fatal_error.load(Ordering::Acquire) {
+                    return Poll::Ready(Err(Error::Fatal));
+                }
+
                 if self.reader.journal.write_index() >= self.target_index {
-                    return Poll::Ready(());
+                    return Poll::Ready(Ok(()));
                 }
 
                 let mut guard = self
@@ -90,7 +97,7 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
                     .lock()
                     .expect("Mutex poisoned");
                 if self.reader.journal.write_index() >= self.target_index {
-                    return Poll::Ready(());
+                    return Poll::Ready(Ok(()));
                 }
                 *guard = Some(ConsumerWait {
                     waker: cx.waker().clone(),
@@ -105,7 +112,7 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
             reader: self,
             target_index,
         }
-        .await;
+        .await
     }
 
     /// Read available entries from RocksDB, up to `max`.
@@ -114,6 +121,10 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
     /// Caller is responsible for calling [`commit`](JournalReader::commit)
     /// after processing the entries.
     pub fn read(&mut self, max: usize) -> Result<&[[u8; ENTRY_SIZE]], Error> {
+        if self.journal.fatal_error.load(Ordering::Acquire) {
+            return Err(Error::Fatal);
+        }
+
         let available = self.available();
         if available == 0 {
             return Ok(&[]);
@@ -136,7 +147,7 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
             IteratorMode::From(&start_key, Direction::Forward),
         );
         for (idx, data) in iter.enumerate() {
-            let (_key, value) = data?;
+            let (_key, value) = data.stop_if_error(&self.journal)?;
             debug_assert_eq!((self.consumed + idx as u64).to_be_bytes(), _key.as_ref(),);
             if value.len() != ENTRY_SIZE {
                 error!("entry at index {idx} has wrong size");
@@ -154,6 +165,10 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
     /// Commit the current consumed index, persisting it to RocksDB and
     /// deleting consumed entries.
     pub fn commit(&mut self) -> Result<(), Error> {
+        if self.journal.fatal_error.load(Ordering::Acquire) {
+            return Err(Error::Fatal);
+        }
+
         let old_consumed = self.journal.consumed_index();
 
         let mut batch = WriteBatch::default();
