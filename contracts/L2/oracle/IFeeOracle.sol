@@ -24,4 +24,14 @@ interface IFeeOracle {
      * @return fee The required fee in Wei, applying the discount ratio.
      */
     function getFloorFee() external view returns (uint256);
+
+    // -- Admin functions to update fee parameters --
+    function setL1Overhead(uint256 l1Overhead) external;
+    function setL1FeeScalar(uint256 l1FeeScalar) external;
+    function setL1GasEstimated(uint256 l1GasEstimated) external;
+    function setCrossDomainGasEstimated(uint256 crossDomainGasEstimated) external;
+    function setL2ExecutionScalar(uint256 l2ExecutionScalar) external;
+    function setL2ExecutionOverhead(uint256 l2ExecutionOverhead) external;
+    function setExpectedBatchSize(uint256 expectedBatchSize) external;
+    function setFeeMultiplier(uint256 feeMultiplier) external;
 }

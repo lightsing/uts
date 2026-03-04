@@ -3,11 +3,11 @@ use crate::codec::v1::{EASAttestation, EASTimestamped};
 use alloy_primitives::{Address, B256};
 use alloy_provider::Provider;
 use alloy_sol_types::SolValue;
-use uts_contracts::eas::{self, IEAS::IEASInstance};
+use uts_contracts::eas::{self, EAS};
 
 #[derive(Debug, Clone)]
 pub struct EASVerifier<P: Provider> {
-    eas: IEASInstance<P>,
+    eas: EAS<P>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -30,7 +30,7 @@ pub enum EASVerifierError {
 
 impl<P: Provider> EASVerifier<P> {
     pub const fn new(address: Address, provider: P) -> Self {
-        let eas = IEASInstance::new(address, provider);
+        let eas = EAS::new(address, provider);
         Self { eas }
     }
 }

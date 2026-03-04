@@ -17,7 +17,7 @@ use std::{env, path::PathBuf, sync::Arc};
 use tower_http::{cors, cors::CorsLayer};
 use tracing::info;
 use uts_calendar::{AppState, routes, shutdown_signal, time};
-use uts_contracts::eas::{EAS_ADDRESSES, IEAS::IEASInstance};
+use uts_contracts::eas::{EAS, EAS_ADDRESSES};
 use uts_journal::{Journal, JournalConfig, checkpoint::CheckpointConfig};
 use uts_stamper::{Stamper, StamperConfig};
 
@@ -58,7 +58,7 @@ async fn main() -> eyre::Result<()> {
     let eas_address = *EAS_ADDRESSES
         .get(&chain_id)
         .context("eas default address not found")?;
-    let contract = IEASInstance::new(eas_address, provider.clone());
+    let contract = EAS::new(eas_address, provider.clone());
 
     // stamper
     let reader = journal.reader();

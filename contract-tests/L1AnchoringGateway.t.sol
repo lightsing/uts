@@ -42,16 +42,16 @@ contract L1AnchoringGatewayTest is Test {
         mockMessenger = new MockL1ScrollMessenger();
 
         L1AnchoringGateway impl = L1AnchoringGateway(payable(vm.deployCode("L1AnchoringGateway")));
-        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, ())));
+        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, (admin))));
         gateway = L1AnchoringGateway(payable(proxy));
 
+        vm.mockCall(address(mockMessenger), abi.encodeWithSignature("rollup()"), abi.encode(address(0)));
         gateway.lateInitialize(newAdmin, address(eas), address(mockMessenger), l2Manager);
         vm.warp(block.timestamp + 1);
-        vm.prank(newAdmin);
-        gateway.completeInitialization();
 
-        // Grant submitter role (admin is now newAdmin)
         vm.startPrank(newAdmin);
+        gateway.completeInitialization();
+        // Grant submitter role (admin is now newAdmin)
         gateway.grantRole(gateway.SUBMITTER_ROLE(), submitter);
         vm.stopPrank();
     }
@@ -67,7 +67,7 @@ contract L1AnchoringGatewayTest is Test {
     function test_LateInitialize() public {
         // Deploy a fresh gateway
         L1AnchoringGateway impl = L1AnchoringGateway(payable(vm.deployCode("L1AnchoringGateway")));
-        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, ())));
+        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, (admin))));
         L1AnchoringGateway gw = L1AnchoringGateway(payable(proxy));
 
         address a = address(0xA1);
@@ -84,21 +84,21 @@ contract L1AnchoringGatewayTest is Test {
         L1AnchoringGateway impl = L1AnchoringGateway(payable(vm.deployCode("L1AnchoringGateway")));
 
         // Zero admin
-        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, ())));
+        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, (admin))));
         L1AnchoringGateway gw = L1AnchoringGateway(payable(proxy));
-        vm.expectRevert("UTS: Invalid admin address");
+        vm.expectRevert(L1AnchoringGateway.InvalidAddress.selector);
         gw.lateInitialize(address(0), address(eas), address(mockMessenger), l2Manager);
 
         // Zero EAS
-        vm.expectRevert("UTS: Invalid EAS address");
+        vm.expectRevert(L1AnchoringGateway.InvalidAddress.selector);
         gw.lateInitialize(newAdmin, address(0), address(mockMessenger), l2Manager);
 
         // Zero messenger
-        vm.expectRevert("UTS: Invalid L1 Scroll Messenger address");
+        vm.expectRevert(L1AnchoringGateway.InvalidAddress.selector);
         gw.lateInitialize(newAdmin, address(eas), address(0), l2Manager);
 
         // Zero manager
-        vm.expectRevert("UTS: Invalid L2 Anchoring Manager address");
+        vm.expectRevert(L1AnchoringGateway.InvalidAddress.selector);
         gw.lateInitialize(newAdmin, address(eas), address(mockMessenger), address(0));
     }
 
@@ -144,12 +144,12 @@ contract L1AnchoringGatewayTest is Test {
 
         // count = 0
         vm.prank(submitter);
-        vm.expectRevert("UTS: Invalid batch size");
+        vm.expectRevert(L1AnchoringGateway.InvalidBatchSize.selector);
         gateway.submitBatch{value: 0.1 ether}(root, 1, 0, 150_000);
 
         // count > 512
         vm.prank(submitter);
-        vm.expectRevert("UTS: Invalid batch size");
+        vm.expectRevert(L1AnchoringGateway.InvalidBatchSize.selector);
         gateway.submitBatch{value: 0.1 ether}(root, 1, 513, 150_000);
     }
 
@@ -159,37 +159,37 @@ contract L1AnchoringGatewayTest is Test {
 
         // too low
         vm.prank(submitter);
-        vm.expectRevert("UTS: Invalid gas limit");
+        vm.expectRevert(L1AnchoringGateway.InvalidGasLimit.selector);
         gateway.submitBatch{value: 0.1 ether}(root, 1, 10, 109_999);
 
         // too high
         vm.prank(submitter);
-        vm.expectRevert("UTS: Invalid gas limit");
+        vm.expectRevert(L1AnchoringGateway.InvalidGasLimit.selector);
         gateway.submitBatch{value: 0.1 ether}(root, 1, 10, 200_001);
     }
 
     function test_SubmitBatch_RevertMessengerNotSet() public {
         L1AnchoringGateway impl = L1AnchoringGateway(payable(vm.deployCode("L1AnchoringGateway")));
-        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, ())));
+        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, (admin))));
         L1AnchoringGateway gw = L1AnchoringGateway(payable(proxy));
         gw.grantRole(gw.SUBMITTER_ROLE(), submitter);
 
         vm.deal(submitter, 1 ether);
         vm.prank(submitter);
-        vm.expectRevert("UTS: L1 Scroll Messenger not set");
+        vm.expectRevert(L1AnchoringGateway.InvalidAddress.selector);
         gw.submitBatch{value: 0.1 ether}(keccak256("test"), 1, 10, 150_000);
     }
 
     function test_SubmitBatch_RevertManagerNotSet() public {
         L1AnchoringGateway impl = L1AnchoringGateway(payable(vm.deployCode("L1AnchoringGateway")));
-        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, ())));
+        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L1AnchoringGateway.initialize, (admin))));
         L1AnchoringGateway gw = L1AnchoringGateway(payable(proxy));
         gw.grantRole(gw.SUBMITTER_ROLE(), submitter);
         gw.setL1ScrollMessenger(address(mockMessenger));
 
         vm.deal(submitter, 1 ether);
         vm.prank(submitter);
-        vm.expectRevert("UTS: L2 Anchoring Manager not set");
+        vm.expectRevert(L1AnchoringGateway.InvalidAddress.selector);
         gw.submitBatch{value: 0.1 ether}(keccak256("test"), 1, 10, 150_000);
     }
 
@@ -201,7 +201,7 @@ contract L1AnchoringGatewayTest is Test {
 
     function test_SetL1ScrollMessenger_RevertZeroAddress() public {
         vm.prank(newAdmin);
-        vm.expectRevert("UTS: Invalid L1 Scroll Messenger address");
+        vm.expectRevert(L1AnchoringGateway.InvalidAddress.selector);
         gateway.setL1ScrollMessenger(address(0));
     }
 
@@ -219,7 +219,7 @@ contract L1AnchoringGatewayTest is Test {
 
     function test_SetL2AnchoringManager_RevertZeroAddress() public {
         vm.prank(newAdmin);
-        vm.expectRevert("UTS: Invalid L2 Anchoring Manager address");
+        vm.expectRevert(L1AnchoringGateway.InvalidAddress.selector);
         gateway.setL2AnchoringManager(address(0));
     }
 
