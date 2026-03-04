@@ -14,13 +14,13 @@ use eyre::{Context, ContextCompat};
 use rocksdb::DB;
 use sha3::Keccak256;
 use sqlx::{
-    SqlitePool, migrate,
+    migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 use std::{env, path::PathBuf, sync::Arc};
 use tokio_util::sync::CancellationToken;
 use tower_http::{cors, cors::CorsLayer};
-use tracing::{info, log::error};
+use tracing::{error, info};
 use uts_calendar::{AppState, routes, shutdown_signal, time};
 use uts_contracts::eas::{EAS, EAS_ADDRESSES};
 use uts_journal::{Journal, JournalConfig, checkpoint::CheckpointConfig};

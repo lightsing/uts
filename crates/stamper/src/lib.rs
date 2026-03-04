@@ -208,9 +208,6 @@ where
         self.kv_storage
             .write(batch)
             .context("failed to write to kv db")?;
-        self.reader
-            .commit()
-            .context("failed to commit journal reader")?;
 
         sql::new_pending_attestation(&self.sql_storage, root)
             .await
@@ -245,8 +242,8 @@ where
                     current_available
                 } else if next_power_of_two / 2 >= self.config.min_leaves {
                     // This is for avoiding creating small Merkle trees with too few leaves.
-                    // e.g. if current_available = 3, min_leaves = 4 then next_power_of_two / 2 = 1,
-                    // we will take 3 entries instead of 1 to create a Merkle tree with 4 leaves instead of 1 leaf.
+                    // e.g. if current_available = 3, min_leaves = 4 then next_power_of_two / 2 = 2,
+                    // we will take 3 entries instead of 2 to create a Merkle tree with 4 leaves instead of 1 leaf.
                     let target = next_power_of_two / 2;
                     trace!(target, "Taking largest power of two less than available");
                     target

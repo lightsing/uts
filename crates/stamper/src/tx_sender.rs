@@ -61,7 +61,13 @@ impl<P: Provider + 'static> TxSender<P> {
                     info!("Cancellation received, stopping TxSender...");
                     break;
                 }
-                _ = self.waker.recv() => {
+                may_msg = self.waker.recv() => {
+                    if may_msg.is_none() {
+                        // the sender has been dropped, which means the main stamper loop has exited,
+                        // we can safely exit as well
+                        info!("Waker channel closed, stopping TxSender...");
+                        break;
+                    }
                     // got a wake-up signal, process pending attestations immediately
                     debug!("Wake up signal received, processing pending attestations...");
                 }
@@ -116,6 +122,10 @@ impl<P: Provider + 'static> TxSender<P> {
             Err(e) if e.as_revert_data().is_some() => {
                 // this timestamp is already timestamped
                 let ts = self.eas.getTimestamp(attestation.trie_root).call().await?;
+                assert!(
+                    ts > 0,
+                    "bug: if the timestamp is not found, it should not revert previously"
+                );
 
                 let provider = self.eas.provider();
 
@@ -132,9 +142,14 @@ impl<P: Provider + 'static> TxSender<P> {
                         bail!("Failed to get block {mid}");
                     };
                     if block.header.timestamp > ts {
+                        assert!(mid > 0, "bug: this should never happen");
                         high = mid - 1;
                     } else if block.header.timestamp < ts {
                         low = mid + 1;
+                    } else {
+                        low = mid;
+                        high = mid;
+                        break;
                     }
                     if high - low <= MAX_GET_LOGS_BLOCK {
                         break;

@@ -105,9 +105,17 @@ where
     }
 
     /// From raw bytes, reconstruct the Merkle tree
+    ///
+    /// # Panics
+    ///
+    /// - If the length of `bytes` is not a multiple of the hash output size.
+    /// - If the number of nodes implied by `bytes` is not consistent with a valid
+    /// Merkle tree structure.
     #[inline]
     pub fn from_raw_bytes(bytes: &[u8]) -> Self {
         let nodes: &[Output<D>] = bytemuck::cast_slice(bytes);
+        assert!(nodes.len().is_multiple_of(2));
+        assert_eq!(nodes[0], Output::<D>::default());
         let len = nodes.len() / 2;
         Self {
             nodes: nodes.to_vec().into_boxed_slice(),
