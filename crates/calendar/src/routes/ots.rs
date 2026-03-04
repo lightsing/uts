@@ -125,7 +125,7 @@ pub async fn get_timestamp(
         return (StatusCode::NOT_FOUND, r#"{"err":"timestamp not found"}"#).into_response();
     };
 
-    let id = match sql::get_attestation_result(&state.sql_pool, commitment).await {
+    let id = match sql::get_attestation_result(&state.sql_pool, root).await {
         Ok((_, AttestationResult::Pending)) => {
             return (StatusCode::NOT_FOUND, r#"{"status":"pending"}"#).into_response();
         }
