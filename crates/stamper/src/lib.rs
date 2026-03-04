@@ -21,7 +21,7 @@ use std::{
 };
 use tokio::time::{Interval, MissedTickBehavior};
 use uts_bmt::MerkleTree;
-use uts_contracts::eas::IEAS::IEASInstance;
+use uts_contracts::eas::EAS;
 use uts_core::utils::Hexed;
 use uts_journal::reader::JournalReader;
 
@@ -46,7 +46,7 @@ pub struct Stamper<D: Digest, P, const ENTRY_SIZE: usize> {
     /// FIFO cache index of recent merkle trees
     cache_index: HashMap<B256, usize>,
     /// The contract
-    contract: IEASInstance<P>,
+    contract: EAS<P>,
     /// Stamper configuration
     config: StamperConfig,
 }
@@ -155,7 +155,7 @@ where
     pub fn new(
         reader: JournalReader<ENTRY_SIZE>,
         storage: Arc<DB>,
-        contract: IEASInstance<P>,
+        contract: EAS<P>,
         config: StamperConfig,
     ) -> Self {
         Self {
