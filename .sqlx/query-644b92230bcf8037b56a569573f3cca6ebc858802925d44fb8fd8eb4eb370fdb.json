@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO attest_attempts (attestation_id, chain_id, tx_hash, block_number)\n        VALUES (?1, ?2, ?3, ?4)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "644b92230bcf8037b56a569573f3cca6ebc858802925d44fb8fd8eb4eb370fdb"
+}

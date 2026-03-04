@@ -27,11 +27,13 @@ pub struct AppState {
     /// Journal
     pub journal: Journal<{ <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>,
     /// RocksDB
-    pub db: Arc<DB>,
+    pub kv_db: Arc<DB>,
+    /// Sqlite pool
+    pub sql_pool: sqlx::SqlitePool,
 }
 
 /// Signal for graceful shutdown.
-pub async fn shutdown_signal() {
+pub async fn shutdown_signal(fatal_error_happens: impl Future<Output = ()>) {
     use tokio::signal;
 
     let ctrl_c = async {
@@ -54,5 +56,6 @@ pub async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
+        _ = fatal_error_happens => {},
     }
 }

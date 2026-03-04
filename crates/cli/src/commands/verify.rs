@@ -84,10 +84,13 @@ impl Verify {
             if attestation.tag == PendingAttestation::TAG {
                 continue; // skip pending attestations
             }
-            if attestation.tag != EASAttestation::TAG || attestation.tag != EASTimestamped::TAG {
+            if attestation.tag != EASAttestation::TAG && attestation.tag != EASTimestamped::TAG {
                 eprintln!("Unknown attestation type: {}", Hexed(&attestation.tag));
             }
 
+            let expected = attestation
+                .value()
+                .expect("Attestation value should be finalized");
             let chain = if attestation.tag == EASAttestation::TAG {
                 EASAttestation::from_raw(attestation)?.chain
             } else {
