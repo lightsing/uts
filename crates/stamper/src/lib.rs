@@ -8,7 +8,7 @@ extern crate tracing;
 
 use alloy_primitives::B256;
 use alloy_provider::Provider;
-use bytemuck::{NoUninit, Pod};
+use bytemuck::Pod;
 use digest::{Digest, FixedOutputReset, Output, typenum::Unsigned};
 use eyre::{Context, bail};
 use rocksdb::{DB, WriteBatch};

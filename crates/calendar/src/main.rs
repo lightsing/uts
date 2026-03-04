@@ -9,7 +9,6 @@ use axum::{
     http::Method,
     routing::{get, post},
 };
-use digest::{OutputSizeUser, typenum::Unsigned};
 use eyre::{Context, ContextCompat};
 use rocksdb::DB;
 use sha3::Keccak256;

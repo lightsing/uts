@@ -219,7 +219,7 @@ impl JournalInner {
     fn notify_consumer(&self) {
         let mut guard = self.consumer_wait.lock().unwrap();
         if let Some(wait) = guard.as_ref()
-            && self.write_index() >= wait.target_index
+            && (self.write_index() >= wait.target_index || self.fatal_error.load(Ordering::Acquire))
         {
             guard.take().unwrap().waker.wake();
         }
