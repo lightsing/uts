@@ -63,7 +63,7 @@ phf = { version = "0.13.1", default-features = false }
 rand = "0.10"
 regex = "1.12"
 reqwest = { version = "0.13", default-features = false }
-rocksdb = "0.24"
+rocksdb = { version = "0.24", default-features = false, features = ["bindgen-runtime"] }
 serde = "1.0"
 serde_json = "1.0"
 serde_with = "3.16"
@@ -92,6 +92,7 @@ uts-bmt = { path = "crates/bmt" }
 uts-contracts = { path = "crates/contracts" }
 uts-core = { path = "crates/core" }
 uts-journal = { path = "crates/journal" }
+uts-journal-rocks = { path = "crates/journal-rocks" }
 uts-stamper = { path = "crates/stamper" }
 
 [profile.bench]

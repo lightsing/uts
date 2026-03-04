@@ -20,6 +20,7 @@ use uts_core::{
     },
     utils::Hexed,
 };
+use uts_journal::Error;
 use uts_stamper::{kv::DbExt, sql, sql::AttestationResult};
 
 /// Maximum digest size accepted by the endpoint.
@@ -29,10 +30,19 @@ pub const MAX_DIGEST_SIZE: usize = 64; // e.g., SHA3-512
 pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) -> Response {
     let (output, commitment) = submit_digest_inner(digest, &state.signer);
     match state.journal.try_commit(&commitment) {
-        Err(_) => {
+        // journal is full
+        Err(Error::Full) => {
             return (StatusCode::SERVICE_UNAVAILABLE, r#"{"err":"server busy"}"#).into_response();
-        } // journal is full
-        Ok(fut) => fut.await,
+        }
+        // journal is in fatal error status
+        Err(Error::Fatal) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                r#"{"err":"internal error"}"#,
+            )
+                .into_response();
+        }
+        Ok(()) => {}
     }
     output.into_response()
 }

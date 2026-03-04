@@ -9,7 +9,6 @@ use axum::{
     http::Method,
     routing::{get, post},
 };
-use digest::{OutputSizeUser, typenum::Unsigned};
 use eyre::{Context, ContextCompat};
 use rocksdb::DB;
 use sha3::Keccak256;
@@ -23,7 +22,7 @@ use tower_http::{cors, cors::CorsLayer};
 use tracing::{error, info};
 use uts_calendar::{AppState, routes, shutdown_signal, time};
 use uts_contracts::eas::{EAS, EAS_ADDRESSES};
-use uts_journal::{Journal, JournalConfig, checkpoint::CheckpointConfig};
+use uts_journal::{Journal, JournalConfig};
 use uts_stamper::{Stamper, StamperConfig};
 
 const RING_BUFFER_CAPACITY: usize = 1 << 20; // 1 million entries
@@ -45,11 +44,7 @@ async fn main() -> eyre::Result<()> {
     let journal = Journal::with_capacity_and_config(
         RING_BUFFER_CAPACITY,
         JournalConfig {
-            consumer_checkpoint: CheckpointConfig {
-                path: PathBuf::from("./.journal/.checkpoint"),
-                ..Default::default()
-            },
-            wal_dir: PathBuf::from("./.journal"),
+            db_path: PathBuf::from("./.db/journal"),
         },
     )?;
 
@@ -84,20 +79,19 @@ async fn main() -> eyre::Result<()> {
         .await
         .context("failed to run database migrations")?;
 
-    let mut stamper =
-        Stamper::<Keccak256, _, { <Keccak256 as OutputSizeUser>::OutputSize::USIZE }>::new(
-            reader,
-            db.clone(),
-            sql.clone(),
-            contract,
-            // TODO: tune configuration
-            StamperConfig {
-                max_interval_seconds: 10,
-                max_entries_per_timestamp: 1 << 10, // 1024 entries
-                min_leaves: 1 << 4,
-                max_cache_size: 256,
-            },
-        );
+    let mut stamper = Stamper::<Keccak256, _>::new(
+        reader,
+        db.clone(),
+        sql.clone(),
+        contract,
+        // TODO: tune configuration
+        StamperConfig {
+            max_interval_seconds: 10,
+            max_entries_per_timestamp: 1 << 10, // 1024 entries
+            min_leaves: 1 << 4,
+            max_cache_size: 256,
+        },
+    );
 
     {
         let token = token.clone();
@@ -136,9 +130,6 @@ async fn main() -> eyre::Result<()> {
             error!("fatal error signal received, shutting down");
         }))
         .await?;
-
-    // this will join the journal's background task and ensure flush of all pending commits
-    journal.shutdown()?;
 
     Ok(())
 }

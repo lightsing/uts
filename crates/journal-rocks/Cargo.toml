@@ -1,0 +1,24 @@
+[package]
+authors.workspace = true
+description = "RocksDB-backed append-only journal for UTS"
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-journal-rocks"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+futures = { workspace = true }
+rocksdb = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+eyre = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

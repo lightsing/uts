@@ -8,9 +8,9 @@ extern crate tracing;
 
 use alloy_primitives::B256;
 use alloy_provider::Provider;
-use bytemuck::{NoUninit, Pod};
+use bytemuck::Pod;
 use digest::{Digest, FixedOutputReset, Output, typenum::Unsigned};
-use eyre::Context;
+use eyre::{Context, bail};
 use rocksdb::{DB, WriteBatch};
 use sqlx::SqlitePool;
 use std::{fmt, marker::PhantomData, sync::Arc, time::Duration};
@@ -45,9 +45,9 @@ pub const MAX_RETRIES: usize = 3;
 /// - if available entries size is not power of two, it will take:
 ///  - the largest power of two less than available entries, if that is >= `min_leaves`
 ///  - else, it will take all available entries
-pub struct Stamper<D: Digest, P, const ENTRY_SIZE: usize> {
+pub struct Stamper<D: Digest, P: Provider> {
     /// Journal reader to read entries from
-    reader: JournalReader<ENTRY_SIZE>,
+    reader: JournalReader,
     /// Storage for merkle trees and leaf->root mappings
     kv_storage: Arc<DB>,
     /// Sql db for storing timestamp metadata
@@ -76,26 +76,24 @@ pub struct StamperConfig {
     pub max_cache_size: usize,
 }
 
-impl<D: Digest, P, const ENTRY_SIZE: usize> fmt::Debug for Stamper<D, P, ENTRY_SIZE> {
+impl<D: Digest, P: Provider> fmt::Debug for Stamper<D, P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Stamper")
             .field("config", &self.config)
+            .field("contract", &self.contract)
             .finish()
     }
 }
 
-impl<D, P, const ENTRY_SIZE: usize> Stamper<D, P, ENTRY_SIZE>
+impl<D, P> Stamper<D, P>
 where
     D: Digest + FixedOutputReset + 'static,
     P: Provider + Clone + 'static,
     Output<D>: Pod + Copy,
-    [u8; ENTRY_SIZE]: NoUninit,
 {
-    const _SIZE_MATCHES: () = assert!(D::OutputSize::USIZE == ENTRY_SIZE);
-
     /// Create a new Stamper
     pub fn new(
-        reader: JournalReader<ENTRY_SIZE>,
+        reader: JournalReader,
         kv_storage: Arc<DB>,
         sql_storage: SqlitePool,
         contract: EAS<P>,
@@ -167,9 +165,9 @@ where
     async fn pack(
         &mut self,
         ticker: &mut Interval,
-        buffer: &mut Vec<[u8; ENTRY_SIZE]>,
+        buffer: &mut Vec<Output<D>>,
     ) -> eyre::Result<usize> {
-        let target_size = self.wait_for_next_batch(ticker).await;
+        let target_size = self.wait_for_next_batch(ticker).await?;
         // no entries to process, skip this round
         if target_size == 0 {
             return Ok(0);
@@ -178,10 +176,11 @@ where
 
         // Read entries, could need two reads if wrapping around
         buffer.clear();
-        buffer.extend_from_slice(self.reader.read(target_size));
-        let remaining = target_size - buffer.len();
-        if remaining > 0 {
-            buffer.extend_from_slice(self.reader.read(remaining));
+        for entry in self.reader.read(target_size)? {
+            let mut node = Output::<D>::default();
+            debug_assert_eq!(entry.len(), D::OutputSize::USIZE);
+            node.copy_from_slice(entry);
+            buffer.push(node);
         }
         debug_assert_eq!(buffer.len(), target_size);
 
@@ -219,7 +218,7 @@ where
         Ok(target_size)
     }
 
-    async fn wait_for_next_batch(&mut self, ticker: &mut Interval) -> usize {
+    async fn wait_for_next_batch(&mut self, ticker: &mut Interval) -> eyre::Result<usize> {
         let entries = self
             .reader
             .wait_at_least(self.config.max_entries_per_timestamp);
@@ -230,7 +229,7 @@ where
                 let current_available = self.reader.available();
                 if current_available == 0 {
                     debug!("No available entries, skipping this round...");
-                    return 0;
+                    return Ok(0);
                 }
 
                 debug!(current_available, "Timeout reached, creating timestamp");
@@ -252,12 +251,15 @@ where
                     current_available
                 }
             }
-            _ = entries => {
+            result = entries => {
+                if result.is_err() {
+                    bail!("fatal error in journal while waiting for entries");
+                }
                 // Max entries reached, create timestamp
                 debug!("Max entries reached, creating timestamp");
                 self.config.max_entries_per_timestamp
             }
         };
-        target_size
+        Ok(target_size)
     }
 }

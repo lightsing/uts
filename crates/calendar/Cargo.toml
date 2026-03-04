@@ -37,7 +37,7 @@ tracing-subscriber = { workspace = true }
 uts-bmt = { workspace = true }
 uts-contracts = { workspace = true }
 uts-core = { workspace = true, features = ["bytes"] }
-uts-journal = { workspace = true }
+uts-journal = { package = "uts-journal-rocks", path = "../../crates/journal-rocks" }
 uts-stamper = { workspace = true }
 
 [dev-dependencies]
