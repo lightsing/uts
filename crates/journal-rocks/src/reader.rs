@@ -1,4 +1,4 @@
-use crate::{ConsumerWait, JournalInner, entry_key};
+use crate::{ConsumerWait, JournalInner};
 use rocksdb::WriteBatch;
 use std::{
     fmt, io,
@@ -127,11 +127,10 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
 
         for i in 0..count as u64 {
             let idx = self.consumed + i;
-            let key = entry_key(idx);
             let data = self
                 .journal
                 .db
-                .get(key)
+                .get(idx.to_le_bytes())
                 .expect("RocksDB read failed")
                 .unwrap_or_else(|| panic!("missing journal entry at index {idx}"));
             assert_eq!(
@@ -154,13 +153,10 @@ impl<const ENTRY_SIZE: usize> JournalReader<ENTRY_SIZE> {
         let old_consumed = self.journal.consumed_index.load(Ordering::Acquire);
 
         let mut batch = WriteBatch::default();
-        batch.put(
-            crate::META_CONSUMED_INDEX_KEY,
-            self.consumed.to_le_bytes(),
-        );
+        batch.put(crate::META_CONSUMED_INDEX_KEY, self.consumed.to_le_bytes());
         // Garbage-collect consumed entries.
         for idx in old_consumed..self.consumed {
-            batch.delete(entry_key(idx));
+            batch.delete(idx.to_le_bytes());
         }
         self.journal
             .db
@@ -186,10 +182,10 @@ mod tests {
 
         assert_eq!(reader.available(), 0);
 
-        journal.commit(&TEST_DATA[0]).await;
+        journal.commit(&TEST_DATA[0]);
         assert_eq!(reader.available(), 1);
 
-        journal.commit(&TEST_DATA[1]).await;
+        journal.commit(&TEST_DATA[1]);
         assert_eq!(reader.available(), 2);
 
         let slice = reader.read(1);
@@ -205,7 +201,7 @@ mod tests {
         let mut reader = journal.reader();
 
         for entry in TEST_DATA.iter().take(3) {
-            journal.commit(entry).await;
+            journal.commit(entry);
         }
 
         let slice = reader.read(2);
@@ -240,7 +236,7 @@ mod tests {
         let journal_clone = journal.clone();
         let task = tokio::spawn(async move {
             sleep(Duration::from_millis(5)).await;
-            journal_clone.commit(&TEST_DATA[0]).await;
+            journal_clone.commit(&TEST_DATA[0]);
         });
 
         reader.wait_at_least(1).await;
@@ -259,7 +255,7 @@ mod tests {
         let journal_clone = journal.clone();
         let task = tokio::spawn(async move {
             for entry in TEST_DATA.iter().take(4) {
-                journal_clone.commit(entry).await;
+                journal_clone.commit(entry);
                 sleep(Duration::from_millis(5)).await;
             }
         });
@@ -291,7 +287,7 @@ mod tests {
     )]
     async fn wait_at_least_dirty_read_exceeds_available() {
         let (journal, _tmp) = test_journal(4);
-        journal.commit(&TEST_DATA[0]).await;
+        journal.commit(&TEST_DATA[0]);
 
         let mut reader = journal.reader();
         reader.read(1);

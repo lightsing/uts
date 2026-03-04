@@ -31,19 +31,8 @@ pub mod error;
 /// Journal reader.
 pub mod reader;
 
-// ── RocksDB key layout ──────────────────────────────────────────────────────
-// Entry keys:  0x00 ++ big-endian u64 index  (9 bytes)
-// Meta keys:   0xFF ++ tag byte
-const META_WRITE_INDEX_KEY: &[u8] = b"\xff\x00";
-const META_CONSUMED_INDEX_KEY: &[u8] = b"\xff\x01";
-
-/// Build a 9-byte entry key: prefix `0x00` + big-endian u64 index.
-#[inline]
-fn entry_key(index: u64) -> [u8; 9] {
-    let mut key = [0u8; 9];
-    key[1..9].copy_from_slice(&index.to_be_bytes());
-    key
-}
+const META_WRITE_INDEX_KEY: &[u8] = b"\x00";
+const META_CONSUMED_INDEX_KEY: &[u8] = b"\x01";
 
 /// Read a u64 from a meta key in RocksDB, returning 0 if absent.
 fn read_meta(db: &DB, key: &[u8]) -> u64 {
@@ -187,10 +176,7 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
     /// Try commit a new entry to the journal.
     ///
     /// The entry is written to RocksDB synchronously.
-    pub fn try_commit(
-        &self,
-        data: &[u8; ENTRY_SIZE],
-    ) -> Result<(), JournalUnavailable> {
+    pub fn try_commit(&self, data: &[u8; ENTRY_SIZE]) -> Result<(), JournalUnavailable> {
         if self.inner.shutdown.load(Ordering::Acquire) {
             return Err(JournalUnavailable::Shutdown);
         }
@@ -208,12 +194,9 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
         // Write entry + updated write_index atomically via WriteBatch.
         let new_write_idx = write_idx.wrapping_add(1);
         let mut batch = WriteBatch::default();
-        batch.put(entry_key(write_idx), data);
+        batch.put(write_idx.to_le_bytes(), data);
         batch.put(META_WRITE_INDEX_KEY, new_write_idx.to_le_bytes());
-        self.inner
-            .db
-            .write(batch)
-            .expect("RocksDB write failed");
+        self.inner.db.write(batch).expect("RocksDB write failed");
 
         self.inner
             .write_index
