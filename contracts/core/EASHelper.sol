@@ -11,18 +11,20 @@ library EASHelper {
 
     /// @notice Helper function to create an attestation for a given content hash using the EAS contract
     function attest(IEAS eas, bytes32 root) public returns (bytes32) {
-        return eas.attest(
-            AttestationRequest({
-                schema: CONTENT_HASH_SCHEMA,
-                data: AttestationRequestData({
-                    recipient: address(0), // No specific recipient, as the attestation is about the content hash
-                    expirationTime: 0, // No expiration
-                    revocable: false, // Un-revokable
-                    refUID: bytes32(0), // No reference to another attestation
-                    data: abi.encode(root), // Encode the root in the data field
-                    value: 0 // No ETH value needed for this attestation
-                })
+        return eas.attest(getAttestationRequest(root));
+    }
+
+    function getAttestationRequest(bytes32 root) public pure returns (AttestationRequest memory) {
+        return AttestationRequest({
+            schema: CONTENT_HASH_SCHEMA,
+            data: AttestationRequestData({
+                recipient: address(0), // No specific recipient, as the attestation is about the content hash
+                expirationTime: 0, // No expiration
+                revocable: false, // Un-revokable
+                refUID: bytes32(0), // No reference to another attestation
+                data: abi.encode(root), // Encode the root in the data field
+                value: 0 // No ETH value needed for this attestation
             })
-        );
+        });
     }
 }

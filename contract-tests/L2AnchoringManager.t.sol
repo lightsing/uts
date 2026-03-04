@@ -11,6 +11,7 @@ import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConsta
 import {TestEASHelper} from "./EAS.t.sol";
 import {IEAS} from "eas-contracts/IEAS.sol";
 import {INFTGenerator} from "../contracts/L2/nft/INFTGenerator.sol";
+import {EASHelper} from "../contracts/core/EASHelper.sol";
 
 contract MockFeeOracle is IFeeOracle {
     function getL1BaseFee() external pure returns (uint256) {
@@ -74,7 +75,8 @@ contract L2AnchoringManagerTest is Test {
         nftGenerator = INFTGenerator(vm.deployCode("NFTGenerator"));
 
         L2AnchoringManager impl = L2AnchoringManager(payable(vm.deployCode("L2AnchoringManager")));
-        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
+        address proxy =
+            address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, (address(this)))));
         L2AnchoringManager proxyInstance = L2AnchoringManager(payable(proxy));
         proxyInstance.lateInitialize(
             "Scroll", address(this), address(eas), address(feeOracle), address(l2Messenger), address(nftGenerator)
@@ -92,9 +94,11 @@ contract L2AnchoringManagerTest is Test {
         console.log("Current floor fee:", fee);
 
         // Simulate submitting a root for L1 anchoring
-        vm.prank(address(1)); // Simulate a call from an external address
+        vm.startPrank(address(1)); // Simulate a call from an external address
         vm.deal(address(1), 100 ether); // Fund the address with some ether to pay for the fee
-        manager.submitForL1Anchoring{value: fee}(root, address(1));
+        bytes32 attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee}(attestationId, address(1));
+        vm.stopPrank();
 
         // Verify that the item was added to the queue
         bool confirmed = manager.isConfirmed(root);
@@ -132,7 +136,8 @@ contract L2AnchoringManagerGasTest is Test {
         nftGenerator = INFTGenerator(vm.deployCode("NFTGenerator"));
 
         L2AnchoringManager impl = L2AnchoringManager(payable(vm.deployCode("L2AnchoringManager")));
-        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
+        address proxy =
+            address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, (address(this)))));
         L2AnchoringManager proxyInstance = L2AnchoringManager(payable(proxy));
         proxyInstance.lateInitialize(
             "Scroll", address(this), address(eas), address(feeOracle), address(l2Messenger), address(nftGenerator)
@@ -147,8 +152,9 @@ contract L2AnchoringManagerGasTest is Test {
         uint256 fee = feeOracle.getFloorFee();
         for (uint256 i = 0; i < 1024; i++) {
             bytes32 root = keccak256(abi.encodePacked(i));
+            bytes32 attestationId = eas.attest(EASHelper.getAttestationRequest(root));
             vm.prank(address(1));
-            manager.submitForL1Anchoring{value: fee}(root, address(1));
+            manager.submitForL1Anchoring{value: fee}(attestationId, address(1));
         }
     }
 

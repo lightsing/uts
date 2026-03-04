@@ -13,6 +13,7 @@ import {IEAS} from "eas-contracts/IEAS.sol";
 import {INFTGenerator} from "../contracts/L2/nft/INFTGenerator.sol";
 import {MerkleTree} from "../contracts/core/MerkleTree.sol";
 import {MockFeeOracle, MockL2ScrollMessenger} from "./L2AnchoringManager.t.sol";
+import {EASHelper} from "../contracts/core/EASHelper.sol";
 
 contract MockNFTGenerator is INFTGenerator {
     function generateTokenURI(uint256, bytes32, uint256, uint256, uint256, string memory)
@@ -34,7 +35,7 @@ contract L2AnchoringManagerExtendedTest is Test {
     INFTGenerator nftGenerator;
 
     address constant L1_GATEWAY = address(0x123);
-    address user = address(0x1);
+    address user = address(0xBEEF);
 
     function setUp() public {
         eas = TestEASHelper(vm.deployCode("TestEASHelper")).eas();
@@ -43,7 +44,8 @@ contract L2AnchoringManagerExtendedTest is Test {
         nftGenerator = new MockNFTGenerator();
 
         L2AnchoringManager impl = L2AnchoringManager(payable(vm.deployCode("L2AnchoringManager")));
-        address proxy = address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, ())));
+        address proxy =
+            address(new ERC1967Proxy(address(impl), abi.encodeCall(L2AnchoringManager.initialize, (address(this)))));
         managerInstance = L2AnchoringManager(payable(proxy));
         managerInstance.lateInitialize(
             "Scroll", address(this), address(eas), address(feeOracle), address(l2Messenger), address(nftGenerator)
@@ -63,9 +65,11 @@ contract L2AnchoringManagerExtendedTest is Test {
         bytes32 root = keccak256("root1");
         uint256 fee = feeOracle.getFloorFee();
 
-        vm.prank(user);
+        vm.startPrank(user);
+        bytes32 attestationId = eas.attest(EASHelper.getAttestationRequest(root));
         vm.expectRevert(L2AnchoringManager.InsufficientFee.selector);
-        manager.submitForL1Anchoring{value: fee - 1}(root);
+        manager.submitForL1Anchoring{value: fee - 1}(attestationId);
+        vm.stopPrank();
     }
 
     function test_SubmitForL1Anchoring_RefundsExcess() public {
@@ -74,9 +78,11 @@ contract L2AnchoringManagerExtendedTest is Test {
         uint256 excess = 1 ether;
 
         uint256 balBefore = user.balance;
-        vm.prank(user);
-        manager.submitForL1Anchoring{value: fee + excess}(root, user);
+        vm.startPrank(user);
+        bytes32 attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee + excess}(attestationId, user);
         uint256 balAfter = user.balance;
+        vm.stopPrank();
 
         // User paid exactly fee (minus gas, but the refund should cover excess)
         assertEq(balBefore - balAfter, fee);
@@ -107,8 +113,10 @@ contract L2AnchoringManagerExtendedTest is Test {
     function test_NotifyAnchored_RevertBatchAlreadyExists() public {
         bytes32 root = keccak256("root3");
         uint256 fee = feeOracle.getFloorFee();
-        vm.prank(user);
-        manager.submitForL1Anchoring{value: fee}(root);
+        vm.startPrank(user);
+        bytes32 attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee}(attestationId);
+        vm.stopPrank();
 
         l2Messenger.setSender(L1_GATEWAY);
         vm.prank(address(l2Messenger));
@@ -123,8 +131,10 @@ contract L2AnchoringManagerExtendedTest is Test {
     function test_NotifyAnchored_RevertInvalidBatchOrder() public {
         bytes32 root = keccak256("root4");
         uint256 fee = feeOracle.getFloorFee();
-        vm.prank(user);
-        manager.submitForL1Anchoring{value: fee}(root);
+        vm.startPrank(user);
+        bytes32 attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee}(attestationId);
+        vm.stopPrank();
 
         l2Messenger.setSender(L1_GATEWAY);
         vm.prank(address(l2Messenger));
@@ -142,8 +152,10 @@ contract L2AnchoringManagerExtendedTest is Test {
     function test_FinalizeBatch_RevertMerkleRootMismatch() public {
         bytes32 root = keccak256("root5");
         uint256 fee = feeOracle.getFloorFee();
-        vm.prank(user);
-        manager.submitForL1Anchoring{value: fee}(root);
+        vm.startPrank(user);
+        bytes32 _attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee}(_attestationId);
+        vm.stopPrank();
 
         bytes32 wrongRoot = keccak256("wrong");
         l2Messenger.setSender(L1_GATEWAY);
@@ -161,9 +173,11 @@ contract L2AnchoringManagerExtendedTest is Test {
         uint256 fee = feeOracle.getFloorFee();
 
         // 1. Submit
-        vm.prank(user);
+        vm.startPrank(user);
         vm.recordLogs();
-        manager.submitForL1Anchoring{value: fee}(root);
+        bytes32 _attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee}(_attestationId);
+        vm.stopPrank();
 
         // Extract attestationId from L1AnchoringQueued event
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -175,7 +189,7 @@ contract L2AnchoringManagerExtendedTest is Test {
                 break;
             }
         }
-        assertTrue(attestationId != bytes32(0), "attestationId should be non-zero");
+        assertEq(attestationId, _attestationId, "Attestation ID should match");
 
         // 2. Notify
         l2Messenger.setSender(L1_GATEWAY);
@@ -184,7 +198,7 @@ contract L2AnchoringManagerExtendedTest is Test {
 
         // 3. Finalize
         manager.finalizeBatch();
-        assertTrue(manager.isConfirmed(root));
+        assertTrue(manager.isConfirmed(attestationId));
 
         // 4. Claim NFT - mock onERC721Received on the proxy (attester) so _safeMint succeeds
         vm.mockCall(
@@ -198,7 +212,7 @@ contract L2AnchoringManagerExtendedTest is Test {
     }
 
     function test_ClaimNFT_RevertInvalidAttestationId() public {
-        vm.expectRevert(L2AnchoringManager.InvalidAttestationId.selector);
+        vm.expectRevert(L2AnchoringManager.InvalidAttestation.selector);
         manager.claimNFT(keccak256("nonexistent"), 1);
     }
 
@@ -206,9 +220,12 @@ contract L2AnchoringManagerExtendedTest is Test {
         bytes32 root = keccak256("claim-twice");
         uint256 fee = feeOracle.getFloorFee();
 
-        vm.prank(user);
+        vm.startPrank(user);
+        bytes32 _attestationId = eas.attest(EASHelper.getAttestationRequest(root));
         vm.recordLogs();
-        manager.submitForL1Anchoring{value: fee}(root);
+        manager.submitForL1Anchoring{value: fee}(_attestationId);
+        vm.stopPrank();
+
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 attestationId;
         bytes32 eventSig = keccak256("L1AnchoringQueued(bytes32,bytes32,uint256,uint256,uint256,uint256)");
@@ -218,6 +235,7 @@ contract L2AnchoringManagerExtendedTest is Test {
                 break;
             }
         }
+        assertEq(attestationId, _attestationId, "Attestation ID should match");
 
         l2Messenger.setSender(L1_GATEWAY);
         vm.prank(address(l2Messenger));
@@ -245,7 +263,8 @@ contract L2AnchoringManagerExtendedTest is Test {
 
         vm.prank(user);
         vm.recordLogs();
-        manager.submitForL1Anchoring{value: fee}(root);
+        bytes32 _attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee}(_attestationId);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 attestationId;
         bytes32 eventSig = keccak256("L1AnchoringQueued(bytes32,bytes32,uint256,uint256,uint256,uint256)");
@@ -255,6 +274,7 @@ contract L2AnchoringManagerExtendedTest is Test {
                 break;
             }
         }
+        assertEq(attestationId, _attestationId, "Attestation ID should match");
 
         l2Messenger.setSender(L1_GATEWAY);
         vm.prank(address(l2Messenger));
@@ -290,8 +310,10 @@ contract L2AnchoringManagerExtendedTest is Test {
         // Accumulate some fees
         bytes32 root = keccak256("fee-test");
         uint256 fee = feeOracle.getFloorFee();
-        vm.prank(user);
-        manager.submitForL1Anchoring{value: fee}(root);
+        vm.startPrank(user);
+        bytes32 _attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee}(_attestationId);
+        vm.stopPrank();
 
         managerInstance.grantRole(managerInstance.FEE_COLLECTOR_ROLE(), address(this));
 
@@ -308,8 +330,10 @@ contract L2AnchoringManagerExtendedTest is Test {
     function test_ClearBatch_Success() public {
         bytes32 root = keccak256("clear-test");
         uint256 fee = feeOracle.getFloorFee();
-        vm.prank(user);
-        manager.submitForL1Anchoring{value: fee}(root);
+        vm.startPrank(user);
+        bytes32 _attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee}(_attestationId);
+        vm.stopPrank();
 
         l2Messenger.setSender(L1_GATEWAY);
         vm.prank(address(l2Messenger));
@@ -366,9 +390,11 @@ contract L2AnchoringManagerExtendedTest is Test {
     function test_IsConfirmed_ReturnsFalseForUnconfirmed() public {
         bytes32 root = keccak256("unconfirmed");
         uint256 fee = feeOracle.getFloorFee();
-        vm.prank(user);
-        manager.submitForL1Anchoring{value: fee}(root);
+        vm.startPrank(user);
+        bytes32 _attestationId = eas.attest(EASHelper.getAttestationRequest(root));
+        manager.submitForL1Anchoring{value: fee}(_attestationId);
+        vm.stopPrank();
 
-        assertFalse(manager.isConfirmed(root));
+        assertFalse(manager.isConfirmed(_attestationId));
     }
 }
