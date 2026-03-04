@@ -57,7 +57,7 @@ impl<const N: usize> Type<Sqlite> for Wrapper<FixedBytes<N>> {
     }
 }
 
-impl<'q, const N: usize> Encode<'q, Sqlite> for Wrapper<FixedBytes<N>> {
+impl<const N: usize> Encode<'_, Sqlite> for Wrapper<FixedBytes<N>> {
     fn encode_by_ref(
         &self,
         args: &mut Vec<SqliteArgumentValue<'_>>,

@@ -91,7 +91,7 @@ impl Stamp {
                 let mut hasher = D::new();
                 Digest::update(&mut hasher, digest.digest());
                 let nonce: [u8; 32] = rand::random();
-                Digest::update(&mut hasher, &nonce);
+                Digest::update(&mut hasher, nonce);
                 builder.append(nonce.to_vec()).digest::<D>();
                 hasher.finalize()
             })
@@ -122,7 +122,7 @@ impl Stamp {
 
         let stamps = futures::future::join_all(
             calendars
-                .into_iter()
+                .iter()
                 .map(|calendar| request_calendar(calendar.clone(), self.timeout, root)),
         )
         .await
@@ -167,7 +167,7 @@ async fn hash_file<D: DigestOpExt + Send>(path: PathBuf) -> io::Result<DigestHea
 
 async fn request_calendar(calendar: Url, timeout: u64, root: &[u8]) -> eyre::Result<Timestamp> {
     eprintln!("Submitting to remote calendar: {calendar}");
-    let url = calendar.join(&"digest")?;
+    let url = calendar.join("digest")?;
     let response = CLIENT
         .post(url)
         .header("Accept", "application/vnd.opentimestamps.v1")
@@ -179,19 +179,16 @@ async fn request_calendar(calendar: Url, timeout: u64, root: &[u8]) -> eyre::Res
         .await
         .inspect_err(|e| {
             if e.is_status() {
-                eprintln!("Calendar {} responded with error: {}", calendar, e);
+                eprintln!("Calendar {calendar} responded with error: {e}");
             } else if e.is_timeout() {
-                eprintln!("Calendar {} timed out after {} seconds", calendar, timeout);
+                eprintln!("Calendar {calendar} timed out after {timeout} seconds");
             } else {
-                eprintln!("Failed to submit to calendar {}: {}", calendar, e);
+                eprintln!("Failed to submit to calendar {calendar}: {e}");
             }
         })?;
 
     let ts = Timestamp::decode(&mut &*response).inspect_err(|e| {
-        eprintln!(
-            "Failed to decode response from calendar {}: {}",
-            calendar, e
-        );
+        eprintln!("Failed to decode response from calendar {calendar}: {e}");
     })?;
     Ok(ts)
 }
