@@ -29,6 +29,6 @@ tracing = { workspace = true }
 uts-bmt = { workspace = true }
 uts-contracts = { workspace = true }
 uts-core = { workspace = true }
-uts-journal = { workspace = true }
+uts-journal = { package = "uts-journal-rocks", path = "../../crates/journal-rocks" }
 
 [features]

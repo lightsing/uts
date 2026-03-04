@@ -32,7 +32,7 @@ pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) ->
         Err(_) => {
             return (StatusCode::SERVICE_UNAVAILABLE, r#"{"err":"server busy"}"#).into_response();
         } // journal is full
-        Ok(fut) => fut.await,
+        Ok(()) => {}
     }
     output.into_response()
 }

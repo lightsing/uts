@@ -23,7 +23,7 @@ use tower_http::{cors, cors::CorsLayer};
 use tracing::{error, info};
 use uts_calendar::{AppState, routes, shutdown_signal, time};
 use uts_contracts::eas::{EAS, EAS_ADDRESSES};
-use uts_journal::{Journal, JournalConfig, checkpoint::CheckpointConfig};
+use uts_journal::{Journal, JournalConfig};
 use uts_stamper::{Stamper, StamperConfig};
 
 const RING_BUFFER_CAPACITY: usize = 1 << 20; // 1 million entries
@@ -45,11 +45,7 @@ async fn main() -> eyre::Result<()> {
     let journal = Journal::with_capacity_and_config(
         RING_BUFFER_CAPACITY,
         JournalConfig {
-            consumer_checkpoint: CheckpointConfig {
-                path: PathBuf::from("./.journal/.checkpoint"),
-                ..Default::default()
-            },
-            wal_dir: PathBuf::from("./.journal"),
+            db_path: PathBuf::from("./.journal"),
         },
     )?;
 

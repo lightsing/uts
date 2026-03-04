@@ -6811,7 +6811,7 @@ dependencies = [
  "uts-bmt",
  "uts-contracts",
  "uts-core",
- "uts-journal",
+ "uts-journal-rocks",
  "uts-stamper",
 ]
 
@@ -6899,6 +6899,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "uts-journal-rocks"
+version = "0.1.0"
+dependencies = [
+ "eyre",
+ "rocksdb",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "uts-stamper"
 version = "0.1.0"
 dependencies = [
@@ -6919,7 +6931,7 @@ dependencies = [
  "uts-bmt",
  "uts-contracts",
  "uts-core",
- "uts-journal",
+ "uts-journal-rocks",
 ]
 
 [[package]]
