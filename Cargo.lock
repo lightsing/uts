@@ -1401,30 +1401,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 
 [[package]]
-name = "bitcode"
-version = "0.6.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a6ed1b54d8dc333e7be604d00fa9262f4635485ffea923647b6521a5fff045d"
-dependencies = [
- "arrayvec",
- "bitcode_derive",
- "bytemuck",
- "glam",
- "serde",
-]
-
-[[package]]
-name = "bitcode_derive"
-version = "0.6.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "238b90427dfad9da4a9abd60f3ec1cdee6b80454bde49ed37f1781dd8e9dc7f9"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.111",
-]
-
-[[package]]
 name = "bitcoin-io"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3014,12 +2990,6 @@ name = "gimli"
 version = "0.32.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
-
-[[package]]
-name = "glam"
-version = "0.32.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34627c5158214743a374170fed714833fdf4e4b0cbcc1ea98417866a4c5d4441"
 
 [[package]]
 name = "glob"
@@ -6799,7 +6769,7 @@ dependencies = [
  "uts-bmt",
  "uts-contracts",
  "uts-core",
- "uts-journal-rocks",
+ "uts-journal",
  "uts-stamper",
 ]
 
@@ -6880,17 +6850,6 @@ name = "uts-journal"
 version = "0.1.0"
 dependencies = [
  "eyre",
- "tempfile",
- "thiserror 2.0.17",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "uts-journal-rocks"
-version = "0.1.0"
-dependencies = [
- "eyre",
  "rocksdb",
  "tempfile",
  "thiserror 2.0.17",
@@ -6904,12 +6863,10 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
- "bitcode",
  "bytemuck",
  "digest 0.11.0-rc.4",
  "eyre",
  "rocksdb",
- "serde",
  "sqlx",
  "strum 0.28.0",
  "thiserror 2.0.17",
@@ -6919,7 +6876,7 @@ dependencies = [
  "uts-bmt",
  "uts-contracts",
  "uts-core",
- "uts-journal-rocks",
+ "uts-journal",
 ]
 
 [[package]]

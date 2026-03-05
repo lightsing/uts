@@ -92,7 +92,6 @@ uts-bmt = { path = "crates/bmt" }
 uts-contracts = { path = "crates/contracts" }
 uts-core = { path = "crates/core" }
 uts-journal = { path = "crates/journal" }
-uts-journal-rocks = { path = "crates/journal-rocks" }
 uts-stamper = { path = "crates/stamper" }
 
 [profile.bench]

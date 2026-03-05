@@ -1,6 +1,6 @@
 [package]
 authors.workspace = true
-description = "High performance append-only journal for UTS"
+description = "RocksDB-backed append-only journal for UTS"
 edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
@@ -10,6 +10,7 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
+rocksdb = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
