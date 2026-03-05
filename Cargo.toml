@@ -88,11 +88,11 @@ sha2 = "0.11.0-rc.3"
 sha3 = "0.11.0-rc.3"
 
 tempfile = "3"
-uts-bmt = { path = "crates/bmt" }
-uts-contracts = { path = "crates/contracts" }
-uts-core = { path = "crates/core" }
-uts-journal = { path = "crates/journal" }
-uts-stamper = { path = "crates/stamper" }
+uts-bmt = { version = "=0.1.0-alpha.0", path = "crates/bmt" }
+uts-contracts = { version = "=0.1.0-alpha.0", path = "crates/contracts" }
+uts-core = { version = "=0.1.0-alpha.0", path = "crates/core" }
+uts-journal = { version = "=0.1.0-alpha.0", path = "crates/journal" }
+uts-stamper = { version = "=0.1.0-alpha.0", path = "crates/stamper" }
 
 [profile.bench]
 codegen-units = 1
