@@ -1,5 +1,6 @@
 [package]
 authors.workspace = true
+description = "UTS Calendar Server for attesting and publishing digests on chain."
 edition.workspace = true
 homepage.workspace = true
 include = [
