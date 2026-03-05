@@ -3256,7 +3256,6 @@ version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1b229d73f5803b562cc26e4da0396c8610a4ee209f4fac8fa4f8d709166dc45"
 dependencies = [
- "bytemuck",
  "typenum",
 ]
 
@@ -6881,7 +6880,6 @@ dependencies = [
  "commonware-storage",
  "criterion 0.8.2",
  "digest 0.11.1",
- "hybrid-array",
  "sha2 0.11.0-rc.5",
  "sha3 0.11.0-rc.8",
 ]

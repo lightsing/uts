@@ -11,7 +11,7 @@ keywords.workspace = true
 license.workspace = true
 name = "uts-bmt"
 repository.workspace = true
-version.workspace = true
+version = "0.1.0"
 
 [dependencies]
 bytemuck = { workspace = true }

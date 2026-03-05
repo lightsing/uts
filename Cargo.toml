@@ -88,7 +88,7 @@ sha2 = "0.11.0-rc.3"
 sha3 = "0.11.0-rc.3"
 
 tempfile = "3"
-uts-bmt = { version = "=0.1.0-alpha.0", path = "crates/bmt" }
+uts-bmt = { version = "0.1.0", path = "crates/bmt" }
 uts-contracts = { version = "=0.1.0-alpha.0", path = "crates/contracts" }
 uts-core = { version = "=0.1.0-alpha.0", path = "crates/core" }
 uts-journal = { version = "=0.1.0-alpha.0", path = "crates/journal" }
