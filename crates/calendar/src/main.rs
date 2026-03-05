@@ -74,7 +74,7 @@ async fn main() -> eyre::Result<()> {
                 .foreign_keys(true),
         )
         .await?;
-    migrate!("../../migrations")
+    migrate!("./migrations")
         .run(&sql)
         .await
         .context("failed to run database migrations")?;

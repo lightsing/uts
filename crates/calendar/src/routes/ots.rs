@@ -32,7 +32,7 @@ pub const MAX_DIGEST_SIZE: usize = 64; // e.g., SHA3-512
 
 /// Submit digest to calendar server and get pending timestamp in response.
 pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) -> Response {
-    let (output, commitment) = submit_digest_inner(digest, &state.signer);
+    let (output, commitment) = submit_digest_inner(digest, &state.signer, &state.config.server.uri);
     match state.journal.try_commit(&commitment) {
         // journal is full
         Err(Error::Full) => return service_unavailable(),
@@ -45,7 +45,11 @@ pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) ->
 
 // TODO: We need to benchmark this.
 /// inner function to submit digest, returns (encoded timestamp, commitment)
-pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u8; 32]) {
+pub fn submit_digest_inner(
+    digest: Bytes,
+    signer: impl SignerSync,
+    pending_uri: &str,
+) -> (Bytes, [u8; 32]) {
     const PRE_ALLOCATION_SIZE_HINT: usize = 4096;
     thread_local! {
         // We don't have `.await` in this function, so it's safe to borrow thread local.
@@ -105,7 +109,7 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
 
         let timestamp = builder
             .attest(PendingAttestation {
-                uri: "http://localhost:3000".into(),
+                uri: pending_uri.into(),
             })
             .unwrap();
 

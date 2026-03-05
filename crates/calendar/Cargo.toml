@@ -2,6 +2,11 @@
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "migrations/**/*",
+]
 keywords.workspace = true
 license.workspace = true
 name = "uts-calendar"
