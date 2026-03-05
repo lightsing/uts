@@ -80,6 +80,7 @@ pub struct KvConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct SqlConfig {
+    /// The file system path where the SQL database (e.g. SQLite) is stored.
     pub filename: PathBuf,
 }
 

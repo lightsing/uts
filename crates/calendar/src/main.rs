@@ -1,8 +1,7 @@
 //! Calendar server
 
-use alloy_primitives::b256;
 use alloy_provider::{Provider, ProviderBuilder, network::EthereumWallet};
-use alloy_signer_local::{LocalSigner, MnemonicBuilder};
+use alloy_signer_local::MnemonicBuilder;
 use axum::{
     Router,
     extract::DefaultBodyLimit,
@@ -18,7 +17,7 @@ use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
-use std::{convert::Infallible, env, path::PathBuf, sync::Arc, time::Duration};
+use std::{convert::Infallible, env, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tower_http::{cors, cors::CorsLayer};
 use tracing::{error, info};
