@@ -2,4 +2,4 @@
 pub mod ots;
 
 mod headers;
-mod reponses;
+mod responses;
