@@ -1,5 +1,6 @@
 [package]
 authors.workspace = true
+description = "Universal Timestamps Stamper Library for packing digest and publish root on chain."
 edition.workspace = true
 homepage.workspace = true
 include = [
