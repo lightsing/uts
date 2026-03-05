@@ -10,5 +10,5 @@ RUN cargo zigbuild --release --bin uts-calendar --target x86_64-unknown-linux-gn
 FROM debian:trixie-slim AS calendar-runtime
 
 WORKDIR /app
-COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/uts-calendar /app/app
+COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/uts-calendar /app/uts-calendar
 ENTRYPOINT ["/app/uts-calendar"]
