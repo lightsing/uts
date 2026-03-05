@@ -21,7 +21,7 @@ interface IFeeOracle {
 
     /**
      * @notice Calculate the final fee a user must pay for L1 anchoring.
-     * @return fee The required fee in Wei, applying the discount ratio.
+     * @return fee The required fee in Wei.
      */
     function getFloorFee() external view returns (uint256);
 

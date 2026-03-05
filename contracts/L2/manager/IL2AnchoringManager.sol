@@ -67,11 +67,11 @@ interface IL2AnchoringManager {
     /// @notice Emitted when the L2 Messenger address is updated.
     event L2MessengerUpdated(address indexed oldMessenger, address indexed newMessenger);
 
-    /// @notice see also submitForL1Anchoring(bytes32 root, address refundAddress).
-    function submitForL1Anchoring(bytes32 root) external payable;
+    /// @notice see also submitForL1Anchoring(bytes32 attestationId, address refundAddress).
+    function submitForL1Anchoring(bytes32 attestationId) external payable;
 
     /**
-     * @notice Submit a root for L2 timestamping + L1 anchoring.
+     * @notice Submit an attestation for L1 anchoring.
      * @param attestationId The attestation ID returned by the EAS contract when the attestation for the root is created.
      * @param refundAddress The address to refund any excess fee after covering the required fee for L1 anchoring.
      * This allows users to get a refund if they overpay.
@@ -87,11 +87,11 @@ interface IL2AnchoringManager {
     function finalizeBatch() external;
 
     /**
-     * @notice Check if a root has been confirmed as anchored on L1.
-     * @param root The Merkle root to check for confirmation.
-     * @return True if the root has been confirmed as anchored on L1, false otherwise.
+     * @notice Check if an attestation has been confirmed as anchored on L1.
+     * @param attestationId The attestation ID to check for confirmation.
+     * @return True if the attestation has been confirmed as anchored on L1, false otherwise.
      */
-    function isConfirmed(bytes32 root) external view returns (bool);
+    function isConfirmed(bytes32 attestationId) external view returns (bool);
 
     /// @notice Claim the NFT for a confirmed attestation.
     // forge-lint: disable-next-line(mixed-case-function)
