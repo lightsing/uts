@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 alloy-primitives = { workspace = true }
-alloy-provider = { workspace = true }
+alloy-provider = { workspace = true, default-features = false }
 bytemuck = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 color-eyre = { workspace = true }
@@ -39,10 +39,10 @@ uts-contracts = { workspace = true }
 uts-core = { workspace = true, features = ["std", "eas-verifier", "io-utils"] }
 
 [features]
-default = ["reqwest-default-tls"]
-reqwest-default-tls = ["reqwest/default-tls"]
-reqwest-native-tls = ["reqwest/native-tls"]
+default = ["reqwest-rustls"]
+reqwest-default-tls = ["reqwest/default-tls", "alloy-provider/reqwest-default-tls"]
+reqwest-native-tls = ["reqwest/native-tls", "alloy-provider/reqwest-native-tls"]
 reqwest-native-tls-no-alpn = ["reqwest/native-tls-no-alpn"]
 reqwest-native-tls-vendored = ["reqwest/native-tls-vendored"]
 reqwest-native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn"]
-reqwest-rustls = ["reqwest/rustls"]
+reqwest-rustls = ["reqwest/rustls", "alloy-provider/reqwest-rustls-tls"]

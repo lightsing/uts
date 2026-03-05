@@ -9,13 +9,13 @@ ENV PATH="/usr/local:${PATH}"
 
 RUN rustup install nightly-2026-01-01 && \
     rustup default nightly-2026-01-01 && \
-    rustup target add x86_64-unknown-linux-gnu && \
     cargo install cargo-chef --version 0.1.77 --locked && \
     cargo install cargo-zigbuild --version 0.22.1 --locked
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
+    pkg-config \
     ca-certificates \
     curl \
     xz-utils \
@@ -26,6 +26,7 @@ RUN apt-get update && \
 
 
 FROM rust-2026-01-01-zig-0-15-2-chef-0-1-77-zigbuild-0-22-1 AS rust
+ENV SQLX_OFFLINE=true
 
 FROM rust AS planner
 
@@ -35,22 +36,27 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 FROM rust AS builder
 
-ENV RUSTFLAGS="-C target-cpu=x86-64"
-
 WORKDIR /app
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --workspace --release --recipe-path recipe.json --zigbuild --target x86_64-unknown-linux-gnu.2.17
 COPY . .
 
-ARG BINARY_NAME
-RUN cargo zigbuild --release --bin ${BINARY_NAME} --target x86_64-unknown-linux-gnu.2.17
+FROM builder AS cli
 
-FROM debian:trixie-slim AS runtime
+RUN cargo zigbuild --release --bin uts-cli --target x86_64-unknown-linux-gnu.2.17
+
+FROM builder AS calendar
+
+RUN cargo zigbuild --release --bin uts-calendar --target x86_64-unknown-linux-gnu.2.17 --features performance
+
+FROM debian:trixie-slim AS cli-runtime
 
 WORKDIR /app
-ARG BINARY_NAME
+COPY --from=cli /app/target/x86_64-unknown-linux-gnu/release/uts-cli /app/app
+ENTRYPOINT ["/app/uts-cli"]
 
-COPY --from=builder /app/target/x86_64-unknown-linux-gnu/${BINARY_NAME} /app/app
+FROM debian:trixie-slim AS calendar-runtime
 
-ENTRYPOINT ["/app/app"]
-# docker build -t uts-calendar:latest --build-arg BINARY_NAME=uts-calendar -f Dockerfile .
+WORKDIR /app
+COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/uts-calendar /app/app
+ENTRYPOINT ["/app/uts-calendar"]
