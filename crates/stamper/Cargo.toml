@@ -3,6 +3,7 @@ authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
 include = [
+  ".sqlx/**/*",
   "src/**/*",
   "Cargo.toml",
 ]
