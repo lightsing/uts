@@ -2,6 +2,7 @@
 [server]
 bind-address = "0.0.0.0:3000"
 node-name = "LGM-1 // PSR_B1919+21"
+uri = "http://localhost:3000"
 
 [blockchain]
 rpc-url = "https://sepolia-rpc.scroll.io"

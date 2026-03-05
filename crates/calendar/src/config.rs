@@ -24,6 +24,8 @@ pub struct ServerConfig {
     pub node_name: String,
     /// The address and port to bind the server to.
     pub bind_address: String,
+    /// The URI base for the server, used in pending timestamp metadata.
+    pub uri: String,
 }
 
 /// Blockchain configuration, including RPC URL and wallet credentials.

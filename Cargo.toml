@@ -9,7 +9,7 @@ homepage = "https://github.com/lightsing/uts/"
 keywords = [] # TODO: add keywords
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/lightsing/uts.git"
-version = "0.1.0"
+version = "0.1.0-alpha.0"
 
 [workspace.lints.rust]
 missing-debug-implementations = "warn"

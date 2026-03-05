@@ -115,6 +115,15 @@
                 Submit digests, retrieve proofs, and verify data integrity on-chain at zero cost.
             </p>
 
+            <!-- TESTNET WARNING -->
+            <div class="bg-amber-950/30 border border-amber-500/50 p-3 sm:p-4 flex items-start gap-3 shadow-[inset_0_0_10px_rgba(245,158,11,0.05)]">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-500 shrink-0 mt-0.5"></i>
+                <div>
+                    <span class="text-amber-500 text-xs font-bold uppercase tracking-widest block mb-1">SYSTEM_WARNING: TESTNET_ENVIRONMENT</span>
+                    <span class="text-amber-400/80 text-xs sm:text-sm leading-relaxed block">This node is connected to the experimental testnet. Proofs generated here are for testing purposes only. Do not rely on this network for production data.</span>
+                </div>
+            </div>
+
             <!-- Node Address Identity Badge -->
             <div class="inline-flex items-start sm:items-center gap-3 bg-black border border-emerald-900/80 px-3 sm:px-4 py-2 sm:py-3 shadow-[inset_0_0_10px_rgba(16,185,129,0.05)] w-full sm:w-auto">
                 <i data-lucide="fingerprint" class="w-5 h-5 text-emerald-500/70 shrink-0 mt-0.5 sm:mt-0"></i>
@@ -219,6 +228,27 @@
                     AWAITING_ONCHAIN_CONFIRMATION...
                 </a>
             </div>
+        </div>
+    </div>
+
+    <!-- CLI Integration -->
+    <div class="mt-12 space-y-6">
+        <div class="mb-4 border-b border-emerald-900 pb-2">
+            <h2 class="text-xl font-bold text-emerald-400 uppercase tracking-widest">> Client_Integration</h2>
+            <p class="text-emerald-600 text-sm mt-2">> Official UTS CLI tool for local interaction.</p>
+        </div>
+
+        <div class="retro-card p-6">
+            <p class="text-sm text-emerald-600 mb-4">
+                To interact with this calendar node locally, install the official UTS CLI tool:
+            </p>
+            <div class="bg-black p-4 border border-emerald-900 relative group">
+                <div class="absolute top-0 right-0 bg-emerald-900 text-black px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase">Cargo</div>
+                <code class="text-emerald-400 text-sm sm:text-base break-all flex items-center gap-2 font-mono">
+                    <span class="text-emerald-600 select-none">$</span> cargo install uts-cli --locked
+                </code>
+            </div>
+            <p class="text-emerald-700 text-[10px] sm:text-xs mt-3 uppercase tracking-widest">> Requires Rust toolchain to be installed.</p>
         </div>
     </div>
 

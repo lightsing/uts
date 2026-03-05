@@ -15,5 +15,6 @@ struct Cli {
 async fn main() -> eyre::Result<()> {
     color_eyre::install()?;
 
+    eprintln!("UTS is current in TESTING, not for production use.");
     Cli::parse().command.run().await
 }

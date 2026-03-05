@@ -43,11 +43,11 @@ async fn main() -> eyre::Result<()> {
     let journal = Journal::with_capacity_and_config(
         RING_BUFFER_CAPACITY,
         JournalConfig {
-            db_path: config.db.journal.db_path,
+            db_path: config.db.journal.db_path.clone(),
         },
     )?;
 
-    let key = MnemonicBuilder::from_phrase(config.blockchain.wallet.mnemonic)
+    let key = MnemonicBuilder::from_phrase(&*config.blockchain.wallet.mnemonic)
         .index(config.blockchain.wallet.index)?
         .build()?;
     let address = key.address();
@@ -65,11 +65,11 @@ async fn main() -> eyre::Result<()> {
 
     // stamper
     let reader = journal.reader();
-    let db = Arc::new(DB::open_default(config.db.kv.path)?);
+    let db = Arc::new(DB::open_default(&config.db.kv.path)?);
     let sql = SqlitePoolOptions::new()
         .connect_with(
             SqliteConnectOptions::new()
-                .filename(config.db.sql.filename)
+                .filename(&config.db.sql.filename)
                 .create_if_missing(true)
                 .foreign_keys(true),
         )
@@ -136,6 +136,7 @@ async fn main() -> eyre::Result<()> {
         .route("/metrics", get(routes::metrics))
         .merge(public_api)
         .with_state(Arc::new(AppState {
+            config,
             signer: key.clone(),
             journal: journal.clone(),
             kv_db: db,

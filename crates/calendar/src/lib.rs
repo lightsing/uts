@@ -6,6 +6,7 @@
 #[macro_use]
 extern crate tracing;
 
+use crate::config::AppConfig;
 use alloy_signer::k256::ecdsa::SigningKey;
 use alloy_signer_local::LocalSigner;
 use rocksdb::DB;
@@ -22,6 +23,8 @@ pub mod time;
 /// Application state shared across handlers.
 #[derive(Debug)]
 pub struct AppState {
+    /// Application configuration.
+    pub config: AppConfig,
     /// Local signer for signing OTS timestamps.
     pub signer: LocalSigner<SigningKey>,
     /// Journal
