@@ -1,11 +1,18 @@
-use crate::{AppState, time::current_time_sec};
+use crate::{
+    AppState,
+    routes::{
+        headers::*,
+        reponses::{internal_server_error, not_found, service_unavailable},
+    },
+    time::current_time_sec,
+};
 use alloy_chains::Chain;
 use alloy_primitives::B256;
 use alloy_signer::SignerSync;
 use axum::{
     body::Bytes,
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, header},
     response::{IntoResponse, Response},
 };
 use bump_scope::Bump;
@@ -31,17 +38,9 @@ pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) ->
     let (output, commitment) = submit_digest_inner(digest, &state.signer);
     match state.journal.try_commit(&commitment) {
         // journal is full
-        Err(Error::Full) => {
-            return (StatusCode::SERVICE_UNAVAILABLE, r#"{"err":"server busy"}"#).into_response();
-        }
+        Err(Error::Full) => return service_unavailable(),
         // journal is in fatal error status
-        Err(Error::Fatal) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                r#"{"err":"internal error"}"#,
-            )
-                .into_response();
-        }
+        Err(Error::Fatal) => return internal_server_error(),
         Ok(()) => {}
     }
     output.into_response()
@@ -132,35 +131,23 @@ pub async fn get_timestamp(
     let Some(root) =
         DbExt::<Keccak256>::get_root_for_leaf(&*state.kv_db, commitment).expect("DB error")
     else {
-        return (StatusCode::NOT_FOUND, r#"{"err":"timestamp not found"}"#).into_response();
+        return not_found();
     };
 
     let id = match sql::get_attestation_result(&state.sql_pool, root).await {
-        Ok((_, AttestationResult::Pending)) => {
-            return (StatusCode::NOT_FOUND, r#"{"status":"pending"}"#).into_response();
-        }
-        Ok((_, AttestationResult::MaxAttemptsExceeded)) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, r#"{"err":"failed"}"#).into_response();
-        }
+        Ok((_, AttestationResult::Pending)) => return not_found(),
+        Ok((_, AttestationResult::MaxAttemptsExceeded)) => return internal_server_error(),
         Ok((id, AttestationResult::Success)) => id,
         Err(e) => {
             error!("SQL error: {e}");
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                r#"{"err":"internal error"}"#,
-            )
-                .into_response();
+            return internal_server_error();
         }
     };
 
     let Ok(Some(attestation)) = sql::get_last_successful_attest_attempt(&state.sql_pool, id).await
     else {
         error!("get_last_successful_attest_attempt failed for attestation_id {id} unexpectedly");
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            r#"{"err":"internal error"}"#,
-        )
-            .into_response();
+        return internal_server_error();
     };
 
     let trie = DbExt::<Keccak256>::load_trie(&*state.kv_db, root)
@@ -186,5 +173,8 @@ pub async fn get_timestamp(
     #[cfg(any(debug_assertions, not(feature = "performance")))]
     trace!(encoded_length = buf.len(), timestamp = ?timestamp);
 
+    let mut headers = HeaderMap::with_capacity(2);
+    headers.insert(header::CACHE_CONTROL, PUBLIC_IMMUTABLE.clone());
+    headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_OCTET_STREAM.clone());
     buf.freeze().into_response()
 }

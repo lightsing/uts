@@ -16,7 +16,7 @@ use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
-use std::{env, path::PathBuf, sync::Arc};
+use std::{convert::Infallible, env, path::PathBuf, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tower_http::{cors, cors::CorsLayer};
 use tracing::{error, info};
@@ -103,24 +103,37 @@ async fn main() -> eyre::Result<()> {
         });
     }
 
-    let app = Router::new()
+    // compatible API.
+    let public_api = Router::new()
         .route(
             "/digest",
             post(routes::ots::submit_digest)
-                .layer(DefaultBodyLimit::max(routes::ots::MAX_DIGEST_SIZE)),
+                .layer::<_, Infallible>(
+                    CorsLayer::new()
+                        .allow_methods([Method::POST])
+                        .allow_origin(cors::Any)
+                        .max_age(Duration::from_hours(24)),
+                )
+                .layer::<_, Infallible>(DefaultBodyLimit::max(routes::ots::MAX_DIGEST_SIZE)),
         )
-        .route("/timestamp/{commitment}", get(routes::ots::get_timestamp))
+        .route(
+            "/timestamp/{commitment}",
+            get(routes::ots::get_timestamp).layer::<_, Infallible>(
+                CorsLayer::new()
+                    .allow_methods([Method::GET])
+                    .allow_origin(cors::Any)
+                    .max_age(Duration::from_hours(24)),
+            ),
+        );
+
+    let app = Router::new()
+        .merge(public_api)
         .with_state(Arc::new(AppState {
             signer,
             journal: journal.clone(),
             kv_db: db,
             sql_pool: sql,
-        }))
-        .layer(
-            CorsLayer::new()
-                .allow_methods([Method::GET, Method::POST])
-                .allow_origin(cors::Any),
-        );
+        }));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
 
