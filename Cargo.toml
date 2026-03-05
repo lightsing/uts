@@ -91,7 +91,7 @@ tempfile = "3"
 uts-bmt = { version = "0.1.0", path = "crates/bmt" }
 uts-contracts = { version = "=0.1.0-alpha.0", path = "crates/contracts" }
 uts-core = { version = "=0.1.0-alpha.0", path = "crates/core" }
-uts-journal = { version = "=0.1.0-alpha.0", path = "crates/journal" }
+uts-journal = { version = "0.1.0", path = "crates/journal" }
 uts-stamper = { version = "=0.1.0-alpha.0", path = "crates/stamper" }
 
 [profile.bench]
