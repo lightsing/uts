@@ -12,6 +12,8 @@ use rocksdb::DB;
 use std::sync::Arc;
 use uts_journal::Journal;
 
+/// Config
+pub mod config;
 /// Calendar server routes and handlers.
 pub mod routes;
 /// Time-related utilities and background tasks.

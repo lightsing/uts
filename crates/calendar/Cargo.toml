@@ -23,9 +23,9 @@ axum = { workspace = true, default-features = false, features = [
 bump-scope.workspace = true
 bytemuck = { workspace = true }
 bytes = { workspace = true }
+config = { workspace = true }
 digest = { workspace = true }
 eyre = { workspace = true }
-hashbrown = { version = "0.15.5", features = ["nightly"] } # why?
 itoa = { workspace = true }
 rocksdb = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -36,11 +36,13 @@ tokio-util = { workspace = true }
 tower-http = { workspace = true, features = ["cors"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-uts-bmt = { workspace = true }
 uts-contracts = { workspace = true }
 uts-core = { workspace = true, features = ["bytes"] }
 uts-journal = { workspace = true }
 uts-stamper = { workspace = true }
+
+hashbrown_15 = { package = "hashbrown", version = "0.15", features = ["nightly"] } # why?
+hashbrown_16 = { package = "hashbrown", version = "0.16", features = ["nightly"] } # why?
 
 [dev-dependencies]
 criterion.workspace = true
