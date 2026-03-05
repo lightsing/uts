@@ -1,5 +1,6 @@
 [package]
 authors.workspace = true
+description = "Universal Timestamps Command Line Interface."
 edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
