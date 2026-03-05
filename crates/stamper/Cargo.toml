@@ -2,6 +2,10 @@
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+]
 keywords.workspace = true
 license.workspace = true
 name = "uts-stamper"
@@ -21,7 +25,6 @@ rocksdb = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "migrate"] }
 strum = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
 tokio = { workspace = true, features = ["time", "macros"] }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
