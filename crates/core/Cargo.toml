@@ -1,5 +1,5 @@
 [package]
-description = "Core types and traits for OpenTimestamps in Rust"
+description = "Core types and traits for Univeral Timestamps in Rust"
 documentation = "https://docs.rs/uts-core/"
 edition.workspace = true
 homepage.workspace = true
