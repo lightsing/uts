@@ -1,27 +1,23 @@
 [package]
 authors.workspace = true
+description = "Ethereum Smart Contracts Interfaces for Universal Timestamps Project"
 edition.workspace = true
 homepage.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+]
 keywords.workspace = true
 license.workspace = true
 name = "uts-contracts"
 repository.workspace = true
 version.workspace = true
 
-[dependencies]
-alloy-contract = { workspace = true }
-alloy-primitives = { workspace = true }
-alloy-sol-types = { workspace = true, features = ["json"] }
-phf = { workspace = true, features = ["std", "macros"] }
-
-[dev-dependencies]
-alloy = { workspace = true, features = ["full", "node-bindings", "signer-mnemonic"] }
-eyre = { workspace = true }
-futures = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-
 [lints]
 workspace = true
 
-[features]
-erc1967 = []
+[dependencies]
+alloy-contract = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
+phf = { workspace = true, features = ["std", "macros"] }
