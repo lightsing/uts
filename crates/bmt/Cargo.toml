@@ -11,11 +11,12 @@ keywords.workspace = true
 license.workspace = true
 name = "uts-bmt"
 repository.workspace = true
-version = "0.1.0"
+version = "0.1.1"
 
 [dependencies]
 bytemuck = { workspace = true }
 digest.workspace = true
+hybrid-array = { workspace = true, features = ["bytemuck"] }
 
 [dev-dependencies]
 alloy-primitives.workspace = true
