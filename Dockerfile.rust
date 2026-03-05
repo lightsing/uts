@@ -1,4 +1,4 @@
-FROM rust:1-trixie AS rust-2026-01-01-zig-0-15-2-zigbuild-0-22-1
+FROM rust:1-trixie
 
 RUN cd /tmp && \
     curl -L -o zig.tar.xz https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz && \
