@@ -12,7 +12,7 @@ pub struct EASVerifier<P: Provider> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EASVerifierError {
-    #[error("invalid value length for Ethereum UTS attestation")]
+    #[error("invalid value length for EAS attestation")]
     InvalidLength,
     #[error("invalid attestation data")]
     InvalidData(#[from] alloy_sol_types::Error),

@@ -37,7 +37,12 @@ export interface UnaryExecutionStep extends BaseExecutionStep {
   op: DigestOp | 'REVERSE' | 'HEXLIFY'
 }
 
-export type AttestationKind = 'pending' | 'bitcoin' | 'ethereum-uts' | 'unknown'
+export type AttestationKind =
+  | 'pending'
+  | 'bitcoin'
+  | 'eas-attestation'
+  | 'eas-timestamped'
+  | 'unknown'
 
 export type PendingAttestation = { kind: 'pending'; url: URL }
 export type BitcoinAttestation = { kind: 'bitcoin'; height: number }

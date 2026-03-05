@@ -33,6 +33,15 @@ contract MockFeeOracle is IFeeOracle {
     function getDiscountRatio() external pure returns (uint256) {
         return 0.5e18; // 50% discount
     }
+
+    function setL1Overhead(uint256 l1Overhead) external pure {}
+    function setL1FeeScalar(uint256 l1FeeScalar) external pure {}
+    function setL1GasEstimated(uint256 l1GasEstimated) external pure {}
+    function setCrossDomainGasEstimated(uint256 crossDomainGasEstimated) external pure {}
+    function setL2ExecutionScalar(uint256 l2ExecutionScalar) external pure {}
+    function setL2ExecutionOverhead(uint256 l2ExecutionOverhead) external pure {}
+    function setExpectedBatchSize(uint256 expectedBatchSize) external pure {}
+    function setFeeMultiplier(uint256 feeMultiplier) external pure {}
 }
 
 contract MockL2ScrollMessenger is IL2ScrollMessenger {

@@ -7,5 +7,5 @@ openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/
 openzeppelin-contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/
 openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src/
 scroll-contracts/=lib/scroll-contracts/src/
-eas-contracts=lib/eas-contracts/contracts
-solady=lib/solady/src
+eas-contracts/=lib/eas-contracts/contracts
+solady/=lib/solady/src
