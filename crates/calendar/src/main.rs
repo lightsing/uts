@@ -6,7 +6,8 @@ use alloy_signer_local::{LocalSigner, MnemonicBuilder};
 use axum::{
     Router,
     extract::DefaultBodyLimit,
-    http::Method,
+    http::{Method, StatusCode},
+    response::Html,
     routing::{get, post},
 };
 use eyre::{Context, ContextCompat};
@@ -127,6 +128,9 @@ async fn main() -> eyre::Result<()> {
         );
 
     let app = Router::new()
+        .route("/", get(|| async { Html(include_str!("index.html")) }))
+        .route("/healthcheck", get(|| async { StatusCode::NO_CONTENT }))
+        .route("/metrics", get(routes::metrics))
         .merge(public_api)
         .with_state(Arc::new(AppState {
             signer,

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UTS Calendar Server - TERMINAL</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Retro-Futuristic Font */
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: #050505;
+            color: #10b981; /* Emerald 500 */
+        }
+
+        /* CRT Scanline Effect */
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+            linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 50;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* Subtle Vignette */
+        .vignette {
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.8) 100%);
+            z-index: 49;
+            pointer-events: none;
+        }
+
+        /* Neon Borders & Glow */
+        .retro-card {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #064e3b; /* Emerald 900 */
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+        }
+        .retro-card:hover {
+            border-color: #10b981;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2), inset 0 0 10px rgba(16, 185, 129, 0.1);
+        }
+
+        .neon-text-green { text-shadow: 0 0 8px rgba(16, 185, 129, 0.6); }
+        .neon-text-cyan { text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
+        .neon-text-amber { text-shadow: 0 0 8px rgba(251, 191, 36, 0.6); }
+        .neon-text-rose { text-shadow: 0 0 8px rgba(244, 63, 94, 0.6); }
+
+        /* Blinking Cursor */
+        .cursor-blink { animation: blink 1s step-end infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #064e3b; }
+        ::-webkit-scrollbar-thumb { background: #064e3b; }
+        ::-webkit-scrollbar-thumb:hover { background: #10b981; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-emerald-500 selection:text-black relative">
+
+<!-- Screen Effects -->
+<div class="crt-overlay"></div>
+<div class="vignette"></div>
+
+<!-- Header -->
+<header class="border-b border-emerald-900 bg-black/90 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="border border-emerald-500 p-2 text-emerald-400 bg-emerald-950/30 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                <i data-lucide="terminal" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-3">
+                    <h1 class="font-bold text-xl text-emerald-400 tracking-widest neon-text-green uppercase">UTS_Calendar_Node</h1>
+                    <!-- FREE SERVICE BADGE -->
+                    <span class="bg-emerald-500 text-black px-2 py-0.5 text-xs font-bold uppercase animate-pulse tracking-wide">
+                            Free Public Service
+                        </span>
+                </div>
+                <p class="text-xs text-emerald-600 tracking-widest">Universal.Timestamps.Calendar.v1</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 px-3 py-1 border border-emerald-900 bg-black text-sm">
+                    <span class="relative flex h-3 w-3">
+                      <span id="status-ping" class="animate-ping absolute inline-flex h-full w-full bg-emerald-400 opacity-75 hidden"></span>
+                      <span id="status-dot" class="relative inline-flex h-3 w-3 bg-emerald-900"></span>
+                    </span>
+                <span id="status-text" class="text-emerald-700">SYS.CONNECTING...</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- Main Content -->
+<main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8 z-10">
+
+    <!-- Welcome Hero / System Info -->
+    <div class="border-l-4 border-emerald-500 pl-4 py-2 mb-8">
+        <h2 class="text-2xl font-bold text-emerald-400 uppercase tracking-wider neon-text-green">
+            > Universal Timestamps Project <span class="cursor-blink">_</span>
+        </h2>
+        <p class="text-emerald-600 mt-2 max-w-3xl leading-relaxed">
+            Welcome to the uts calendar server. This infrastructure is operated as a <span class="text-emerald-400 border-b border-dashed border-emerald-400 pb-0.5">100% free public good</span>.
+            Submit digests, retrieve proofs, and verify data integrity on-chain at zero cost.
+        </p>
+    </div>
+
+    <!-- Metrics Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Total Digests -->
+        <div class="retro-card p-5 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <i data-lucide="database" class="w-16 h-16 text-cyan-400"></i>
+            </div>
+            <h3 class="text-emerald-600 text-xs font-bold tracking-widest uppercase mb-1">Total_Processed</h3>
+            <div class="text-3xl font-bold text-cyan-400 tracking-widest neon-text-cyan flex items-baseline gap-2 mt-2">
+                <span id="metric-total">N/A</span>
+            </div>
+            <div class="w-full h-1 bg-emerald-900/50 mt-4"><div class="h-full bg-cyan-500/50 w-full"></div></div>
+        </div>
+
+        <!-- Pending Digests (Outer) -->
+        <div class="retro-card p-5 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <i data-lucide="cpu" class="w-16 h-16 text-amber-400"></i>
+            </div>
+            <h3 class="text-emerald-600 text-xs font-bold tracking-widest uppercase mb-1">Pending_Digests</h3>
+            <div class="text-3xl font-bold text-amber-400 tracking-widest neon-text-amber flex items-baseline gap-2 mt-2">
+                <span id="metric-pending-digests">N/A</span>
+            </div>
+            <div class="w-full h-1 bg-emerald-900/50 mt-4"><div class="h-full bg-amber-500/50 w-3/4 animate-pulse"></div></div>
+        </div>
+
+        <!-- Success -->
+        <div class="retro-card p-5 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <i data-lucide="shield-check" class="w-16 h-16 text-emerald-400"></i>
+            </div>
+            <h3 class="text-emerald-600 text-xs font-bold tracking-widest uppercase mb-1">OnChain_Success</h3>
+            <div class="text-3xl font-bold text-emerald-400 tracking-widest neon-text-green flex items-baseline gap-2 mt-2">
+                <span id="metric-success">N/A</span>
+            </div>
+            <div class="w-full h-1 bg-emerald-900/50 mt-4"><div class="h-full bg-emerald-500/50 w-full"></div></div>
+        </div>
+
+        <!-- Failed -->
+        <div class="retro-card p-5 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <i data-lucide="alert-triangle" class="w-16 h-16 text-rose-400"></i>
+            </div>
+            <h3 class="text-emerald-600 text-xs font-bold tracking-widest uppercase mb-1">Failed_Attempts</h3>
+            <div class="text-3xl font-bold text-rose-400 tracking-widest neon-text-rose flex items-baseline gap-2 mt-2">
+                <span id="metric-failed">N/A</span>
+            </div>
+            <div class="w-full h-1 bg-emerald-900/50 mt-4"><div class="h-full bg-rose-500/50 w-[5%]"></div></div>
+        </div>
+    </div>
+
+    <!-- Last Attestation Details -->
+    <div class="retro-card p-6 border-l-4 border-l-emerald-500">
+        <h2 class="text-lg font-bold text-emerald-400 mb-6 flex items-center gap-3 uppercase tracking-widest">
+            <i data-lucide="activity" class="w-5 h-5 text-emerald-400"></i>
+            Stamper_Daemon_Status
+        </h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Status Details -->
+            <div class="space-y-1 bg-black p-4 border border-emerald-900/50">
+                <div class="flex justify-between items-center py-2 border-b border-emerald-900/50 hover:bg-emerald-900/20 px-2 transition-colors">
+                    <span class="text-emerald-600 text-sm">> mempool.tx_queue</span>
+                    <span id="metric-stamper-pending" class="text-amber-400 font-bold bg-amber-900/30 px-2 border border-amber-500/30">N/A</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-emerald-900/50 hover:bg-emerald-900/20 px-2 transition-colors">
+                    <span class="text-emerald-600 text-sm">> last_sync.timestamp</span>
+                    <span id="metric-last-attempt" class="text-emerald-400">N/A</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-emerald-900/50 hover:bg-emerald-900/20 px-2 transition-colors">
+                    <span class="text-emerald-600 text-sm">> network.chain_id</span>
+                    <span class="flex items-center gap-2">
+                            <span id="metric-chain-id" class="text-cyan-400 font-bold">N/A</span>
+                        </span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-emerald-900/50 hover:bg-emerald-900/20 px-2 transition-colors">
+                    <span class="text-emerald-600 text-sm">> latest.block_height</span>
+                    <span id="metric-block" class="text-emerald-400">N/A</span>
+                </div>
+            </div>
+
+            <!-- Transaction Hash -->
+            <div class="flex flex-col">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-emerald-600 text-sm uppercase tracking-widest">> Transaction_Hash</span>
+                </div>
+                <!-- Cyberpunk styled hash block -->
+                <a id="metric-tx" class="flex-1 block w-full bg-black p-5 border border-emerald-900 text-emerald-700 transition-all duration-300 break-all leading-relaxed relative group overflow-hidden" title="Awaiting data">
+                    <!-- Scanning line effect inside the hash box -->
+                    <div class="absolute top-0 left-0 w-full h-1 bg-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.5)] -translate-y-full group-hover:animate-[scan_2s_linear_infinite]"></div>
+                    AWAITING_ONCHAIN_CONFIRMATION...
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Reference -->
+    <div class="mt-12 space-y-6">
+        <div class="mb-4 border-b border-emerald-900 pb-2">
+            <h2 class="text-xl font-bold text-emerald-400 uppercase tracking-widest">> Protocol_API_Interface</h2>
+            <p class="text-emerald-600 text-sm mt-2">> UTS is an enhanced superset of opentimestamps.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Digest Route -->
+            <div class="retro-card p-6">
+                <div class="flex items-center gap-3 mb-4 border-b border-emerald-900/50 pb-3">
+                    <span class="px-2 py-0.5 text-xs font-bold bg-cyan-950 text-cyan-400 border border-cyan-500/50 shadow-[0_0_5px_rgba(34,211,238,0.3)]">POST</span>
+                    <h3 class="text-lg text-emerald-300">/digest</h3>
+                </div>
+                <p class="text-sm text-emerald-600 mb-4 h-16">
+                    Submit a digest to the calendar server. The server writes it to its journal and returns a pending proof.
+                </p>
+                <div class="bg-black p-4 border border-emerald-900 relative">
+                    <div class="absolute top-0 right-0 bg-emerald-900 text-black px-2 py-0.5 text-xs">BASH</div>
+                    <pre id="curl-digest" class="text-sm text-emerald-400 overflow-x-auto whitespace-pre mt-2">Loading...</pre>
+                </div>
+            </div>
+
+            <!-- Timestamp Route -->
+            <div class="retro-card p-6">
+                <div class="flex items-center gap-3 mb-4 border-b border-emerald-900/50 pb-3">
+                    <span class="px-2 py-0.5 text-xs font-bold bg-emerald-950 text-emerald-400 border border-emerald-500/50 shadow-[0_0_5px_rgba(16,185,129,0.3)]">GET</span>
+                    <h3 class="text-lg text-emerald-300">/timestamp/{commitment}</h3>
+                </div>
+                <p class="text-sm text-emerald-600 mb-4 h-16">
+                    Retrieve the completed proof. Once the stamper commits the root on-chain (EAS), it returns the complete merkle proof.
+                </p>
+                <div class="bg-black p-4 border border-emerald-900 relative">
+                    <div class="absolute top-0 right-0 bg-emerald-900 text-black px-2 py-0.5 text-xs">BASH</div>
+                    <pre id="curl-timestamp" class="text-sm text-emerald-400 overflow-x-auto whitespace-pre mt-2">Loading...</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<footer class="border-t border-emerald-900 py-6 text-center text-emerald-700 text-sm mt-auto z-10 bg-black/80">
+    <p>END OF TRANSMISSION // UNIVERSAL TIMESTAMPS CALENDAR SERVER</p>
+</footer>
+
+<!-- Scripts -->
+<script>
+    // Initialize Icons
+    lucide.createIcons();
+
+    let pollInterval;
+
+    // Custom animation for the hash box scanning line
+    const style = document.createElement('style');
+    style.textContent = `
+            @keyframes scan {
+                0% { transform: translateY(-100%); }
+                100% { transform: translateY(10000%); }
+            }
+        `;
+    document.head.appendChild(style);
+
+    // Formatter functions
+    const formatNumber = (num) => new Intl.NumberFormat('en-US', { minimumIntegerDigits: 2 }).format(num);
+    const formatTime = (unix) => {
+        if (!unix) return 'NULL';
+        const d = new Date(unix * 1000);
+        return d.toISOString().replace('T', ' ').substring(0, 19) + 'Z';
+    };
+
+    // Utility to map chainId to explorer URL
+    function getExplorerUrl(chainId, txHash) {
+        const explorers = {
+            1: 'https://etherscan.io',
+            11155111: 'https://sepolia.etherscan.io',
+            10: 'https://optimistic.etherscan.io',
+            8453: 'https://basescan.org',
+            42161: 'https://arbiscan.io',
+            534352: 'https://scrollscan.com',
+            534351: 'https://sepolia.scrollscan.com'
+        };
+        const baseUrl = explorers[chainId] || 'https://blockscan.com';
+        return `${baseUrl}/tx/${txHash}`;
+    }
+
+    function setStatus(status) {
+        const dot = document.getElementById('status-dot');
+        const ping = document.getElementById('status-ping');
+        const text = document.getElementById('status-text');
+
+        if (status === 'online') {
+            dot.classList.replace('bg-emerald-900', 'bg-emerald-400');
+            dot.classList.add('shadow-[0_0_8px_rgba(16,185,129,1)]');
+            ping.classList.remove('hidden');
+            text.innerText = 'SYS.ONLINE';
+            text.className = 'text-emerald-400 font-bold neon-text-green';
+        } else {
+            dot.classList.replace('bg-emerald-400', 'bg-rose-500');
+            dot.classList.replace('bg-emerald-900', 'bg-rose-500');
+            dot.classList.remove('shadow-[0_0_8px_rgba(16,185,129,1)]');
+            dot.classList.add('shadow-[0_0_8px_rgba(244,63,94,1)]');
+            ping.classList.add('hidden');
+            text.innerText = 'SYS.OFFLINE';
+            text.className = 'text-rose-500 font-bold neon-text-rose animate-pulse';
+        }
+    }
+
+    function updateDOM(data) {
+        document.getElementById('metric-total').innerText = formatNumber(data.total);
+        document.getElementById('metric-pending-digests').innerText = formatNumber(data.pending);
+
+        if (data.stamper) {
+            document.getElementById('metric-stamper-pending').innerText = formatNumber(data.stamper.pending);
+            document.getElementById('metric-success').innerText = formatNumber(data.stamper.success);
+            document.getElementById('metric-failed').innerText = formatNumber(data.stamper.failed);
+            document.getElementById('metric-last-attempt').innerText = formatTime(data.stamper.last_attempt);
+
+            if (data.stamper.last_success) {
+                document.getElementById('metric-chain-id').innerText = `[${data.stamper.last_success.chain_id}]`;
+                document.getElementById('metric-block').innerText = formatNumber(data.stamper.last_success.block_number);
+
+                const txElement = document.getElementById('metric-tx');
+                txElement.innerText = data.stamper.last_success.tx_hash;
+
+                // Transform to active terminal link
+                txElement.href = getExplorerUrl(data.stamper.last_success.chain_id, data.stamper.last_success.tx_hash);
+                txElement.target = "_blank";
+                txElement.rel = "noopener noreferrer";
+                txElement.title = "EXECUTE: Open Block Explorer";
+
+                // Cyberpunk active state styling
+                txElement.classList.remove('text-emerald-700');
+                txElement.classList.add('text-emerald-400', 'hover:bg-emerald-950/50', 'hover:border-emerald-400', 'hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]', 'neon-text-green');
+            }
+        }
+    }
+
+    async function fetchMetrics() {
+        try {
+            const res = await fetch(`/metrics`, {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+            const data = await res.json();
+            setStatus('online');
+            updateDOM(data);
+
+        } catch (error) {
+            console.warn("Failed to fetch API metrics.", error);
+            setStatus('offline');
+        }
+    }
+
+    // Setup dynamic API docs based on the domain loading this page
+    const origin = window.location.origin;
+    document.getElementById('curl-digest').innerText = `$ curl -X POST \\\n  --data-binary @my_hash.bin \\\n  ${origin}/digest \\\n  --output pending_proof.uts`;
+    document.getElementById('curl-timestamp').innerText = `$ curl -X GET \\\n  ${origin}/timestamp/0x123...abc \\\n  --output completed_proof.uts`;
+
+    // Initial fetch and start polling
+    fetchMetrics();
+    pollInterval = setInterval(fetchMetrics, 5000);
+
+</script>
+</body>
+</html>
