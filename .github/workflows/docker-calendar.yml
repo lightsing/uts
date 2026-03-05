@@ -34,7 +34,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.REPO }}
+          images: ${{ env.REGISTRY }}/${{ env.REPO }}-calendar
           tags: |
             type=raw,value=latest
             type=sha,format=short
