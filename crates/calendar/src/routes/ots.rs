@@ -17,12 +17,9 @@ use bytes::BytesMut;
 use digest::Digest;
 use sha3::Keccak256;
 use std::{cell::RefCell, sync::Arc};
-use uts_core::{
-    codec::{
-        Encode,
-        v1::{EASTimestamped, PendingAttestation, Timestamp},
-    },
-    utils::Hexed,
+use uts_core::codec::{
+    Encode,
+    v1::{EASTimestamped, PendingAttestation, Timestamp},
 };
 use uts_journal::Error;
 use uts_stamper::{kv::DbExt, sql, sql::AttestationResult};
@@ -89,9 +86,9 @@ pub fn submit_digest_inner(
 
     #[cfg(any(debug_assertions, not(feature = "performance")))]
     trace!(
-        recv_timestamp = ?Hexed(&recv_timestamp),
-        digest = ?Hexed(&digest),
-        undeniable_sig = ?Hexed(&undeniable_sig),
+        recv_timestamp = ?uts_core::utils::Hexed(&recv_timestamp),
+        digest = ?uts_core::utils::Hexed(&digest),
+        undeniable_sig = ?uts_core::utils::Hexed(&undeniable_sig),
     );
 
     BUMP.with(|bump| {
