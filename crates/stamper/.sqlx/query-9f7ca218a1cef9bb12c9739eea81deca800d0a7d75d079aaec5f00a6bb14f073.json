@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            id as \"id!\",\n            trie_root as \"trie_root: TextWrapper<B256>\",\n            created_at as \"created_at!\",\n            updated_at as \"updated_at!\"\n        FROM pending_attestations\n        WHERE result = 'pending'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "trie_root: TextWrapper<B256>",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "updated_at!",
+        "ordinal": 3,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9f7ca218a1cef9bb12c9739eea81deca800d0a7d75d079aaec5f00a6bb14f073"
+}

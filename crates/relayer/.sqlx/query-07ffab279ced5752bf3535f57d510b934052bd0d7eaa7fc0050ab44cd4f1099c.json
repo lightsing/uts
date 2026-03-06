@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO l1_batch (l2_chain_id, start_index, count, root, status)\n        VALUES (?1, ?2, ?3, ?4, ?5)\n        ON CONFLICT(l2_chain_id, start_index, count) DO UPDATE SET\n            root = excluded.root,\n            status = excluded.status\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "07ffab279ced5752bf3535f57d510b934052bd0d7eaa7fc0050ab44cd4f1099c"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO indexer_cursors (chain_id, event_signature_hash, last_indexed_block)\n        VALUES (?1, ?2, ?3)\n        ON CONFLICT(chain_id, event_signature_hash) DO UPDATE SET last_indexed_block = excluded.last_indexed_block, updated_at = CURRENT_TIMESTAMP\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "c51afa7c515a0fe748f75fc072f05552a929304b1da57f28a9347bab75300b27"
+}

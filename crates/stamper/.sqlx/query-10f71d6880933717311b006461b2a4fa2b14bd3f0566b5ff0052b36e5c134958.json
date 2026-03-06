@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            chain_id,\n            tx_hash as \"tx_hash!: TextWrapper<TxHash>\",\n            block_number as \"block_number!\"\n        FROM attest_attempts\n        WHERE tx_hash IS NOT NULL AND block_number IS NOT NULL\n        ORDER BY created_at DESC\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "chain_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "tx_hash!: TextWrapper<TxHash>",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "block_number!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "10f71d6880933717311b006461b2a4fa2b14bd3f0566b5ff0052b36e5c134958"
+}

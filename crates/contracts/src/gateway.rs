@@ -1,5 +1,7 @@
 mod inner {
     alloy_sol_types::sol! {
+        #![sol(all_derives)]
+
         #[sol(rpc)]
         interface IL1AnchoringGateway {
             /// Emitted when a new batch of Merkle roots is submitted to L1 for anchoring.

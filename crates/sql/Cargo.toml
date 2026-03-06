@@ -1,0 +1,17 @@
+[package]
+authors.workspace = true
+description = "SQLite database helpers for Universal Timestamps Project"
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-sql"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true }
+sqlx = { workspace = true, features = ["sqlite"] }
+
+[lints]
+workspace = true

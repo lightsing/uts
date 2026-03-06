@@ -32,7 +32,7 @@ pub mod sql;
 mod tx_sender;
 
 /// Maximum number of retries for transient errors in transaction sending.
-pub const MAX_RETRIES: usize = 3;
+pub const MAX_RETRIES: i64 = 3;
 
 /// Stamper for timestamping
 ///

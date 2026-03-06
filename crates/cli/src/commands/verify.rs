@@ -2,7 +2,7 @@ use alloy_primitives::Address;
 use alloy_provider::ProviderBuilder;
 use clap::Args;
 use digest::{Digest, DynDigest};
-use eyre::bail;
+use eyre::{Context, bail};
 use jiff::{Timestamp, tz::TimeZone};
 use std::{
     fs::File,
@@ -134,7 +134,7 @@ impl Verify {
                 eprintln!("EAS Timestamped");
             }
 
-            let ts = Timestamp::from_second(time as i64)?;
+            let ts = Timestamp::from_second(time.try_into().context("i64 overflow")?)?;
             let zdt = ts.to_zoned(TimeZone::system());
             eprintln!("\ttime attested: {zdt}");
             eprintln!("\tmerkle root: {}", Hexed(&expected));

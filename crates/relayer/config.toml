@@ -1,0 +1,35 @@
+[blockchain]
+gateway-address = "0x39Ea3C70A5e26C8dB4a1A5E9A7Fc7Bab04684C08"
+manager-address = "0x7249802D50CB719547F7685d090d4b84e7183C32"
+
+[blockchain.rpc]
+l1 = "https://eth-sepolia.g.alchemy.com/v2/<REDACTED>"
+l2-ws = "wss://scroll-sepolia.g.alchemy.com/v2/<REDACTED>"
+
+[blockchain.rpc.retry]
+compute-units-per-second = 20
+initial-backoff = 100
+max-rate-limit-retries = 10
+
+[blockchain.rpc.throttle]
+requests-per-second = 25
+
+[blockchain.wallet]
+index = 0
+mnemonic = "<REDACTED>"
+
+[indexer.l2]
+batch-size = 10
+start-block = 17048863
+
+[relayer]
+batch-max-size = 512
+batch-max-wait-seconds = 3600
+l1-batch-submission-gas-limit = 150_000
+tick-interval-seconds = 10
+
+[db.kv]
+path = "./.db/relayer-kv"
+
+[db.sql]
+filename = "./.db/relayer.sqlite"

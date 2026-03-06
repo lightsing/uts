@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO l1_batch_arrived (l1_batch_id, internal_log_id, l1_block_attested, l1_timestamp_attested, l2_block_number, l2_timestamp_received)\n        VALUES (?1, ?2, ?3, ?4, ?5, ?6)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "85a9fa1d680ce9e346d84a0d32a22e84c1661d46d99cfa5774de4dff356cf405"
+}

@@ -4,8 +4,16 @@ bind-address = "0.0.0.0:3000"
 node-name = "LGM-1 // PSR_B1919+21"
 uri = "http://localhost:3000"
 
-[blockchain]
-rpc-url = "https://sepolia-rpc.scroll.io"
+[blockchain.rpc]
+url = "https://sepolia-rpc.scroll.io"
+
+[blockchain.rpc.retry]
+compute-units-per-second = 20
+initial-backoff = 100
+max-rate-limit-retries = 10
+
+[blockchain.rpc.throttle]
+requests-per-second = 25
 
 [blockchain.wallet]
 #mnemonic = "<REDACTED>" # You can also load it from env var.

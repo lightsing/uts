@@ -23,4 +23,5 @@ repos:
         entry: npx prettier --write
         language: system
         files: \.(js|jsx|ts|tsx|json|css|scss|md|html|toml)$
+        exclude: \.sqlx/.*\.json$
         pass_filenames: true
