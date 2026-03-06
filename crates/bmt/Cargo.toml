@@ -3,11 +3,15 @@ authors.workspace = true
 description = "Binary Merkle Tree implementation for Universal Timestamps in Rust"
 edition.workspace = true
 homepage.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+]
 keywords.workspace = true
 license.workspace = true
 name = "uts-bmt"
 repository.workspace = true
-version.workspace = true
+version = "0.1.1"
 
 [dependencies]
 bytemuck = { workspace = true }

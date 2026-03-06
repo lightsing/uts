@@ -3,11 +3,15 @@ authors.workspace = true
 description = "RocksDB-backed append-only journal for UTS"
 edition.workspace = true
 homepage.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+]
 keywords.workspace = true
 license.workspace = true
 name = "uts-journal"
 repository.workspace = true
-version.workspace = true
+version = "0.1.0"
 
 [dependencies]
 rocksdb = { workspace = true }

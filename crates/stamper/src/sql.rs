@@ -1,5 +1,5 @@
 use crate::MAX_RETRIES;
-use alloy_primitives::{B256, BlockNumber, ChainId, TxHash};
+use alloy_primitives::{B256, BlockNumber, ChainId, TxHash, private::serde::Serialize};
 use sqlx::SqlitePool;
 use types::Wrapper;
 
@@ -49,6 +49,34 @@ pub struct AttestTx {
     /// The hash of the transaction that attested the merkle root on-chain.
     pub tx_hash: TxHash,
     /// The block number in which the transaction was included.
+    pub block_number: BlockNumber,
+}
+
+/// A struct representing statistics about pending attestations in the database.
+#[derive(Debug, Copy, Clone, Serialize)]
+pub struct Stats {
+    /// The total number of pending attestations in the database.
+    pub pending: usize,
+    /// The total number of successful attempts for pending attestations.
+    pub success: usize,
+    /// The total number of failed attempts for pending attestations.
+    pub failed: usize,
+    /// The unix timestamp of the last attestation attempt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_attempt: Option<u64>,
+    /// The details of the last successful attestation attempt, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_success: Option<SuccessAttempt>,
+}
+
+/// A struct representing the details of a successful attestation attempt.
+#[derive(Debug, Copy, Clone, Serialize)]
+pub struct SuccessAttempt {
+    /// The chain ID on which the successful attest attempt was made.
+    pub chain_id: ChainId,
+    /// The hash of the transaction that successfully attested the merkle root on-chain.
+    pub tx_hash: TxHash,
+    /// The block number in which the successful transaction was included.
     pub block_number: BlockNumber,
 }
 
@@ -220,4 +248,58 @@ pub async fn new_attest_attempt(
     tx.commit().await?;
 
     Ok(())
+}
+
+/// Get stats
+pub async fn get_stats(pool: &SqlitePool) -> sqlx::Result<Stats> {
+    let mut tx = pool.begin().await?;
+
+    let counts = sqlx::query!(
+        r#"
+        SELECT
+            SUM(CASE WHEN result = 'pending' THEN 1 ELSE 0 END) as "pending!",
+            SUM(CASE WHEN result = 'success' THEN 1 ELSE 0 END) as "success!",
+            SUM(CASE WHEN result <> 'pending' AND result <> 'success' THEN 1 ELSE 0 END) as "failed!"
+        FROM pending_attestations
+        "#
+    )
+        .fetch_one(&mut *tx)
+        .await?;
+
+    let last_attempt: Option<i64> = sqlx::query_scalar!(
+        r#"SELECT created_at FROM attest_attempts ORDER BY created_at DESC LIMIT 1"#
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let last_success_rec = sqlx::query!(
+        r#"
+        SELECT
+            chain_id,
+            tx_hash as "tx_hash!: Wrapper<TxHash>",
+            block_number as "block_number!"
+        FROM attest_attempts
+        WHERE tx_hash IS NOT NULL AND block_number IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let last_success = last_success_rec.map(|rec| SuccessAttempt {
+        chain_id: rec.chain_id as u64,
+        tx_hash: rec.tx_hash.0,
+        block_number: rec.block_number as u64,
+    });
+
+    tx.commit().await?;
+
+    Ok(Stats {
+        pending: counts.pending as usize,
+        success: counts.success as usize,
+        failed: counts.failed as usize,
+        last_attempt: last_attempt.map(|ts| ts as u64),
+        last_success,
+    })
 }

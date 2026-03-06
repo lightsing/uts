@@ -15,15 +15,8 @@ use uts_core::{
     utils::{HashAsyncFsExt, Hexed},
 };
 
-static DEFAULT_CALENDARS: LazyLock<Vec<Url>> = LazyLock::new(|| {
-    vec![
-        // Url::parse("https://a.pool.opentimestamps.org/").unwrap(),
-        // Url::parse("https://b.pool.opentimestamps.org/").unwrap(),
-        // Url::parse("https://a.pool.eternitywall.com/").unwrap(),
-        // Url::parse("https://ots.btc.catallaxy.com/").unwrap(),
-        Url::parse("http://127.0.0.1:3000/").unwrap(),
-    ]
-});
+static DEFAULT_CALENDARS: LazyLock<Vec<Url>> =
+    LazyLock::new(|| vec![Url::parse("https://lgm1.test.timestamps.now/").unwrap()]);
 
 #[derive(Debug, Args)]
 pub struct Stamp {

@@ -6,12 +6,15 @@
 #[macro_use]
 extern crate tracing;
 
+use crate::config::AppConfig;
 use alloy_signer::k256::ecdsa::SigningKey;
 use alloy_signer_local::LocalSigner;
 use rocksdb::DB;
 use std::sync::Arc;
 use uts_journal::Journal;
 
+/// Config
+pub mod config;
 /// Calendar server routes and handlers.
 pub mod routes;
 /// Time-related utilities and background tasks.
@@ -20,6 +23,8 @@ pub mod time;
 /// Application state shared across handlers.
 #[derive(Debug)]
 pub struct AppState {
+    /// Application configuration.
+    pub config: AppConfig,
     /// Local signer for signing OTS timestamps.
     pub signer: LocalSigner<SigningKey>,
     /// Journal

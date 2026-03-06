@@ -1,7 +1,13 @@
 [package]
 authors.workspace = true
+description = "UTS Calendar Server for attesting and publishing digests on chain."
 edition.workspace = true
 homepage.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "migrations/**/*",
+]
 keywords.workspace = true
 license.workspace = true
 name = "uts-calendar"
@@ -11,22 +17,24 @@ version.workspace = true
 [dependencies]
 alloy-chains = { workspace = true }
 alloy-primitives = { workspace = true }
-alloy-provider = { workspace = true }
+alloy-provider = { workspace = true, default-features = false, features = ["reqwest"] }
 alloy-signer = { workspace = true }
 alloy-signer-local = { workspace = true, features = ["mnemonic"] }
 axum = { workspace = true, default-features = false, features = [
   "macros",
   "http2",
   "tokio",
+  "json",
 ] } # http2 only
 bump-scope.workspace = true
 bytemuck = { workspace = true }
 bytes = { workspace = true }
+config = { workspace = true }
 digest = { workspace = true }
 eyre = { workspace = true }
-hashbrown = { version = "0.15.5", features = ["nightly"] } # why?
 itoa = { workspace = true }
 rocksdb = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 sha3 = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio", "sqlite"] }
 tokio = { workspace = true, features = ["full"] }
@@ -34,11 +42,13 @@ tokio-util = { workspace = true }
 tower-http = { workspace = true, features = ["cors"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-uts-bmt = { workspace = true }
 uts-contracts = { workspace = true }
 uts-core = { workspace = true, features = ["bytes"] }
 uts-journal = { workspace = true }
 uts-stamper = { workspace = true }
+
+hashbrown_15 = { package = "hashbrown", version = "0.15", features = ["nightly"] } # why?
+hashbrown_16 = { package = "hashbrown", version = "0.16", features = ["nightly"] } # why?
 
 [dev-dependencies]
 criterion.workspace = true
@@ -51,5 +61,8 @@ name = "submit_digest"
 workspace = true
 
 [features]
+default = ["reqwest-rustls-tls"]
+
 dev = ["axum/http1"] # for easier testing
 performance = ["tracing/release_max_level_info"]
+reqwest-rustls-tls = ["alloy-provider/reqwest-rustls-tls"]

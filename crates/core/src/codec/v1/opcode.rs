@@ -7,6 +7,7 @@ use crate::{
     error::{DecodeError, EncodeError},
 };
 use alloc::{alloc::Allocator, vec::Vec};
+use alloy_primitives::hex;
 use core::{fmt, hint::unreachable_unchecked};
 use digest::Digest;
 use ripemd::Ripemd160;

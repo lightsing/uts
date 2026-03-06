@@ -1,8 +1,14 @@
 [package]
-description = "Core types and traits for OpenTimestamps in Rust"
+description = "Core types and traits for Univeral Timestamps in Rust"
 documentation = "https://docs.rs/uts-core/"
 edition.workspace = true
 homepage.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "LICENSE*",
+  "README*",
+]
 keywords.workspace = true
 license.workspace = true
 name = "uts-core"
@@ -18,7 +24,6 @@ alloy-sol-types = { workspace = true, optional = true }
 auto_impl.workspace = true
 bytes = { workspace = true, optional = true }
 digest.workspace = true
-hex.workspace = true
 once_cell = { workspace = true, features = ["alloc"] }
 paste.workspace = true
 ripemd.workspace = true
@@ -45,5 +50,4 @@ verifier = []
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
-opentimestamps = { git = "https://github.com/opentimestamps/rust-opentimestamps" }
 serde_json.workspace = true

@@ -72,8 +72,6 @@ pub struct StamperConfig {
     /// The minimum size of the Merkle tree leaves.
     /// It should be a power of two.
     pub min_leaves: usize,
-    /// The maximum number of recent Merkle trees to keep in cache.
-    pub max_cache_size: usize,
 }
 
 impl<D: Digest, P: Provider> fmt::Debug for Stamper<D, P> {

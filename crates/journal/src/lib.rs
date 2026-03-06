@@ -209,6 +209,18 @@ impl Journal {
 
         Ok(())
     }
+
+    /// Get the current consumed index.
+    #[inline]
+    pub fn consumed_index(&self) -> u64 {
+        self.inner.consumed_index()
+    }
+
+    /// Get the current write index.
+    #[inline]
+    pub fn write_index(&self) -> u64 {
+        self.inner.write_index()
+    }
 }
 
 impl JournalInner {
