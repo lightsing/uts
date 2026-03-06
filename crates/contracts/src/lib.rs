@@ -13,3 +13,7 @@ pub mod manager;
 
 /// Solidity interfaces for the Fee Oracle.
 pub mod fee_oracle;
+
+/// Helper for construct retry and throttle provider layers.
+#[cfg(feature = "provider-helper")]
+pub mod provider_helper;

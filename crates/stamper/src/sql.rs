@@ -1,9 +1,10 @@
 use crate::MAX_RETRIES;
 use alloy_primitives::{B256, BlockNumber, ChainId, TxHash, private::serde::Serialize};
+use eyre::Context;
 use sqlx::SqlitePool;
-use types::Wrapper;
+use uts_sql::{TextWrapper, define_text_enum, migrator};
 
-mod types;
+migrator!("./migrations");
 
 /// A struct representing a pending attestation that has been created but not yet attested on-chain.
 #[derive(Debug, Copy, Clone)]
@@ -31,6 +32,7 @@ pub enum AttestationResult {
     /// Exceeded maximum number of attempts to attest on-chain.
     MaxAttemptsExceeded,
 }
+define_text_enum!(AttestationResult);
 
 /// A struct representing an attempt to attest a merkle root on-chain
 #[derive(Debug, Copy, Clone)]
@@ -82,7 +84,7 @@ pub struct SuccessAttempt {
 
 /// Create a new pending attestation in the database and return its ID.
 pub async fn new_pending_attestation(pool: &SqlitePool, root: B256) -> sqlx::Result<i64> {
-    let root = Wrapper(root);
+    let root = TextWrapper(root);
 
     let rec = sqlx::query!(
         r#"INSERT INTO pending_attestations (trie_root) VALUES (?) RETURNING id"#,
@@ -102,7 +104,7 @@ pub async fn load_all_pending_attestations(
         r#"
         SELECT
             id as "id!",
-            trie_root as "trie_root: Wrapper<B256>",
+            trie_root as "trie_root: TextWrapper<B256>",
             created_at as "created_at!",
             updated_at as "updated_at!"
         FROM pending_attestations
@@ -130,7 +132,7 @@ pub async fn get_attestation_result(
     pool: &SqlitePool,
     trie_root: B256,
 ) -> sqlx::Result<(i64, AttestationResult)> {
-    let trie_root = Wrapper(trie_root);
+    let trie_root = TextWrapper(trie_root);
 
     let rec = sqlx::query!(
         r#"
@@ -156,7 +158,7 @@ pub async fn get_last_successful_attest_attempt(
         SELECT
             attestation_id,
             chain_id,
-            tx_hash as "tx_hash: Wrapper<TxHash>",
+            tx_hash as "tx_hash: TextWrapper<TxHash>",
             block_number as "block_number!"
         FROM attest_attempts
         WHERE attestation_id = ?1 AND tx_hash IS NOT NULL AND block_number IS NOT NULL
@@ -188,10 +190,13 @@ pub async fn new_attest_attempt(
     attestation_id: i64,
     chain_id: ChainId,
     may_success: Option<AttestTx>,
-) -> sqlx::Result<()> {
-    let chain_id = chain_id as i64;
-    let tx_hash = may_success.map(|tx| Wrapper(tx.tx_hash));
-    let block_number = may_success.map(|tx| tx.block_number as i64);
+) -> eyre::Result<()> {
+    let chain_id: i64 = chain_id.try_into().context("i64 overflow")?;
+    let tx_hash = may_success.map(|tx| TextWrapper(tx.tx_hash));
+    let block_number: Option<i64> = match may_success {
+        Some(tx) => Some(tx.block_number.try_into().context("i64 overflow")?),
+        None => None,
+    };
 
     let mut tx = pool.begin().await?;
 
@@ -231,7 +236,7 @@ pub async fn new_attest_attempt(
         )
         .fetch_one(&mut *tx)
         .await?;
-        if total_attempts >= MAX_RETRIES as i64 {
+        if total_attempts >= MAX_RETRIES {
             sqlx::query!(
                 r#"
                 UPDATE pending_attestations
@@ -276,7 +281,7 @@ pub async fn get_stats(pool: &SqlitePool) -> sqlx::Result<Stats> {
         r#"
         SELECT
             chain_id,
-            tx_hash as "tx_hash!: Wrapper<TxHash>",
+            tx_hash as "tx_hash!: TextWrapper<TxHash>",
             block_number as "block_number!"
         FROM attest_attempts
         WHERE tx_hash IS NOT NULL AND block_number IS NOT NULL

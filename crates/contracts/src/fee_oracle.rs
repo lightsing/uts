@@ -1,5 +1,7 @@
 mod inner {
     alloy_sol_types::sol! {
+        #![sol(all_derives)]
+
         #[sol(rpc)]
         interface IFeeOracle {
             /// Calculate the final fee a user must pay for L1 anchoring.

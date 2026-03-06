@@ -20,4 +20,12 @@ workspace = true
 alloy-contract = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
+alloy-transport = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
 phf = { workspace = true, features = ["std", "macros"] }
+serde = { workspace = true, optional = true }
+
+[features]
+provider-helper = ["dep:alloy-transport", "alloy-transport/throttle"]
+provider-helper-clap = ["provider-helper", "dep:clap", "clap/derive"]
+provider-helper-serde = ["provider-helper", "dep:serde", "serde/derive"]

@@ -34,5 +34,6 @@ uts-bmt = { workspace = true }
 uts-contracts = { workspace = true }
 uts-core = { workspace = true }
 uts-journal = { workspace = true }
+uts-sql = { workspace = true }
 
 [features]

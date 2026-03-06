@@ -1,6 +1,7 @@
 //! Calendar server
 
 use alloy_provider::{Provider, ProviderBuilder, network::EthereumWallet};
+use alloy_rpc_client::ClientBuilder;
 use alloy_signer_local::MnemonicBuilder;
 use axum::{
     Router,
@@ -13,18 +14,15 @@ use bytes::Bytes;
 use eyre::{Context, ContextCompat};
 use rocksdb::DB;
 use sha3::Keccak256;
-use sqlx::{
-    migrate,
-    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
-};
-use std::{convert::Infallible, env, sync::Arc, time::Duration};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use std::{convert::Infallible, env, fs, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tower_http::{cors, cors::CorsLayer};
 use tracing::{error, info};
 use uts_calendar::{AppState, config::AppConfig, routes, shutdown_signal, time};
 use uts_contracts::eas::{EAS, EAS_ADDRESSES};
 use uts_journal::{Journal, JournalConfig};
-use uts_stamper::{Stamper, StamperConfig};
+use uts_stamper::{Stamper, StamperConfig, sql};
 
 const RING_BUFFER_CAPACITY: usize = 1 << 20; // 1 million entries
 const INDEX_PAGE_TEMPLATE: &str = include_str!("index.html");
@@ -55,8 +53,12 @@ async fn main() -> eyre::Result<()> {
 
     let provider = ProviderBuilder::new()
         .wallet(EthereumWallet::new(key.clone()))
-        .connect("https://sepolia-rpc.scroll.io")
-        .await?;
+        .connect_client(
+            ClientBuilder::default()
+                .layer(config.blockchain.rpc.retry.layer())
+                .layer(config.blockchain.rpc.throttle.layer())
+                .http(config.blockchain.rpc.url.parse()?),
+        );
     let chain_id = provider.get_chain_id().await?; // sanity check
     let eas_address = *EAS_ADDRESSES
         .get(&chain_id)
@@ -65,7 +67,9 @@ async fn main() -> eyre::Result<()> {
 
     // stamper
     let reader = journal.reader();
+    fs::create_dir_all(config.db.kv.path.parent().unwrap())?;
     let db = Arc::new(DB::open_default(&config.db.kv.path)?);
+    fs::create_dir_all(config.db.sql.filename.parent().unwrap())?;
     let sql = SqlitePoolOptions::new()
         .connect_with(
             SqliteConnectOptions::new()
@@ -74,8 +78,7 @@ async fn main() -> eyre::Result<()> {
                 .foreign_keys(true),
         )
         .await?;
-    migrate!("./migrations")
-        .run(&sql)
+    sql::migrate(&sql)
         .await
         .context("failed to run database migrations")?;
 

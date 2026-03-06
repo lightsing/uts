@@ -1,5 +1,7 @@
 mod inner {
     alloy_sol_types::sol! {
+        #![sol(all_derives)]
+
         #[sol(rpc)]
         interface IL2AnchoringManager {
             /// Emitted when a user pays to have their root anchored to L1.

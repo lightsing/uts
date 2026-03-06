@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT last_indexed_block FROM indexer_cursors\n        WHERE chain_id = ?1 AND event_signature_hash = ?2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "last_indexed_block",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e8fdb00094a7ad83caa03fd3da3b26fc07c9e9907529f37d684e22c7fd18b1aa"
+}
