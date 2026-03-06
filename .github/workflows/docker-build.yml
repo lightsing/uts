@@ -1,0 +1,97 @@
+name: Build in Docker
+
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase repository name
+        run: |
+          echo "REPO=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
+      - name: Extract metadata for Calendar
+        id: meta-calendar
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.REPO }}-calendar
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - name: Extract metadata for CLI
+        id: meta-cli
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.REPO }}-cli
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - name: Build and push Calendar App
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          file: Dockerfile
+          target: calendar-runtime
+          tags: ${{ steps.meta-calendar.outputs.tags }}
+          labels: ${{ steps.meta-calendar.outputs.labels }}
+          cache-from: type=gha,scope=rust-build
+          cache-to: type=gha,mode=max,scope=rust-build
+
+      - name: Build and push CLI App
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          file: Dockerfile
+          target: cli-runtime
+          tags: ${{ steps.meta-cli.outputs.tags }}
+          labels: ${{ steps.meta-cli.outputs.labels }}
+          cache-from: type=gha,scope=rust-build
+
+      - name: Build Builder Stage for Extraction
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          file: Dockerfile
+          target: builder
+          tags: rust-builder-temp:latest
+          cache-from: type=gha,scope=rust-build
+
+      - name: Extract Binaries
+        run: |
+          docker create --name extract rust-builder-temp:latest
+          docker cp extract:/app/target/x86_64-unknown-linux-gnu/release/uts-calendar ./uts-calendar
+          docker cp extract:/app/target/x86_64-unknown-linux-gnu/release/uts ./uts
+          docker rm extract
+
+      - name: Upload Binaries as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-binaries
+          path: |
+            uts-calendar
+            uts
+          retention-days: 7
