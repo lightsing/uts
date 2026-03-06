@@ -9,7 +9,8 @@ ENV PATH="/usr/local:${PATH}"
 
 RUN rustup install nightly-2026-01-01 && \
     rustup default nightly-2026-01-01 && \
-    cargo install cargo-zigbuild --version 0.22.1 --locked
+    cargo install cargo-zigbuild --version 0.22.1 --locked && \
+    cargo install cargo-chef --version 0.1.77 --locked
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
