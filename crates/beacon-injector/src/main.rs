@@ -211,7 +211,6 @@ impl<P: Provider + 'static> Ctx<P> {
                         break
                     }
                     _ = self.cancellation_token.cancelled() => { return Ok(()) }
-                    else => { return Ok(()) }
                 }
             }
             let hash = hasher.finalize();
