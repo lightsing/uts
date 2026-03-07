@@ -56,12 +56,15 @@ async fn main() -> eyre::Result<()> {
     let address = key.address();
     info!("Using address: {address}");
 
-    let provider = ProviderBuilder::new().wallet(key).connect_client(
-        ClientBuilder::default()
-            .layer(config.blockchain.rpc.retry.layer())
-            .layer(config.blockchain.rpc.throttle.layer())
-            .http(config.blockchain.rpc.l2.parse()?),
-    );
+    let provider = ProviderBuilder::new()
+        .with_simple_nonce_management()
+        .wallet(key)
+        .connect_client(
+            ClientBuilder::default()
+                .layer(config.blockchain.rpc.retry.layer())
+                .layer(config.blockchain.rpc.throttle.layer())
+                .http(config.blockchain.rpc.l2.parse()?),
+        );
 
     let eas = EAS::new(config.blockchain.eas_address, provider.clone());
     let l2anchoring_manager =
