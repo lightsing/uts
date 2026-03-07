@@ -2,12 +2,14 @@
 
 use alloy_provider::{ProviderBuilder, WsConnect};
 use alloy_rpc_client::ClientBuilder;
+use alloy_signer_local::MnemonicBuilder;
 use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 use std::fs;
 use tokio_util::sync::CancellationToken;
+use tracing::info;
 use uts_contracts::{gateway::L1AnchoringGateway, manager::L2AnchoringManager};
 use uts_relayer::{config::AppConfig, indexer::L2Indexer, relayer::Relayer};
 
@@ -36,13 +38,18 @@ async fn main() -> eyre::Result<()> {
         .await?;
     migrate!().run(&db).await?;
 
-    let l1_provider = ProviderBuilder::new().connect_client(
+    let key = MnemonicBuilder::from_phrase(&*config.blockchain.wallet.mnemonic)
+        .index(config.blockchain.wallet.index)?
+        .build()?;
+    info!("Using address: {}", key.address());
+
+    let l1_provider = ProviderBuilder::new().wallet(key.clone()).connect_client(
         ClientBuilder::default()
             .layer(config.blockchain.rpc.retry.layer())
             .layer(config.blockchain.rpc.throttle.layer())
             .http(config.blockchain.rpc.l1.parse()?),
     );
-    let l2_provider = ProviderBuilder::new().connect_client(
+    let l2_provider = ProviderBuilder::new().wallet(key.clone()).connect_client(
         ClientBuilder::default()
             .layer(config.blockchain.rpc.retry.layer())
             .layer(config.blockchain.rpc.throttle.layer())
@@ -75,6 +82,8 @@ async fn main() -> eyre::Result<()> {
 
     // block waiting for catch up, ensure data is up to date before trying to submit any transactions to L1.
     l2_indexer.start_scanners().await?;
+
+    info!("L2 indexer is up to date, starting relayer");
 
     relayer.run().await?;
 

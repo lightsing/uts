@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT root as \"root: TextWrapper<B256>\"\n        FROM l1_anchoring_queued\n        WHERE queue_index >= ?1\n        ORDER BY queue_index\n        LIMIT ?2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "root: TextWrapper<B256>",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b03c1f317f3cdd1ea774359763fc72d9e5c933bdad7e923826e447a03d2987f3"
+}

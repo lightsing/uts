@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE l1_batch\n        SET l1_tx_hash = ?1, status = ?2, updated_at = unixepoch()\n        WHERE id = ?3\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "d212440f3955c55af0c723154198bdb4c53e933d905577baf2759c4b9a12f896"
+}

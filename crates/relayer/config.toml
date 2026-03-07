@@ -24,12 +24,10 @@ start-block = 17048863
 
 [relayer]
 batch-max-size = 512
-batch-max-wait-seconds = 3600
+batch-max-wait-seconds = 60
+l1-batch-submission-fee = "0x38d7ea4c68000" # 0.001 ETH
 l1-batch-submission-gas-limit = 150_000
 tick-interval-seconds = 10
-
-[db.kv]
-path = "./.db/relayer-kv"
 
 [db.sql]
 filename = "./.db/relayer.sqlite"

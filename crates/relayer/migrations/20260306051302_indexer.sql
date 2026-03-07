@@ -43,7 +43,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_eth_log_transaction_id_log_index ON eth_lo
 --      uint256 blockNumber,
 --      uint256 timestamp
 --  )
-CREATE TABLE IF NOT EXISTS l2_anchoring_queued (
+CREATE TABLE IF NOT EXISTS l1_anchoring_queued (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   internal_log_id INTEGER NOT NULL REFERENCES eth_log (id) ON DELETE CASCADE,
 
@@ -54,25 +54,31 @@ CREATE TABLE IF NOT EXISTS l2_anchoring_queued (
   block_number INTEGER NOT NULL,
   timestamp INTEGER NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_l2_anchoring_queued_log_id ON l2_anchoring_queued (internal_log_id);
-CREATE INDEX IF NOT EXISTS idx_l2_anchoring_queued_attestation_id ON l2_anchoring_queued (attestation_id);
-CREATE INDEX IF NOT EXISTS idx_l2_anchoring_queued_root ON l2_anchoring_queued (root);
-CREATE INDEX IF NOT EXISTS idx_l2_anchoring_queued_queue_index ON l2_anchoring_queued (queue_index);
-CREATE INDEX IF NOT EXISTS idx_l2_anchoring_queued_block_number ON l2_anchoring_queued (block_number);
-CREATE INDEX IF NOT EXISTS idx_l2_anchoring_queued_timestamp ON l2_anchoring_queued (timestamp);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_l1_anchoring_queued_log_id ON l1_anchoring_queued (internal_log_id);
+CREATE INDEX IF NOT EXISTS idx_l1_anchoring_queued_attestation_id ON l1_anchoring_queued (attestation_id);
+CREATE INDEX IF NOT EXISTS idx_l1_anchoring_queued_root ON l1_anchoring_queued (root);
+CREATE INDEX IF NOT EXISTS idx_l1_anchoring_queued_queue_index ON l1_anchoring_queued (queue_index);
+CREATE INDEX IF NOT EXISTS idx_l1_anchoring_queued_block_number ON l1_anchoring_queued (block_number);
+CREATE INDEX IF NOT EXISTS idx_l1_anchoring_queued_timestamp ON l1_anchoring_queued (timestamp);
 
 CREATE TABLE IF NOT EXISTS l1_batch (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
 
   l2_chain_id INTEGER NOT NULL,
   start_index INTEGER NOT NULL,
+
   count INTEGER NOT NULL,
   root TEXT NOT NULL,
+
+  l1_tx_hash TEXT NULL,
+  l2_tx_hash TEXT NULL,
+
   status TEXT NOT NULL,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_l1_batch_start_count_index ON l1_batch (l2_chain_id, start_index, count);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_l1_batch_start_index ON l1_batch (l2_chain_id, start_index);
+CREATE INDEX IF NOT EXISTS idx_l1_batch_root ON l1_batch (root);
 CREATE INDEX IF NOT EXISTS idx_l1_batch_status ON l1_batch (status);
 
 --  /// Emitted when L1 notifies that a batch of roots has been anchored on L1.
@@ -132,7 +138,6 @@ CREATE INDEX IF NOT EXISTS idx_l1_batch_arrived_l2_timestamp_received ON l1_batc
 CREATE TABLE IF NOT EXISTS l1_batch_finalized (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   l1_batch_id INTEGER NOT NULL REFERENCES l1_batch (id) ON DELETE CASCADE,
-  l1_batch_arrived_id INTEGER NOT NULL REFERENCES l1_batch_arrived (id) ON DELETE CASCADE,
   internal_log_id INTEGER NOT NULL REFERENCES eth_log (id) ON DELETE CASCADE,
 
   l2_block_number INTEGER NOT NULL,
