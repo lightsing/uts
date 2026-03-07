@@ -24,7 +24,7 @@ contract SubmitEAS is Script {
                     expirationTime: 0, // No expiration
                     revocable: false, // Un-revokable
                     refUID: bytes32(0), // No reference to another attestation
-                    data: abi.encode(0x0000000000000000000000000000000000000000000000000000000000000004), // Encode the root in the data field
+                    data: abi.encode(0x0000000000000000000000000000000000000000000000000000000000000007), // Encode the root in the data field
                     value: 0 // No ETH value needed for this attestation
                 })
             })
@@ -47,9 +47,9 @@ contract SubmitAnchoring is Script {
         vm.startBroadcast();
         // submit(0x45c9a61d29a852778fc2d3fd4f955136dd2a49d633d6431bbe379842102518d7);
         // submit(0xcbca13c4d782ed3ee2306f4c0aa21112cea47e920f10ccac48ce1fd135917387);
-        // submit(0xb2135365d636d3f9674c5425fdee7f0e3a1b09e2e37814100e7cded8d6d63301);
+        submit(0x4168A6777EC5730C480A613661ED418790BF31A6B47ABC6602072DD2E74D6F36);
         // submit(0x7cbb36e4a87098984ff38a1f07c8d493eaed57992d116322b7bc2354e1b9a608);
-        submit(0xb3c7afbdcf6213aaf8aef4367a74199d6aa97a7c0aea5c302dd279e2a667c54d);
+        // submit(0xE47C7963CBD803028A83A00B33C27DC5ABF4790400385F3EE5268BA645C2F401);
         vm.stopBroadcast();
     }
 

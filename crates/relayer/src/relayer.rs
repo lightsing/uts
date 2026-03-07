@@ -6,7 +6,7 @@ use crate::{
         l1_batch::{L1Batch, L1BatchStatus},
     },
 };
-use alloy_primitives::{B256, ChainId, U256};
+use alloy_primitives::{Address, B256, ChainId, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use eyre::{Context, ContextCompat, bail};
 use jiff::Timestamp;
@@ -26,6 +26,7 @@ use uts_contracts::{
 #[derive(Debug)]
 pub struct Relayer<P1, P2> {
     db: SqlitePool,
+    wallet: Address,
     l1_chain_id: ChainId,
     l2_chain_id: ChainId,
     gateway: L1AnchoringGateway<P1>,
@@ -38,6 +39,7 @@ impl<P1: Provider, P2: Provider> Relayer<P1, P2> {
     /// Create a new instance of the relayer.
     pub async fn new(
         db: SqlitePool,
+        wallet: Address,
         gateway: L1AnchoringGateway<P1>,
         manager: L2AnchoringManager<P2>,
         config: RelayerConfig,
@@ -47,6 +49,7 @@ impl<P1: Provider, P2: Provider> Relayer<P1, P2> {
         let l2_chain_id = manager.provider().get_chain_id().await?;
         Ok(Self {
             db,
+            wallet,
             l1_chain_id,
             l2_chain_id,
             gateway,
@@ -216,11 +219,11 @@ impl<P1: Provider, P2: Provider> Relayer<P1, P2> {
 
         info!(%tx_hash, "Watching for batch submission transaction to be mined...");
 
-        let receipt =
-            PendingTransactionBuilder::new(self.gateway.provider().root().clone(), tx_hash)
-                .get_receipt()
-                .await
-                .context("get receipt")?;
+        let provider = self.gateway.provider();
+        let receipt = PendingTransactionBuilder::new(provider.root().clone(), tx_hash)
+            .get_receipt()
+            .await
+            .context("get receipt")?;
         info!(%tx_hash, block_number = receipt.block_number, "Batch submission transaction mined");
 
         // sanity check: make sure the transaction was successful
@@ -233,6 +236,24 @@ impl<P1: Provider, P2: Provider> Relayer<P1, P2> {
             );
         }
 
+        let block_number = receipt
+            .block_number
+            .context("missing block number in receipt")?;
+        let prev = provider
+            .get_balance(self.wallet)
+            .block_id((block_number - 1).into())
+            .await?;
+        let current = provider
+            .get_balance(self.wallet)
+            .block_id(block_number.into())
+            .await?;
+        let gas_fee = U256::from(receipt.gas_used as u128 * receipt.effective_gas_price);
+        let cross_chain_fee = if prev > current + gas_fee {
+            prev - current - gas_fee
+        } else {
+            U256::ZERO
+        };
+
         let mut db_tx = self.db.begin().await?;
         sql::l1_batch::compare_and_set_l1batch_status(
             &mut *db_tx,
@@ -242,6 +263,8 @@ impl<P1: Provider, P2: Provider> Relayer<P1, P2> {
         )
         .await?;
         insert_tx_receipt(&mut *db_tx, self.l1_chain_id, &receipt).await?;
+        sql::stats::set_l1_gas_fee(&mut *db_tx, batch.id, gas_fee).await?;
+        sql::stats::set_cross_chain_fee(&mut *db_tx, batch.id, cross_chain_fee).await?;
         db_tx.commit().await?;
 
         Ok(())
@@ -271,18 +294,20 @@ impl<P1: Provider, P2: Provider> Relayer<P1, P2> {
 
         info!(%tx_hash, "Watching for finalize transaction to be mined...");
 
-        let receipt =
-            PendingTransactionBuilder::new(self.manager.provider().root().clone(), tx_hash)
-                .get_receipt()
-                .await
-                .context("get receipt")?;
+        let provider = self.manager.provider();
+        let receipt = PendingTransactionBuilder::new(provider.root().clone(), tx_hash)
+            .get_receipt()
+            .await
+            .context("get receipt")?;
         let block_number = receipt
             .block_number
             .context("missing block number in log")?;
         info!(%tx_hash, block_number, "Finalize transaction mined");
+        let gas_fee = U256::from(receipt.gas_used as u128 * receipt.effective_gas_price);
 
         let mut db_tx = self.db.begin().await?;
         insert_tx_receipt(&mut *db_tx, self.l2_chain_id, &receipt).await?;
+        sql::stats::set_l2_gas_fee(&mut *db_tx, batch.id, gas_fee).await?;
         db_tx.commit().await?;
 
         // sanity check: make sure the transaction was successful

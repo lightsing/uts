@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO batch_fee (internal_batch_id, l1_gas_fee, l2_gas_fee, cross_chain_fee)\n        VALUES (?1, 0, ?2, 0)\n        ON CONFLICT(internal_batch_id) DO UPDATE SET l2_gas_fee = excluded.l2_gas_fee\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "0d0d2ef416a8f8ff4375465ccf7e4e84764dbd9a62fb81615b7adf8b1bb3c3a7"
+}

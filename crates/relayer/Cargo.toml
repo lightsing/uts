@@ -20,11 +20,17 @@ alloy-rpc-client = { workspace = true }
 alloy-rpc-types-eth = { workspace = true }
 alloy-signer-local = { workspace = true, features = ["mnemonic"] }
 alloy-sol-types = { workspace = true }
+axum = { workspace = true, default-features = false, features = [
+  "macros",
+  "http2",
+  "tokio",
+  "json",
+] }
 color-eyre = { workspace = true }
 config = { workspace = true }
 eyre = { workspace = true }
 futures = { workspace = true }
-jiff = { workspace = true }
+jiff = { workspace = true, features = ["serde"] }
 rustls = { workspace = true, optional = true }
 serde = { workspace = true }
 sha3 = { workspace = true }

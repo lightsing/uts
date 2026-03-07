@@ -1,11 +1,12 @@
 use alloy_primitives::{B256, ChainId};
 use eyre::{Context, ContextCompat};
 use jiff::Timestamp;
+use serde::Serialize;
 use sqlx::{Executor, Sqlite, SqliteConnection};
 use uts_contracts::manager::events::{L1BatchArrived, L1BatchFinalized};
 use uts_sql::{TextWrapper, define_text_enum};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::IntoStaticStr, strum::EnumString)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::IntoStaticStr, strum::EnumString, Serialize)]
 pub enum L1BatchStatus {
     Collected,
     L1Sent,
@@ -16,7 +17,7 @@ pub enum L1BatchStatus {
 }
 define_text_enum!(L1BatchStatus);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
 pub struct L1Batch {
     pub id: i64,
     pub l2_chain_id: ChainId,
@@ -28,6 +29,20 @@ pub struct L1Batch {
     pub status: L1BatchStatus,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+}
+
+pub async fn count_l1batches<'e, E: Executor<'e, Database = Sqlite>>(
+    executor: E,
+) -> eyre::Result<i64> {
+    let count = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) FROM l1_batch
+        "#
+    )
+    .fetch_one(executor)
+    .await
+    .context("count l1 batches")?;
+    Ok(count)
 }
 
 /// Insert a new L1 batch or update the existing one with the same (l2_chain_id, start_index) combination.

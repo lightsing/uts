@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT SUM(CAST(l1_gas_fee AS REAL)) as l1_gas_fee,\n               SUM(CAST(l2_gas_fee AS REAL)) as l2_gas_fee,\n               SUM(CAST(cross_chain_fee AS REAL)) as cross_chain_fee\n        FROM batch_fee\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "l1_gas_fee",
+        "ordinal": 0,
+        "type_info": "Float"
+      },
+      {
+        "name": "l2_gas_fee",
+        "ordinal": 1,
+        "type_info": "Float"
+      },
+      {
+        "name": "cross_chain_fee",
+        "ordinal": 2,
+        "type_info": "Float"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "158542f76f97e59891337373d52948cf757e95cf05319b6592e5e4d9eac7a822"
+}

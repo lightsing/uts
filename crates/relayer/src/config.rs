@@ -8,6 +8,8 @@ use uts_contracts::provider_helper::{RetryBackoffArgs, ThrottleArgs};
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AppConfig {
+    /// Server configuration, including node name and bind address.
+    pub server: ServerConfig,
     /// Blockchain configuration, including RPC URL and wallet credentials.
     pub blockchain: BlockchainConfig,
     /// Indexer configuration.
@@ -16,6 +18,16 @@ pub struct AppConfig {
     pub relayer: RelayerConfig,
     /// Database configuration for journal, key-value store, and SQL database.
     pub db: DbConfig,
+}
+
+/// Server configuration, including node name and bind address.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ServerConfig {
+    /// A human-readable name for the calendar node, used in homepage.
+    pub node_name: String,
+    /// The address and port to bind the server to.
+    pub bind_address: String,
 }
 
 /// Blockchain configuration, including RPC URL and wallet credentials.

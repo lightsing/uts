@@ -6804,6 +6804,7 @@ dependencies = [
  "alloy-rpc-types-eth",
  "alloy-signer-local",
  "alloy-sol-types",
+ "axum",
  "color-eyre",
  "config",
  "eyre",
