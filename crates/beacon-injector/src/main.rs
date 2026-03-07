@@ -1,7 +1,9 @@
 //! Bot for mocking the behavior of a real user.
 
 use crate::config::AppConfig;
-use alloy_primitives::{Address, B256, Bytes, Keccak256, U256, keccak256_uncached};
+use alloy_primitives::{
+    Address, B256, Bytes, KECCAK256_EMPTY, Keccak256, U256, keccak256_uncached,
+};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_client::ClientBuilder;
 use alloy_signer_local::MnemonicBuilder;
@@ -194,26 +196,32 @@ impl<P: Provider + 'static> Ctx<P> {
     }
 
     async fn run_on_chain(self: Arc<Self>, mut hash_rx: Receiver<B256>) -> eyre::Result<()> {
-        let mut ticker = tokio::time::interval(Duration::from_secs(60));
         loop {
-            select! {
-                _ = ticker.tick() => {
-                    let mut hasher = Keccak256::new();
-                    while let Some(hash) = hash_rx.recv().await {
+            let timeout = tokio::time::sleep(Duration::from_secs(5));
+            let mut hasher = Keccak256::new();
+            tokio::pin!(timeout);
+            loop {
+                select! {
+                    Some(hash) = hash_rx.recv() => {
                         hasher.update(hash);
                     }
-                    let hash = hasher.finalize();
-                    if let Err(e) = self.clone().submit_on_chain(hash).await {
-                        error!(%hash, "Failed to submit attestation on-chain: {e:?}");
-                    }
+                    _ = &mut timeout => { break }
+                    _ = self.cancellation_token.cancelled() => { return Ok(()) }
+                    else => { return Ok(()) }
                 }
-                _ = self.cancellation_token.cancelled() => { return Ok(()) }
+            }
+            let hash = hasher.finalize();
+            if hash == KECCAK256_EMPTY {
+                continue;
+            }
+            if let Err(e) = self.submit_on_chain(hash).await {
+                error!(%hash, "{e:?}");
             }
         }
     }
 
     #[instrument(skip(self), err)]
-    async fn submit_on_chain(self: Arc<Self>, hash: B256) -> eyre::Result<()> {
+    async fn submit_on_chain(&self, hash: B256) -> eyre::Result<()> {
         let receipt = self
             .eas
             .attest(AttestationRequest {
