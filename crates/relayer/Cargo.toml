@@ -41,4 +41,5 @@ uts-sql = { workspace = true }
 [features]
 default = ["reqwest-rustls-tls"]
 
+performance = ["tracing/release_max_level_info"]
 reqwest-rustls-tls = ["rustls", "alloy-provider/reqwest-rustls-tls"]
