@@ -203,14 +203,19 @@ impl<P: Provider + 'static> Ctx<P> {
             loop {
                 select! {
                     Some(hash) = hash_rx.recv() => {
+                        info!(%hash, "Received hash from calendar request");
                         hasher.update(hash);
                     }
-                    _ = &mut timeout => { break }
+                    _ = &mut timeout => {
+                        info!("Hash collection timeout reached, finalizing hash and submitting on-chain if not empty");
+                        break
+                    }
                     _ = self.cancellation_token.cancelled() => { return Ok(()) }
                     else => { return Ok(()) }
                 }
             }
             let hash = hasher.finalize();
+            info!(%hash, "Finalized hash after collection period");
             if hash == KECCAK256_EMPTY {
                 continue;
             }
