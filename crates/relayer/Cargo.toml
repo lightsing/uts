@@ -26,7 +26,6 @@ axum = { workspace = true, default-features = false, features = [
   "tokio",
   "json",
 ] }
-color-eyre = { workspace = true }
 config = { workspace = true }
 eyre = { workspace = true }
 futures = { workspace = true }

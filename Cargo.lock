@@ -4963,6 +4963,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
@@ -6678,6 +6680,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "uts-bot"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "alloy-contract",
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-rpc-client",
+ "alloy-rpc-types-eth",
+ "alloy-signer-local",
+ "alloy-sol-types",
+ "config",
+ "eyre",
+ "reqwest 0.13.2",
+ "serde",
+ "sha3 0.11.0-rc.8",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "uts-contracts",
+]
+
+[[package]]
 name = "uts-calendar"
 version = "0.1.0-alpha.0"
 dependencies = [
@@ -6805,7 +6830,6 @@ dependencies = [
  "alloy-signer-local",
  "alloy-sol-types",
  "axum",
- "color-eyre",
  "config",
  "eyre",
  "futures",

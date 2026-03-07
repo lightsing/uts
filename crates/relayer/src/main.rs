@@ -50,19 +50,25 @@ async fn main() -> eyre::Result<()> {
     let address = key.address();
     info!("Using address: {address}");
 
-    let l1_provider = ProviderBuilder::new().wallet(key.clone()).connect_client(
-        ClientBuilder::default()
-            .layer(config.blockchain.rpc.retry.layer())
-            .layer(config.blockchain.rpc.throttle.layer())
-            .http(config.blockchain.rpc.l1.parse()?),
-    );
-    let l2_provider = ProviderBuilder::new().wallet(key.clone()).connect_client(
-        ClientBuilder::default()
-            .layer(config.blockchain.rpc.retry.layer())
-            .layer(config.blockchain.rpc.throttle.layer())
-            .ws(WsConnect::new(&*config.blockchain.rpc.l2_ws))
-            .await?,
-    );
+    let l1_provider = ProviderBuilder::new()
+        .with_simple_nonce_management()
+        .wallet(key.clone())
+        .connect_client(
+            ClientBuilder::default()
+                .layer(config.blockchain.rpc.retry.layer())
+                .layer(config.blockchain.rpc.throttle.layer())
+                .http(config.blockchain.rpc.l1.parse()?),
+        );
+    let l2_provider = ProviderBuilder::new()
+        .with_simple_nonce_management()
+        .wallet(key.clone())
+        .connect_client(
+            ClientBuilder::default()
+                .layer(config.blockchain.rpc.retry.layer())
+                .layer(config.blockchain.rpc.throttle.layer())
+                .ws(WsConnect::new(&*config.blockchain.rpc.l2_ws))
+                .await?,
+        );
 
     let gateway = L1AnchoringGateway::new(config.blockchain.gateway_address, l1_provider);
     let manager = L2AnchoringManager::new(config.blockchain.manager_address, l2_provider);
