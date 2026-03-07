@@ -85,9 +85,14 @@ async fn main() -> eyre::Result<()> {
         .map(|network| (network, 30u64))
         .collect();
 
-    for (_network, period) in beacon_periods.iter_mut() {
+    for (network, period) in beacon_periods.iter_mut() {
         let info = client
-            .get(config.injector.drand_base_url.join("/v2/beacons")?)
+            .get(
+                config
+                    .injector
+                    .drand_base_url
+                    .join(&format!("/v2/beacons/{network}/info"))?,
+            )
             .header("Accept", "application/json")
             .send()
             .await?
