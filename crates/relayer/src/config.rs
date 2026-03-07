@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, BlockNumber};
+use alloy_primitives::{Address, BlockNumber, U256};
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -8,6 +8,8 @@ use uts_contracts::provider_helper::{RetryBackoffArgs, ThrottleArgs};
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AppConfig {
+    /// Server configuration, including node name and bind address.
+    pub server: ServerConfig,
     /// Blockchain configuration, including RPC URL and wallet credentials.
     pub blockchain: BlockchainConfig,
     /// Indexer configuration.
@@ -16,6 +18,16 @@ pub struct AppConfig {
     pub relayer: RelayerConfig,
     /// Database configuration for journal, key-value store, and SQL database.
     pub db: DbConfig,
+}
+
+/// Server configuration, including node name and bind address.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ServerConfig {
+    /// A human-readable name for the calendar node, used in homepage.
+    pub node_name: String,
+    /// The address and port to bind the server to.
+    pub bind_address: String,
 }
 
 /// Blockchain configuration, including RPC URL and wallet credentials.
@@ -88,6 +100,8 @@ pub struct RelayerConfig {
     pub batch_max_wait_seconds: i64,
     /// The gas limit to use for submitting a batch to L1.
     pub l1_batch_submission_gas_limit: u64,
+    /// The fee in wei to pay for submitting a batch to L1.
+    pub l1_batch_submission_fee: U256,
     /// The interval in seconds at which the relayer's main loop runs.
     pub tick_interval_seconds: u64,
 }
@@ -96,18 +110,8 @@ pub struct RelayerConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct DbConfig {
-    /// Configuration for the key-value store, including storage path.
-    pub kv: KvConfig,
     /// Configuration for the SQL database, including filename.
     pub sql: SqlConfig,
-}
-
-/// Configuration for the key-value store, including storage path.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct KvConfig {
-    /// The file system path where the key-value store (e.g. RocksDB) is stored.
-    pub path: PathBuf,
 }
 
 /// Configuration for the SQL database, including filename.

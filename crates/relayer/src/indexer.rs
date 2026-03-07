@@ -44,6 +44,7 @@ where
         } = self;
 
         let subscription = event_filter.subscribe().await?;
+        info!(event = Event::SIGNATURE, "Started event subscription");
         let mut stream = subscription.into_stream();
         loop {
             select! {
@@ -63,12 +64,12 @@ where
                             // This update is unsafe, cuz we might not handle all events in this block.
                             // But during the startup phase, the scanner will rewind the cursor a few blocks to make sure we don't miss any events.
                             sql::indexer::update_cursor(&mut *tx, chain_id, Event::SIGNATURE_HASH, block_number).await?;
-                            let id = sql::indexer::insert_log(&mut *tx, chain_id, log).await?;
+                            let id = sql::eth::insert_log(&mut *tx, chain_id, &log).await?;
                             insert_event_fn(&mut tx, chain_id, id, event).await?;
                             tx.commit().await?;
                         },
                         Some(Err(e)) => {
-                            error!("Error while receiving event: {e}");
+                            error!("Error while receiving event: {e:?}");
                             cancellation_token.cancel();
                             break;
                         }
@@ -142,12 +143,13 @@ where
                 blk.saturating_sub(REWIND_BLOCKS)
             })
             .unwrap_or(default_start_block);
+        info!(event = Event::SIGNATURE, start_block, "Starting event scan");
 
         let mut end_block = event_filter.provider.get_block_number().await?;
 
         while start_block <= end_block {
             let batch_end = std::cmp::min(start_block + batch_size - 1, end_block);
-            debug!(
+            trace!(
                 event = Event::SIGNATURE,
                 start_block,
                 end_block = batch_end,
@@ -165,7 +167,7 @@ where
                     event_data = ?event,
                     "Received event"
                 );
-                let id = sql::indexer::insert_log(&mut *tx, chain_id, log).await?;
+                let id = sql::eth::insert_log(&mut *tx, chain_id, &log).await?;
                 insert_event(&mut tx, chain_id, id, event).await?;
             }
             sql::indexer::update_cursor(&mut *tx, chain_id, Event::SIGNATURE_HASH, batch_end)

@@ -1,15 +1,23 @@
 //! The relayer for collecting L2 events and submitting them to L1.
 
+use alloy_primitives::bytes::Bytes;
 use alloy_provider::{ProviderBuilder, WsConnect};
 use alloy_rpc_client::ClientBuilder;
+use alloy_signer_local::MnemonicBuilder;
+use axum::{Router, http::StatusCode, response::Html, routing::get};
 use sqlx::{
     migrate,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
-use std::fs;
+use std::{fs, sync::Arc};
 use tokio_util::sync::CancellationToken;
+use tracing::info;
 use uts_contracts::{gateway::L1AnchoringGateway, manager::L2AnchoringManager};
-use uts_relayer::{config::AppConfig, indexer::L2Indexer, relayer::Relayer};
+use uts_relayer::{
+    AppState, config::AppConfig, indexer::L2Indexer, relayer::Relayer, shutdown_signal,
+};
+
+const INDEX_PAGE_TEMPLATE: &str = include_str!("index.html");
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -36,13 +44,19 @@ async fn main() -> eyre::Result<()> {
         .await?;
     migrate!().run(&db).await?;
 
-    let l1_provider = ProviderBuilder::new().connect_client(
+    let key = MnemonicBuilder::from_phrase(&*config.blockchain.wallet.mnemonic)
+        .index(config.blockchain.wallet.index)?
+        .build()?;
+    let address = key.address();
+    info!("Using address: {address}");
+
+    let l1_provider = ProviderBuilder::new().wallet(key.clone()).connect_client(
         ClientBuilder::default()
             .layer(config.blockchain.rpc.retry.layer())
             .layer(config.blockchain.rpc.throttle.layer())
             .http(config.blockchain.rpc.l1.parse()?),
     );
-    let l2_provider = ProviderBuilder::new().connect_client(
+    let l2_provider = ProviderBuilder::new().wallet(key.clone()).connect_client(
         ClientBuilder::default()
             .layer(config.blockchain.rpc.retry.layer())
             .layer(config.blockchain.rpc.throttle.layer())
@@ -62,7 +76,8 @@ async fn main() -> eyre::Result<()> {
     .await?;
 
     let relayer = Relayer::new(
-        db,
+        db.clone(),
+        key.address(),
         gateway,
         manager,
         config.relayer,
@@ -70,11 +85,33 @@ async fn main() -> eyre::Result<()> {
     )
     .await?;
 
+    let html = INDEX_PAGE_TEMPLATE
+        .replace("{{VERSION}}", env!("CARGO_PKG_VERSION"))
+        .replace("{{NODE_NAME}}", config.server.node_name.as_str())
+        .replace("{{NODE_ADDRESS}}", &address.to_string());
+    let html = Bytes::from(html);
+
+    let app = Router::new()
+        .route("/", get(|| async move { Html(html.clone()) }))
+        .route("/healthcheck", get(|| async { StatusCode::NO_CONTENT }))
+        .route("/metrics", get(uts_relayer::metrics))
+        .with_state(Arc::new(AppState { db }));
+
+    let listener = tokio::net::TcpListener::bind(&*config.server.bind_address).await?;
+
+    tokio::spawn(
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal(cancellation_token.clone()))
+            .into_future(),
+    );
+
     // spawn the subscriber tasks first.
     tokio::spawn(l2_indexer.clone().start_subscribers());
 
     // block waiting for catch up, ensure data is up to date before trying to submit any transactions to L1.
     l2_indexer.start_scanners().await?;
+
+    info!("L2 indexer is up to date, starting relayer");
 
     relayer.run().await?;
 

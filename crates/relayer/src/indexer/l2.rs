@@ -12,7 +12,7 @@ use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use uts_contracts::manager::{
     L2AnchoringManager,
-    events::{L1AnchoringQueued, L1BatchArrived},
+    events::{L1AnchoringQueued, L1BatchArrived, L1BatchFinalized},
 };
 
 /// Indexer for L2 events.
@@ -84,8 +84,9 @@ impl<P: Provider + 'static> L2Indexer<P> {
         };
 
         if let Err(e) = scanner.run().await {
-            error!("Error while scanning for events: {e}");
+            error!("Error while scanning for events: {e:?}");
             self.cancellation_token.cancel();
+            return Err(e);
         }
         Ok(())
     }
@@ -101,7 +102,7 @@ impl<P: Provider + 'static> L2Indexer<P> {
         };
 
         if let Err(e) = subscriber.run().await {
-            error!("Error while subscribing to events: {e}");
+            error!("Error while subscribing to events: {e:?}");
             self.cancellation_token.cancel();
         }
         Ok(())
@@ -120,7 +121,7 @@ impl<P: Provider + 'static> L2Indexer<P> {
         };
 
         if let Err(e) = scanner.run().await {
-            error!("Error while scanning for events: {e}");
+            error!("Error while scanning for events: {e:?}");
             self.cancellation_token.cancel();
         }
         Ok(())
@@ -137,7 +138,7 @@ impl<P: Provider + 'static> L2Indexer<P> {
         };
 
         if let Err(e) = subscriber.run().await {
-            error!("Error while subscribing to events: {e}");
+            error!("Error while subscribing to events: {e:?}");
             self.cancellation_token.cancel();
         }
 
@@ -157,7 +158,7 @@ impl<P: Provider + 'static> L2Indexer<P> {
         };
 
         if let Err(e) = scanner.run().await {
-            error!("Error while scanning for events: {e}");
+            error!("Error while scanning for events: {e:?}");
             self.cancellation_token.cancel();
         }
         Ok(())
@@ -174,7 +175,7 @@ impl<P: Provider + 'static> L2Indexer<P> {
         };
 
         if let Err(e) = subscriber.run().await {
-            error!("Error while subscribing to events: {e}");
+            error!("Error while subscribing to events: {e:?}");
             self.cancellation_token.cancel();
         }
 
@@ -196,9 +197,9 @@ impl<P: Provider + 'static> L2Indexer<P> {
     }
 
     #[inline]
-    fn l1batch_finalized_filter(&self) -> Event<&P, L1BatchArrived> {
+    fn l1batch_finalized_filter(&self) -> Event<&P, L1BatchFinalized> {
         self.manager
-            .L1BatchArrived_filter()
+            .L1BatchFinalized_filter()
             .address(*self.manager.address())
     }
 }
@@ -232,7 +233,7 @@ fn insert_l1batch_finalized(
     executor: &'_ mut SqliteConnection,
     chain_id: ChainId,
     log_id: i64,
-    event: L1BatchArrived,
+    event: L1BatchFinalized,
 ) -> BoxedFuture<'_, eyre::Result<()>> {
     Box::pin(sql::l1_batch::insert_l1batch_finalized(
         executor, chain_id, log_id, event,

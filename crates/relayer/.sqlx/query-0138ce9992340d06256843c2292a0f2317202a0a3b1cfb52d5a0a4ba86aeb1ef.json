@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO l1_batch (l2_chain_id, start_index, count, root, status)\n        VALUES (?1, ?2, ?3, ?4, ?5)\n        ON CONFLICT(l2_chain_id, start_index) DO UPDATE SET\n            count = excluded.count,\n            root = excluded.root,\n            status = excluded.status\n        WHERE\n            CASE excluded.status\n                WHEN 'Collected' THEN 1\n                WHEN 'L1Sent' THEN 2\n                WHEN 'L1Mined' THEN 3\n                WHEN 'L2Received' THEN 4\n                WHEN 'L2FinalizeTxSent' THEN 5\n                WHEN 'L2Finalized' THEN 6\n                ELSE 0\n            END\n            >=\n            CASE l1_batch.status\n                WHEN 'Collected' THEN 1\n                WHEN 'L1Sent' THEN 2\n                WHEN 'L1Mined' THEN 3\n                WHEN 'L2Received' THEN 4\n                WHEN 'L2FinalizeTxSent' THEN 5\n                WHEN 'L2Finalized' THEN 6\n                ELSE 0\n            END\n        RETURNING\n            id,\n            l1_tx_hash as \"l1_tx_hash: TextWrapper<B256>\",\n            l2_tx_hash as \"l2_tx_hash: TextWrapper<B256>\",\n            created_at,\n            updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "l1_tx_hash: TextWrapper<B256>",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "l2_tx_hash: TextWrapper<B256>",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 4,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "0138ce9992340d06256843c2292a0f2317202a0a3b1cfb52d5a0a4ba86aeb1ef"
+}

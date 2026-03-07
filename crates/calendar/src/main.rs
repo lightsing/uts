@@ -104,6 +104,8 @@ async fn main() -> eyre::Result<()> {
         });
     }
 
+    let listener = tokio::net::TcpListener::bind(&*config.server.bind_address).await?;
+
     // compatible API.
     let public_api = Router::new()
         .route(
@@ -145,8 +147,6 @@ async fn main() -> eyre::Result<()> {
             kv_db: db,
             sql_pool: sql,
         }));
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal(async move {

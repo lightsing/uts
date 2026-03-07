@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO tx_receipt (internal_transaction_id, gas_used, effective_gas_price, from_address, to_address)\n        VALUES (?1, ?2, ?3, ?4, ?5)\n        ON CONFLICT(internal_transaction_id) DO UPDATE SET\n            gas_used = excluded.gas_used,\n            effective_gas_price = excluded.effective_gas_price,\n            from_address = excluded.from_address,\n            to_address = excluded.to_address\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "056fa0e19151915971d355c3233079ba8c40e71daf0e7e0de578bfc6a5812a51"
+}

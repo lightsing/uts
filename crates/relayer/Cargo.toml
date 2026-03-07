@@ -15,16 +15,22 @@ workspace = true
 [dependencies]
 alloy-contract = { workspace = true, features = ["pubsub"] }
 alloy-primitives = { workspace = true, features = ["serde"] }
-alloy-provider = { workspace = true, default-features = false, features = ["ws"] }
+alloy-provider = { workspace = true, default-features = false, features = ["ws", "reqwest"] }
 alloy-rpc-client = { workspace = true }
 alloy-rpc-types-eth = { workspace = true }
+alloy-signer-local = { workspace = true, features = ["mnemonic"] }
 alloy-sol-types = { workspace = true }
-bytemuck = { workspace = true }
+axum = { workspace = true, default-features = false, features = [
+  "macros",
+  "http2",
+  "tokio",
+  "json",
+] }
+color-eyre = { workspace = true }
 config = { workspace = true }
 eyre = { workspace = true }
 futures = { workspace = true }
-jiff = { workspace = true }
-rocksdb = { workspace = true }
+jiff = { workspace = true, features = ["serde"] }
 rustls = { workspace = true, optional = true }
 serde = { workspace = true }
 sha3 = { workspace = true }
@@ -41,4 +47,5 @@ uts-sql = { workspace = true }
 [features]
 default = ["reqwest-rustls-tls"]
 
+performance = ["tracing/release_max_level_info"]
 reqwest-rustls-tls = ["rustls", "alloy-provider/reqwest-rustls-tls"]
