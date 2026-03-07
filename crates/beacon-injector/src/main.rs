@@ -1,7 +1,7 @@
 //! Bot for mocking the behavior of a real user.
 
 use crate::config::AppConfig;
-use alloy_primitives::{Address, B256, Bytes, U256, keccak256_uncached};
+use alloy_primitives::{Address, B256, Bytes, Keccak256, U256, keccak256_uncached};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_client::ClientBuilder;
 use alloy_signer_local::MnemonicBuilder;
@@ -10,7 +10,11 @@ use eyre::ContextCompat;
 use reqwest::Client;
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use tokio::{select, task::JoinSet};
+use tokio::{
+    select,
+    sync::mpsc::{Receiver, Sender},
+    task::JoinSet,
+};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, instrument};
 use url::Url;
@@ -39,6 +43,7 @@ struct Ctx<P: Provider> {
     eas: EAS<P>,
     fee_oracle: FeeOracle<P>,
     l2anchoring_manager: L2AnchoringManager<P>,
+    hash_tx: Sender<B256>,
     cancellation_token: CancellationToken,
 }
 
@@ -56,15 +61,12 @@ async fn main() -> eyre::Result<()> {
     let address = key.address();
     info!("Using address: {address}");
 
-    let provider = ProviderBuilder::new()
-        .with_simple_nonce_management()
-        .wallet(key)
-        .connect_client(
-            ClientBuilder::default()
-                .layer(config.blockchain.rpc.retry.layer())
-                .layer(config.blockchain.rpc.throttle.layer())
-                .http(config.blockchain.rpc.l2.parse()?),
-        );
+    let provider = ProviderBuilder::new().wallet(key).connect_client(
+        ClientBuilder::default()
+            .layer(config.blockchain.rpc.retry.layer())
+            .layer(config.blockchain.rpc.throttle.layer())
+            .http(config.blockchain.rpc.l2.parse()?),
+    );
 
     let eas = EAS::new(config.blockchain.eas_address, provider.clone());
     let l2anchoring_manager =
@@ -102,12 +104,14 @@ async fn main() -> eyre::Result<()> {
         *period = info.period;
     }
 
+    let (hash_tx, hash_rx) = tokio::sync::mpsc::channel(1000);
     let ctx = Arc::new(Ctx {
         config,
         client,
         eas,
         fee_oracle,
         l2anchoring_manager,
+        hash_tx,
         cancellation_token: cancellation_token.clone(),
     });
 
@@ -115,6 +119,7 @@ async fn main() -> eyre::Result<()> {
     for (network, period) in beacon_periods {
         join_set.spawn(ctx.clone().run(network, period));
     }
+    join_set.spawn(ctx.clone().run_on_chain(hash_rx));
 
     select! {
         _ = tokio::signal::ctrl_c() => {
@@ -169,7 +174,7 @@ impl<P: Provider + 'static> Ctx<P> {
         info!(%randomness.round, %randomness.signature, %hash);
 
         tokio::spawn(self.clone().request_calendar(hash));
-        tokio::spawn(self.clone().submit_on_chain(hash));
+        self.hash_tx.send(hash).await?;
 
         Ok(())
     }
@@ -186,6 +191,25 @@ impl<P: Provider + 'static> Ctx<P> {
             .bytes()
             .await?;
         Ok(())
+    }
+
+    async fn run_on_chain(self: Arc<Self>, mut hash_rx: Receiver<B256>) -> eyre::Result<()> {
+        let mut ticker = tokio::time::interval(Duration::from_secs(60));
+        loop {
+            select! {
+                _ = ticker.tick() => {
+                    let mut hasher = Keccak256::new();
+                    while let Some(hash) = hash_rx.recv().await {
+                        hasher.update(hash);
+                    }
+                    let hash = hasher.finalize();
+                    if let Err(e) = self.clone().submit_on_chain(hash).await {
+                        error!(%hash, "Failed to submit attestation on-chain: {e:?}");
+                    }
+                }
+                _ = self.cancellation_token.cancelled() => { return Ok(()) }
+            }
+        }
     }
 
     #[instrument(skip(self), err)]
