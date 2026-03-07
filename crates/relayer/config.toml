@@ -7,8 +7,8 @@ gateway-address = "0x39Ea3C70A5e26C8dB4a1A5E9A7Fc7Bab04684C08"
 manager-address = "0x7249802D50CB719547F7685d090d4b84e7183C32"
 
 [blockchain.rpc]
-l1 = "https://eth-sepolia.g.alchemy.com/v2/<REDACTED>"
-l2-ws = "wss://scroll-sepolia.g.alchemy.com/v2/<REDACTED>"
+l1 = "https://eth-sepolia.g.alchemy.com/v2/uymDlBa_asemsxbDEdpTU"
+l2-ws = "wss://scroll-sepolia.g.alchemy.com/v2/uymDlBa_asemsxbDEdpTU"
 
 [blockchain.rpc.retry]
 compute-units-per-second = 20
@@ -20,7 +20,7 @@ requests-per-second = 25
 
 [blockchain.wallet]
 index = 0
-mnemonic = "<REDACTED>"
+mnemonic = "tag text lens coyote rescue reason drive tag cousin rice just tongue hotel effort focus grape venue pool hard coffee busy tomorrow comic under"
 
 [indexer.l2]
 batch-size = 10

@@ -28,3 +28,6 @@ uts-contracts = { workspace = true, features = ["provider-helper-serde"] }
 
 [lints]
 workspace = true
+
+[features]
+performance = ["tracing/release_max_level_info"]
