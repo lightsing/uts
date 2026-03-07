@@ -33,18 +33,15 @@ ENTRYPOINT ["/app/uts"]
 
 FROM runtime AS calendar-runtime
 
-WORKDIR /app
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/uts-calendar /app/uts-calendar
 ENTRYPOINT ["/app/uts-calendar"]
 
 FROM runtime AS relayer-runtime
 
-WORKDIR /app
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/uts-relayer /app/uts-relayer
 ENTRYPOINT ["/app/uts-relayer"]
 
 FROM runtime AS beacon-injector-runtime
 
-WORKDIR /app
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/uts-beacon-injector /app/uts-beacon-injector
 ENTRYPOINT ["/app/uts-beacon-injector"]
