@@ -20,6 +20,7 @@ RUN cargo chef cook --release --recipe-path recipe.json --zigbuild --target x86_
 COPY . .
 RUN cargo zigbuild --release --bin uts-calendar --target x86_64-unknown-linux-gnu.2.17 --features performance
 RUN cargo zigbuild --release --bin uts-relayer --target x86_64-unknown-linux-gnu.2.17 --features performance
+RUN cargo zigbuild --release --bin uts-beacon-injector --target x86_64-unknown-linux-gnu.2.17 --features performance
 RUN cargo zigbuild --release --bin uts
 
 FROM debian:trixie-slim AS cli-runtime
@@ -39,3 +40,9 @@ FROM debian:trixie-slim AS relayer-runtime
 WORKDIR /app
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/uts-relayer /app/uts-relayer
 ENTRYPOINT ["/app/uts-relayer"]
+
+FROM debian:trixie-slim AS beacon-injector-runtime
+
+WORKDIR /app
+COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/uts-beacon-injector /app/uts-beacon-injector
+ENTRYPOINT ["/app/uts-beacon-injector"]
