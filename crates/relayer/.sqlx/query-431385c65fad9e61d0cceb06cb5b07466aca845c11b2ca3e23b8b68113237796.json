@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT COUNT(*) as \"count!\"\n        FROM l2_anchoring_queued\n        WHERE queue_index >= ?1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "431385c65fad9e61d0cceb06cb5b07466aca845c11b2ca3e23b8b68113237796"
+}

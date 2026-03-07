@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO eth_log (internal_transaction_id, log_index)\n        VALUES (?1, ?2)\n        ON CONFLICT DO NOTHING\n        RETURNING id as \"id!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "25ef4786ec076cd2ad773442169639666f9a6db7681ba1ff51d4bf74183bea45"
+}
