@@ -91,7 +91,7 @@ export const DEFAULT_CALENDARS = [
   // new URL('https://b.pool.opentimestamps.org/'),
   // new URL('https://a.pool.eternitywall.com/'),
   // new URL('https://ots.btc.catallaxy.com/'),
-  new URL('http://127.0.0.1:3000/'),
+  new URL('https://lgm1.test.timestamps.now/'),
 ]
 
 export const DEFAULT_EAS_ADDRESSES: Record<number, Hex> = {
@@ -143,7 +143,9 @@ export default class SDK {
       calendars = DEFAULT_CALENDARS,
       btcRPC = new BitcoinRPC(),
       ethRPCs = {
-        534352: createPublicClient({ transport: http('https://rpc.scroll.io') }),
+        534352: createPublicClient({
+          transport: http('https://rpc.scroll.io'),
+        }),
         534351: createPublicClient({
           transport: http('https://sepolia-rpc.scroll.io'),
         }),
@@ -215,9 +217,7 @@ export default class SDK {
    * If the wallet is on a different chain, attempts to switch to the target chain if it's well-known.
    * Returns null if no web3Provider or if switching fails.
    */
-  async getWeb3ProviderForChain(
-    chainId: number,
-  ): Promise<PublicClient | null> {
+  async getWeb3ProviderForChain(chainId: number): Promise<PublicClient | null> {
     if (!this.web3Provider) return null
 
     try {
