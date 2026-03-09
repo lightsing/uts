@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { hexlify } from 'ethers/utils'
+import { toHex } from 'viem'
 import {
   FileUp,
   Search,
@@ -91,7 +91,7 @@ async function handleOriginalFileUpload(event: Event) {
   try {
     const algo = loadedTimestamp.value.header.kind as SecureDigestOp
     const result = await digestFile(file, algo)
-    const headerHex = hexlify(loadedTimestamp.value.header.digest as Uint8Array)
+    const headerHex = toHex(loadedTimestamp.value.header.digest as Uint8Array)
     originalFileMatch.value = result.digest === headerHex ? 'match' : 'mismatch'
   } catch {
     originalFileMatch.value = 'mismatch'
@@ -163,7 +163,7 @@ function handleReset() {
           {{ t('Original Digest ({algo})', { algo: loadedTimestamp.header.kind }) }}
         </div>
         <div class="break-all font-mono text-xs text-neon-cyan">
-          {{ hexlify(loadedTimestamp.header.digest as Uint8Array) }}
+          {{ toHex(loadedTimestamp.header.digest as Uint8Array) }}
         </div>
       </div>
 

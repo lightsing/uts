@@ -1,8 +1,12 @@
 import { ref, onUnmounted } from 'vue'
-import { BrowserProvider } from 'ethers'
-import type { Eip1193Provider } from 'ethers'
+import { createPublicClient, custom, parseAbiItem } from 'viem'
+import type { EIP1193Provider } from '@uts/sdk'
 import { SDK } from '@uts/sdk'
 import { getSDK } from './useTimestampSDK'
+
+const UTS_ATTESTED_EVENT = parseAbiItem(
+  'event Attested(bytes32 indexed hash, address indexed sender, uint256 timestamp)',
+)
 
 const CHAIN_NAMES: Record<number, string> = {
   1: 'Ethereum',
@@ -44,40 +48,36 @@ export function useWebSocketFeed() {
 
   /** Poll web3Provider. Returns the wallet's chainId on success, or null. */
   async function fetchEventsFromWeb3(
-    web3Provider: Eip1193Provider,
+    web3Provider: EIP1193Provider,
   ): Promise<number | null> {
     try {
-      const provider = new BrowserProvider(web3Provider)
-      const network = await provider.getNetwork()
-      const chainId = Number(network.chainId)
+      const client = createPublicClient({ transport: custom(web3Provider) })
+      const chainId = await client.getChainId()
 
-      const currentBlock = await provider.getBlockNumber()
+      const currentBlock = Number(await client.getBlockNumber())
       const fromBlock = lastBlockWeb3[chainId]
         ? lastBlockWeb3[chainId] + 1
         : currentBlock - 10
 
       if (fromBlock > currentBlock) return chainId
 
-      const logs = await provider.getLogs({
-        fromBlock,
-        toBlock: currentBlock,
-        topics: [SDK.utsLogTopic],
+      const logs = await client.getLogs({
+        fromBlock: BigInt(fromBlock),
+        toBlock: BigInt(currentBlock),
+        event: UTS_ATTESTED_EVENT,
       })
 
       for (const log of logs) {
-        const parsed = SDK.utsInterface.parseLog(log)
-        if (!parsed) continue
-
         addEntry({
-          id: `${chainId}-${log.blockNumber}-${log.index}`,
-          hash: parsed.args[0],
+          id: `${chainId}-${Number(log.blockNumber)}-${log.logIndex}`,
+          hash: log.args.hash!,
           type: 'ethereum',
           chain: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
           chainId,
-          blockHeight: log.blockNumber,
-          sender: parsed.args[1],
-          txHash: log.transactionHash,
-          timestamp: Number(parsed.args[2] as bigint) * 1000,
+          blockHeight: Number(log.blockNumber),
+          sender: log.args.sender!,
+          txHash: log.transactionHash!,
+          timestamp: Number(log.args.timestamp!) * 1000,
         })
       }
 
@@ -99,37 +99,34 @@ export function useWebSocketFeed() {
     for (const chainId of chainIds) {
       if (skipChainIds.has(chainId)) continue
 
-      const provider = sdk.getEthProvider(chainId)
-      if (!provider) continue
+      const client = sdk.getEthProvider(chainId)
+      if (!client) continue
 
       try {
-        const currentBlock = await provider.getBlockNumber()
+        const currentBlock = Number(await client.getBlockNumber())
         const fromBlock = lastBlockRPC[chainId]
           ? lastBlockRPC[chainId] + 1
           : currentBlock - 5
 
         if (fromBlock > currentBlock) continue
 
-        const logs = await provider.getLogs({
-          fromBlock,
-          toBlock: currentBlock,
-          topics: [SDK.utsLogTopic],
+        const logs = await client.getLogs({
+          fromBlock: BigInt(fromBlock),
+          toBlock: BigInt(currentBlock),
+          event: UTS_ATTESTED_EVENT,
         })
 
         for (const log of logs) {
-          const parsed = SDK.utsInterface.parseLog(log)
-          if (!parsed) continue
-
           addEntry({
-            id: `${chainId}-${log.blockNumber}-${log.index}`,
-            hash: parsed.args[0],
+            id: `${chainId}-${Number(log.blockNumber)}-${log.logIndex}`,
+            hash: log.args.hash!,
             type: 'ethereum',
             chain: CHAIN_NAMES[chainId] ?? `Chain ${chainId}`,
             chainId,
-            blockHeight: log.blockNumber,
-            sender: parsed.args[1],
-            txHash: log.transactionHash,
-            timestamp: Number(parsed.args[2] as bigint) * 1000,
+            blockHeight: Number(log.blockNumber),
+            sender: log.args.sender!,
+            txHash: log.transactionHash!,
+            timestamp: Number(log.args.timestamp!) * 1000,
           })
         }
 

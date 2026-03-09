@@ -7,7 +7,7 @@ import type {
   DigestHeader,
   StampEventCallback,
 } from '@uts/sdk'
-import type { Eip1193Provider } from 'ethers'
+import type { EIP1193Provider } from '@uts/sdk'
 import JSZip from 'jszip'
 
 export type StampPhase =
@@ -33,7 +33,7 @@ export function getSDK(): SDK {
 
 export function resetSDK(options?: {
   calendars?: URL[]
-  web3Provider?: Eip1193Provider | null
+  web3Provider?: EIP1193Provider | null
 }) {
   _sdkInstance = new SDK({
     timeout: 15000,
@@ -42,7 +42,7 @@ export function resetSDK(options?: {
   })
 }
 
-export function setWeb3Provider(provider: Eip1193Provider | null) {
+export function setWeb3Provider(provider: EIP1193Provider | null) {
   const sdk = getSDK()
   sdk.web3Provider = provider
 }

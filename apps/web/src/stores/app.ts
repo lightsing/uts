@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { DEFAULT_CALENDARS } from '@uts/sdk'
 import type { DetachedTimestamp, SecureDigestOp } from '@uts/sdk'
 import { getSDK, resetSDK } from '@/composables/useTimestampSDK'
-import { JsonRpcProvider } from 'ethers'
+import { createPublicClient, http, type PublicClient } from 'viem'
 
 const CHAIN_NAMES: Record<number, string> = {
   1: 'Ethereum',
@@ -164,33 +164,35 @@ export const useAppStore = defineStore('app', () => {
 
     for (const chain of ethChains.value) {
       // Try custom RPC first, then SDK provider, then public RPC fallback
-      let provider: JsonRpcProvider | null = null
+      let client: PublicClient | null = null
       const rpc = customRpcs.value[chain.chainId]
       if (rpc) {
         try {
-          provider = new JsonRpcProvider(rpc)
+          client = createPublicClient({ transport: http(rpc) })
         } catch {
           /* ignore */
         }
       }
-      if (!provider) {
-        provider = sdk.getEthProvider(chain.chainId)
+      if (!client) {
+        client = sdk.getEthProvider(chain.chainId)
       }
-      if (!provider && PUBLIC_RPCS[chain.chainId]) {
+      if (!client && PUBLIC_RPCS[chain.chainId]) {
         try {
-          provider = new JsonRpcProvider(PUBLIC_RPCS[chain.chainId])
+          client = createPublicClient({
+            transport: http(PUBLIC_RPCS[chain.chainId]),
+          })
         } catch {
           /* ignore */
         }
       }
 
-      if (!provider) {
+      if (!client) {
         chain.status = 'offline'
         continue
       }
       const start = performance.now()
       try {
-        await provider.getBlockNumber()
+        await client.getBlockNumber()
         chain.latency = Math.round(performance.now() - start)
         chain.status = 'online'
       } catch {
