@@ -1,7 +1,7 @@
 //! This crate provides utilities for working with SQL databases.
 
 mod alloy;
-mod marcos;
+mod macros;
 
 /// Wrapper type for implementing sqlx Encode and Decode for types by converting them to and from text.
 #[derive(Debug)]
