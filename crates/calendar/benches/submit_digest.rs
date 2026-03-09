@@ -24,7 +24,11 @@ fn benchmark(c: &mut Criterion) {
             b.iter_batched(
                 || input.clone(),
                 |input| {
-                    let out = submit_digest_inner(input, &signer);
+                    let out = submit_digest_inner(
+                        input,
+                        &signer,
+                        black_box("https://lgm1.test.timestamps.now/"),
+                    );
                     black_box(out)
                 },
                 BatchSize::SmallInput,
