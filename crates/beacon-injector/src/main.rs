@@ -63,12 +63,15 @@ async fn main() -> eyre::Result<()> {
     let address = key.address();
     info!("Using address: {address}");
 
-    let provider = ProviderBuilder::new().wallet(key).connect_client(
-        ClientBuilder::default()
-            .layer(config.blockchain.rpc.retry.layer())
-            .layer(config.blockchain.rpc.throttle.layer())
-            .http(config.blockchain.rpc.l2.parse()?),
-    );
+    let provider = ProviderBuilder::new()
+        .with_simple_nonce_management()
+        .wallet(key)
+        .connect_client(
+            ClientBuilder::default()
+                .layer(config.blockchain.rpc.retry.layer())
+                .layer(config.blockchain.rpc.throttle.layer())
+                .http(config.blockchain.rpc.l2.parse()?),
+        );
 
     let eas = EAS::new(config.blockchain.eas_address, provider.clone());
     let l2anchoring_manager =
@@ -173,7 +176,7 @@ impl<P: Provider + 'static> Ctx<P> {
         *round = randomness.round;
 
         let hash = keccak256_uncached(&*randomness.signature);
-        info!(%randomness.round, %randomness.signature, %hash);
+        // trace!(%randomness.round, %randomness.signature, %hash);
 
         tokio::spawn(self.clone().request_calendar(hash));
         self.hash_tx.send(hash).await?;
@@ -246,7 +249,6 @@ impl<P: Provider + 'static> Ctx<P> {
         let attested = receipt
             .decoded_log::<Attested>()
             .context("Attested event not found")?;
-        info!(%hash, uid = %attested.uid, "Attestation submitted on-chain");
 
         let floor_fee = self.fee_oracle.getFloorFee().call().await?;
         let fee = floor_fee * U256::from(110) / U256::from(100); // add 10% buffer
@@ -257,6 +259,7 @@ impl<P: Provider + 'static> Ctx<P> {
             .await?
             .watch()
             .await?;
+        info!(%hash, uid = %attested.uid, "Attestation submitted on-chain");
         Ok(())
     }
 }
