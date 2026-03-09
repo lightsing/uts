@@ -1,4 +1,4 @@
-import { hexlify } from 'ethers/utils'
+import { hexlify } from '../utils.ts'
 import { DecodeError, ErrorCode } from '../errors.ts'
 import {
   DIGEST_OPS,

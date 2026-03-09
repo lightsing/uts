@@ -10,7 +10,6 @@ import StatusBadge from '@/components/base/StatusBadge.vue'
 import { useLingui } from '@/composables/useLingui'
 import type { AttestationStatus } from '@uts/sdk'
 import { WELL_KNOWN_CHAINS } from '@uts/sdk'
-import { hexlify } from 'ethers/utils'
 import ScrollLogo from '@/assets/Scroll_Logomark.svg'
 
 const { t } = useLingui()

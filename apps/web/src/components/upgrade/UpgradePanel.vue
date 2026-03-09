@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { hexlify } from 'ethers/utils'
+import { toHex } from 'viem'
 import {
   FileUp,
   RefreshCw,
@@ -123,7 +123,7 @@ function handleReset() {
           {{ t('Digest ({algo})', { algo: loadedTimestamp.header.kind }) }}
         </div>
         <div class="break-all font-mono text-xs text-neon-cyan">
-          {{ hexlify(loadedTimestamp.header.digest as Uint8Array) }}
+          {{ toHex(loadedTimestamp.header.digest as Uint8Array) }}
         </div>
       </div>
 

@@ -32,9 +32,9 @@
   "author": "Akase Haruka <light.tsing@gmail.com>",
   "license": "(MIT OR Apache-2.0)",
   "dependencies": {
-    "@ethereum-attestation-service/eas-sdk": "^2.9.0",
     "@noble/hashes": "^2.0.1",
-    "ethers": "^6.16.0"
+    "@uts/contracts": "workspace:*",
+    "viem": "^2.47.0"
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",

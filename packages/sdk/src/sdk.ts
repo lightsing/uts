@@ -1,13 +1,12 @@
 import {
-  type AbstractProvider,
-  type Eip1193Provider,
-  BrowserProvider,
-  getBytes,
-  hexlify,
-  id,
-  Interface,
-  JsonRpcProvider,
-} from 'ethers'
+  createPublicClient,
+  custom,
+  http,
+  toHex,
+  type Hex,
+  type PublicClient,
+} from 'viem'
+import { getBytes, hexlify } from './utils.ts'
 import {
   AttestationStatusKind,
   UpgradeStatus,
@@ -35,10 +34,11 @@ import { EncodeError, ErrorCode, RemoteError, VerifyError } from './errors.ts'
 import { ripemd160, sha1 } from '@noble/hashes/legacy.js'
 import BitcoinRPC from './rpc/btc.ts'
 import {
-  EAS,
+  readEASTimestamp,
+  readEASAttestation,
+  decodeContentHash,
   NO_EXPIRATION,
-  SchemaEncoder,
-} from '@ethereum-attestation-service/eas-sdk'
+} from './eas.ts'
 
 export type StampEvent =
   | { phase: 'generating-nonce' }
@@ -56,11 +56,16 @@ export type StampEvent =
 
 export type StampEventCallback = (event: StampEvent) => void
 
+/** EIP-1193 compliant Ethereum provider interface (e.g., MetaMask, WalletConnect). */
+export interface EIP1193Provider {
+  request(args: { method: string; params?: unknown[] }): Promise<unknown>
+}
+
 export interface SDKOptions {
   calendars?: URL[]
   btcRPC?: BitcoinRPC
-  ethRPCs?: Record<number, AbstractProvider>
-  web3Provider?: Eip1193Provider | null
+  ethRPCs?: Record<number, PublicClient>
+  web3Provider?: EIP1193Provider | null
   timeout?: number
   quorum?: number
   nonceSize?: number
@@ -89,22 +94,21 @@ export const DEFAULT_CALENDARS = [
   new URL('http://127.0.0.1:3000/'),
 ]
 
-export const DEFAULT_EAS_ADDRESSES: Record<number, string> = {
+export const DEFAULT_EAS_ADDRESSES: Record<number, Hex> = {
   1: '0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587',
   11155111: '0xC2679fBD37d54388Ce493F1DB75320D236e1815e',
   534352: '0xC47300428b6AD2c7D03BB76D05A176058b47E6B0',
   534351: '0xaEF4103A04090071165F78D45D83A0C0782c2B2a',
 }
 
-export const EAS_SCHEMA_ID =
+export const EAS_SCHEMA_ID: Hex =
   '0x5c5b8b295ff43c8e442be11d569e94a4cd5476f5e23df0f71bdd408df6b9649c'
 
 export default class SDK {
   readonly calendars: URL[]
   btcRPC: BitcoinRPC
-  ethRPCs: Record<number, AbstractProvider>
-  web3Provider: Eip1193Provider | null = null
-  eas: Record<number, EAS>
+  ethRPCs: Record<number, PublicClient>
+  web3Provider: EIP1193Provider | null = null
 
   /**
    * Maximum time to wait for calendar responses in milliseconds.
@@ -133,15 +137,16 @@ export default class SDK {
   private hasher: CHash = keccak_256
 
   private static encoder = new TextEncoder()
-  private static schemaEncoder = new SchemaEncoder('bytes32 contentHash')
 
   constructor(options: SDKOptions = {}) {
     const {
       calendars = DEFAULT_CALENDARS,
       btcRPC = new BitcoinRPC(),
       ethRPCs = {
-        534352: new JsonRpcProvider('https://rpc.scroll.io'),
-        534351: new JsonRpcProvider('https://sepolia-rpc.scroll.io'),
+        534352: createPublicClient({ transport: http('https://rpc.scroll.io') }),
+        534351: createPublicClient({
+          transport: http('https://sepolia-rpc.scroll.io'),
+        }),
       },
       web3Provider = null,
       timeout = 10000,
@@ -154,7 +159,6 @@ export default class SDK {
     this.btcRPC = btcRPC
     this.ethRPCs = ethRPCs
     this.web3Provider = web3Provider
-    this.eas = {}
 
     this.timeout = timeout
     this.nonceSize = nonceSize
@@ -189,31 +193,21 @@ export default class SDK {
     }
   }
 
-  getEthProvider(chainId: number): AbstractProvider | null {
+  getEthProvider(chainId: number): PublicClient | null {
     if (Object.hasOwn(this.ethRPCs, chainId)) {
       return this.ethRPCs[chainId]!
     }
     return null
   }
 
-  getEAS(chainId: number, easAddress?: string): EAS {
-    if (Object.hasOwn(this.eas, chainId)) {
-      return this.eas[chainId]!
-    }
-    const provider = this.getEthProvider(chainId)
-    if (!provider) {
+  getEthProviderOrThrow(chainId: number): PublicClient {
+    const client = this.getEthProvider(chainId)
+    if (!client) {
       throw new Error(
-        `No RPC provider configured for Ethereum chain ${chainId}, which is required to interact with EAS for that chain`,
+        `No RPC provider configured for Ethereum chain ${chainId}`,
       )
     }
-    const address = easAddress ?? DEFAULT_EAS_ADDRESSES[chainId]
-    if (!address) {
-      throw new Error(`No EAS address configured for Ethereum chain ${chainId}`)
-    }
-    const eas = new EAS(address)
-    eas.connect(provider)
-    this.eas[chainId] = eas
-    return eas
+    return client
   }
 
   /**
@@ -223,14 +217,16 @@ export default class SDK {
    */
   async getWeb3ProviderForChain(
     chainId: number,
-  ): Promise<AbstractProvider | null> {
+  ): Promise<PublicClient | null> {
     if (!this.web3Provider) return null
 
     try {
-      const browser = new BrowserProvider(this.web3Provider)
-      const network = await browser.getNetwork()
-      if (Number(network.chainId) === chainId) {
-        return browser
+      const client = createPublicClient({
+        transport: custom(this.web3Provider),
+      })
+      const currentChainId = await client.getChainId()
+      if (currentChainId === chainId) {
+        return client
       }
 
       // Try switching to the target chain if it's well-known
@@ -241,7 +237,9 @@ export default class SDK {
             method: 'wallet_switchEthereumChain',
             params: [{ chainId: knownChain.chainId }],
           })
-          return new BrowserProvider(this.web3Provider)
+          return createPublicClient({
+            transport: custom(this.web3Provider),
+          })
         } catch {
           // Switch failed, fall through
         }
@@ -706,10 +704,20 @@ export default class SDK {
     input: Uint8Array,
     attestation: EASAttestation | EASTimestamped,
   ): Promise<AttestationStatus> {
-    const eas = this.getEAS(attestation.chain)
+    const client = this.getEthProviderOrThrow(attestation.chain)
+    const easAddress = DEFAULT_EAS_ADDRESSES[attestation.chain]
+    if (!easAddress) {
+      throw new Error(
+        `No EAS address configured for Ethereum chain ${attestation.chain}`,
+      )
+    }
 
     if (attestation.kind === 'eas-timestamped') {
-      const time = await eas.getTimestamp(hexlify(input))
+      const time = await readEASTimestamp(
+        client,
+        easAddress,
+        toHex(input, { size: 32 }),
+      )
       if (time === 0n) {
         return {
           attestation,
@@ -727,7 +735,9 @@ export default class SDK {
       }
     }
 
-    const onChainAttestation = await eas.getAttestation(
+    const onChainAttestation = await readEASAttestation(
+      client,
+      easAddress,
       hexlify(attestation.uid),
     )
 
@@ -764,12 +774,17 @@ export default class SDK {
       }
     }
 
-    const decoded = SDK.schemaEncoder.decodeData(onChainAttestation.data)
-    console.debug(
-      `Decoded EAS attestation data for UID ${hexlify(attestation.uid)}:`,
-      decoded,
-    )
-    if (decoded.length !== 1 || decoded[0].type !== 'bytes32') {
+    try {
+      const contentHash = decodeContentHash(onChainAttestation.data)
+      console.debug(
+        `Decoded EAS attestation data for UID ${hexlify(attestation.uid)}:`,
+        contentHash,
+      )
+    } catch (e) {
+      console.debug(
+        `Failed to decode EAS attestation data for UID ${hexlify(attestation.uid)}:`,
+        e,
+      )
       return {
         attestation,
         status: AttestationStatusKind.INVALID,

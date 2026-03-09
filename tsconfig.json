@@ -51,7 +51,8 @@
     "skipLibCheck": true, // skip all type checks for .d.ts files
 
     "paths": {
-      "@uts/sdk": ["./packages/sdk/src/index.ts"]
+      "@uts/sdk": ["./packages/sdk/src/index.ts"],
+      "@uts/contracts": ["./packages/contract-types/src/index.ts"]
     },
     "customConditions": ["uts-source"]
   },

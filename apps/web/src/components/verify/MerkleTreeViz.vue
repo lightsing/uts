@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { Step, Attestation } from '@uts/sdk'
-import { hexlify } from 'ethers/utils'
+import { toHex } from 'viem'
 import {
   ChevronRight,
   ChevronDown,
@@ -91,7 +91,7 @@ function formatOp(step: Step): string {
   switch (step.op) {
     case 'APPEND':
     case 'PREPEND':
-      return `${step.op}(${truncateHex(hexlify(step.data))})`
+      return `${step.op}(${truncateHex(toHex(step.data))})`
     case 'SHA256':
     case 'KECCAK256':
     case 'SHA1':

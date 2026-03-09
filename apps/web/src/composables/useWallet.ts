@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
-import { BrowserProvider } from 'ethers'
-import type { Eip1193Provider } from 'ethers'
+import type { EIP1193Provider } from '@uts/sdk'
 import { WELL_KNOWN_CHAINS } from '@uts/sdk'
 
 const walletAddress = ref<string | null>(null)
@@ -26,7 +25,7 @@ const walletChainName = computed(() => {
   return CHAIN_NAMES[walletChainId.value] ?? `Chain ${walletChainId.value}`
 })
 
-function getEip1193Provider(): Eip1193Provider | null {
+function getEip1193Provider(): EIP1193Provider | null {
   if (typeof window === 'undefined') return null
   return (window as any).ethereum ?? null
 }
@@ -48,16 +47,19 @@ export function useWallet() {
     walletError.value = null
 
     try {
-      const provider = new BrowserProvider(ethereum)
-      const accounts = await provider.send('eth_requestAccounts', [])
+      const accounts = (await ethereum.request({
+        method: 'eth_requestAccounts',
+      })) as string[]
       if (accounts.length === 0) {
         walletError.value = 'No accounts returned from wallet'
         return
       }
       walletAddress.value = accounts[0] ?? null
 
-      const network = await provider.getNetwork()
-      walletChainId.value = Number(network.chainId)
+      const chainIdHex = (await ethereum.request({
+        method: 'eth_chainId',
+      })) as string
+      walletChainId.value = parseInt(chainIdHex, 16)
 
       // Listen for account/chain changes
       ;(ethereum as any).on?.('accountsChanged', handleAccountsChanged)

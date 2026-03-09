@@ -4,7 +4,7 @@ import path from 'node:path'
 import Decoder from '../src/codec/decode.ts'
 import type { DetachedTimestamp } from '../src/types.ts'
 import SDK from '../src/sdk.ts'
-import { getBytes } from 'ethers'
+import { hexToBytes } from 'viem'
 
 const __filename = import.meta.filename
 const __dirname = import.meta.dirname
@@ -26,7 +26,7 @@ describe.skip('Stamp', () => {
     expect(results).toHaveLength(1)
     const result = results[0]
 
-    expect(result.header.digest).toEqual(getBytes(testDigest))
+    expect(result.header.digest).toEqual(hexToBytes(testDigest as `0x${string}`))
     expect(result.timestamp).toBeDefined()
     console.debug('Timestamp:', JSON.stringify(result, null, 2))
   })
@@ -48,7 +48,7 @@ describe('Verify', () => {
     const sdk = new SDK()
 
     const verified = await sdk.verifyAttestation(
-      getBytes(
+      hexToBytes(
         '0x7eb06fdbe20e402a8125775968899b4ab87b9af1c20a81d4af8d5bb0c96d7c64',
       ),
       {
