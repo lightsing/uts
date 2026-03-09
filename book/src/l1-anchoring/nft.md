@@ -82,4 +82,4 @@ Generating NFT metadata on-chain (rather than pointing to IPFS) ensures:
 - **Trustlessness**: Anyone can verify the metadata by calling the contract directly.
 - **Consistency**: The visual representation always matches the on-chain state.
 
-The trade-off is higher gas cost for minting (due to SVG generation), but since this is on L2, the cost is manageable.
+The SVG for the NFT is generated every time the `tokenURI` is called.

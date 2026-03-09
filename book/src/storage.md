@@ -79,7 +79,7 @@ CREATE TABLE attest_attempts (
 );
 ```
 
-**Encoding**: Large integers and 32-byte hashes are stored as text (hex or decimal strings) via a `TextWrapper<T>` pattern, ensuring SQLite compatibility without size constraints.
+**Encoding**: Large integers and 32-byte hashes are stored as text (hex or decimal strings) via a `TextWrapper<T>` pattern to improve human-readability. The performance impact is minimal and hence is an acceptable trade-off.
 
 ## Relayer DB (SQLite)
 

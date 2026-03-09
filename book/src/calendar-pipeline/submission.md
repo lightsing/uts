@@ -74,7 +74,7 @@ digest
   └─ PREPEND(timestamp_bytes)
        └─ APPEND(signature_bytes)
             └─ KECCAK256
-                 └─ PendingAttestation { uri: "https://calendar/digest/<commitment>" }
+                 └─ PendingAttestation { uri: "https://calendar/" }
 ```
 
 The `KECCAK256` opcode produces the commitment — a deterministic 32-byte value that the user can later use to retrieve their proof.

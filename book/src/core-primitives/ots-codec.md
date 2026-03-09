@@ -91,7 +91,7 @@ Indicates the timestamp is not yet confirmed. Contains a URI pointing to the cal
 
 ```rust
 pub struct PendingAttestation<'a> {
-    uri: Cow<'a, str>,  // e.g., "https://calendar.example.com/digest/<commitment>"
+    uri: Cow<'a, str>,  // e.g., "https://calendar.example.com"
 }
 ```
 

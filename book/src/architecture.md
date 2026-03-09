@@ -87,7 +87,6 @@ graph TB
 | `uts-relayer` | L2→L1→L2 relay service with batch state machine |
 | `uts-beacon-injector` | Injects drand beacon randomness into the timestamping pipeline |
 | `uts-sql` | SQLite utilities and Alloy type wrappers |
-| `uts-contracts-sdk` | Smart contract SDK |
 
 ## Two Pipelines
 

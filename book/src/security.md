@@ -68,20 +68,6 @@ function finalizeBatch() external {
 
 This prevents a malicious relayer from submitting a fraudulent Merkle root that doesn't match the actual queued entries. The contract uses its own stored data (not relayer-provided data) to reconstruct the tree.
 
-## Reorg Protection
-
-The L2 indexer rewinds by 100 blocks on startup:
-
-```rust
-const REWIND_BLOCKS: u64 = 100;
-```
-
-This protects against chain reorganizations that could cause the indexer to miss events. After a reorg:
-
-1. The scanner re-processes the last 100 blocks.
-2. Duplicate events are handled via UNIQUE constraints in SQLite.
-3. The indexer converges to the correct chain state.
-
 ## Sequential Batch Ordering
 
 The L2AnchoringManager enforces strict sequential batch ordering:
@@ -130,7 +116,7 @@ This ensures that once an attestation is used for L1 anchoring, it cannot be inv
 
 ## Compare-and-Set Status Transitions
 
-The relayer's batch state machine uses compare-and-set semantics in SQL:
+The relayer's batch state machine uses compare-and-set (CAS) semantics in SQL:
 
 ```sql
 UPDATE l1_batch
@@ -138,7 +124,7 @@ SET status = ?new_status, updated_at = ?now
 WHERE id = ?id AND status = ?expected_status;
 ```
 
-If the update affects zero rows (status changed concurrently), the operation is retried. This prevents race conditions in the unlikely event of concurrent relayer instances.
+The indexer updates the status once new event arrives. There's a possibility that the event arrives just before the receipt, hence we use CAS.
 
 ## Fail-Fast Error Handling
 
