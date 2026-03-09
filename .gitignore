@@ -44,3 +44,6 @@ dist
 *.wal
 checkpoint.meta
 checkpoint.meta.tmp
+
+# Book build
+book/build

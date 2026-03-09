@@ -1,0 +1,18 @@
+[book]
+title = "UTS: Universal Timestamps"
+authors = ["UTS Contributors"]
+language = "en"
+multilingual = false
+src = "src"
+
+[build]
+build-dir = "build"
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[preprocessor.katex]
+command = "mdbook-katex"
+
+[output.html]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
