@@ -68,6 +68,7 @@ export function useWebSocketFeed() {
       })
 
       for (const log of logs) {
+        if (log.blockNumber == null || log.transactionHash == null) continue
         addEntry({
           id: `${chainId}-${Number(log.blockNumber)}-${log.logIndex}`,
           hash: log.args.hash!,
@@ -76,7 +77,7 @@ export function useWebSocketFeed() {
           chainId,
           blockHeight: Number(log.blockNumber),
           sender: log.args.sender!,
-          txHash: log.transactionHash!,
+          txHash: log.transactionHash,
           timestamp: Number(log.args.timestamp!) * 1000,
         })
       }
@@ -117,6 +118,7 @@ export function useWebSocketFeed() {
         })
 
         for (const log of logs) {
+          if (log.blockNumber == null || log.transactionHash == null) continue
           addEntry({
             id: `${chainId}-${Number(log.blockNumber)}-${log.logIndex}`,
             hash: log.args.hash!,
@@ -125,7 +127,7 @@ export function useWebSocketFeed() {
             chainId,
             blockHeight: Number(log.blockNumber),
             sender: log.args.sender!,
-            txHash: log.transactionHash!,
+            txHash: log.transactionHash,
             timestamp: Number(log.args.timestamp!) * 1000,
           })
         }

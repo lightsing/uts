@@ -9,7 +9,14 @@ export type BytesLike = Hex | Uint8Array
  */
 export function getBytes(value: BytesLike): Uint8Array {
   if (value instanceof Uint8Array) return value
-  return hexToBytes(value)
+  try {
+    return hexToBytes(value)
+  } catch (e) {
+    throw new Error(
+      `Invalid hex string: ${value}`,
+      { cause: e },
+    )
+  }
 }
 
 /**

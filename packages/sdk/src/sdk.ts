@@ -56,6 +56,7 @@ export type StampEvent =
 
 export type StampEventCallback = (event: StampEvent) => void
 
+/** EIP-1193 compliant Ethereum provider interface (e.g., MetaMask, WalletConnect). */
 export interface EIP1193Provider {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>
 }
@@ -779,7 +780,11 @@ export default class SDK {
         `Decoded EAS attestation data for UID ${hexlify(attestation.uid)}:`,
         contentHash,
       )
-    } catch {
+    } catch (e) {
+      console.debug(
+        `Failed to decode EAS attestation data for UID ${hexlify(attestation.uid)}:`,
+        e,
+      )
       return {
         attestation,
         status: AttestationStatusKind.INVALID,
