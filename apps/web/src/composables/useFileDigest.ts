@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import { hexlify } from 'ethers/utils'
+import { toHex } from 'viem'
 import type { SecureDigestOp, DigestHeader } from '@uts/sdk'
 
 export interface FileDigestResult {
@@ -79,7 +79,7 @@ export function useFileDigest() {
       stopFakeProgress()
 
       const digestBytes = hasher.digest()
-      const digestHex = hexlify(digestBytes)
+      const digestHex = toHex(digestBytes)
 
       const digestResult: FileDigestResult = {
         fileName: file.webkitRelativePath || file.name,
@@ -135,7 +135,7 @@ export function useFileDigest() {
           fileName: file.webkitRelativePath || file.name,
           fileSize: file.size,
           algorithm,
-          digest: hexlify(digestBytes),
+          digest: toHex(digestBytes),
           header: { kind: algorithm, digest: digestBytes },
         })
       }

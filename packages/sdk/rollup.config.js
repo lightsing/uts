@@ -12,7 +12,7 @@ export default [
         sourcemap: true,
       },
     ],
-    external: [/node_modules/, '@noble/hashes', 'ethers'],
+    external: [/node_modules/, '@noble/hashes', 'viem', '@uts/contracts'],
     plugins: [
       resolve(),
       typescript({

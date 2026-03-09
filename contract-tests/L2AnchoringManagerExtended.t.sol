@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.28;
 
-import {Test, console, Vm} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {L2AnchoringManager} from "../contracts/L2/manager/L2AnchoringManager.sol";
 import {IL2AnchoringManager} from "../contracts/L2/manager/IL2AnchoringManager.sol";
-import {IFeeOracle} from "../contracts/L2/oracle/IFeeOracle.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {IL2ScrollMessenger} from "scroll-contracts/L2/IL2ScrollMessenger.sol";
-import {ScrollConstants} from "scroll-contracts/libraries/constants/ScrollConstants.sol";
 import {TestEASHelper} from "./EAS.t.sol";
 import {IEAS} from "eas-contracts/IEAS.sol";
 import {INFTGenerator} from "../contracts/L2/nft/INFTGenerator.sol";
-import {MerkleTree} from "../contracts/core/MerkleTree.sol";
 import {MockFeeOracle, MockL2ScrollMessenger} from "./L2AnchoringManager.t.sol";
 import {EASHelper} from "../contracts/core/EASHelper.sol";
 

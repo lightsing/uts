@@ -23,7 +23,7 @@ import type {
   EASAttestation,
   EASTimestamped,
 } from '../types.ts'
-import { getBytes, hexlify } from 'ethers/utils'
+import { getBytes } from '../utils.ts'
 import { EncodeError, ErrorCode } from '../errors.ts'
 
 export default class Encoder {

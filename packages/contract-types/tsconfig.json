@@ -8,6 +8,5 @@
     "types": []
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../contract-types" }]
+  "exclude": ["node_modules", "dist"]
 }

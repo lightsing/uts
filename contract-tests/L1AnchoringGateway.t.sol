@@ -23,7 +23,8 @@ contract MockL1ScrollMessenger {
         external
         payable
     {
-        lastMessage = Message(to, value, message, gasLimit, refundAddress);
+        lastMessage =
+            Message({to: to, value: value, message: message, gasLimit: gasLimit, refundAddress: refundAddress});
     }
 }
 
