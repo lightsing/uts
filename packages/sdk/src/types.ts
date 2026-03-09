@@ -1,4 +1,4 @@
-import { type BytesLike } from 'ethers/utils'
+import type { BytesLike } from './utils.ts'
 
 export const DIGEST_OPS = ['SHA1', 'SHA256', 'RIPEMD160', 'KECCAK256'] as const
 

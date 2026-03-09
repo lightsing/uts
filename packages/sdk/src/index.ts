@@ -1,6 +1,8 @@
-import { hexlify as h } from 'ethers'
+import { toHex } from 'viem'
 
 export type * from './types.ts'
+
+export type { BytesLike } from './utils.ts'
 
 export type {
   Attestation,
@@ -37,7 +39,7 @@ export const hexlify = (obj: any): any => {
     return obj
   }
   if (obj instanceof Uint8Array) {
-    return h(obj)
+    return toHex(obj)
   }
   if (Array.isArray(obj)) {
     return obj.map((item) => hexlify(item))

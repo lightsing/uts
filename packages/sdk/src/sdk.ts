@@ -1,13 +1,12 @@
 import {
-  type AbstractProvider,
-  type Eip1193Provider,
-  BrowserProvider,
-  getBytes,
-  hexlify,
-  id,
-  Interface,
-  JsonRpcProvider,
-} from 'ethers'
+  createPublicClient,
+  custom,
+  http,
+  toHex,
+  type Hex,
+  type PublicClient,
+} from 'viem'
+import { getBytes, hexlify } from './utils.ts'
 import {
   AttestationStatusKind,
   UpgradeStatus,
@@ -35,10 +34,11 @@ import { EncodeError, ErrorCode, RemoteError, VerifyError } from './errors.ts'
 import { ripemd160, sha1 } from '@noble/hashes/legacy.js'
 import BitcoinRPC from './rpc/btc.ts'
 import {
-  EAS,
+  readEASTimestamp,
+  readEASAttestation,
+  decodeContentHash,
   NO_EXPIRATION,
-  SchemaEncoder,
-} from '@ethereum-attestation-service/eas-sdk'
+} from './eas.ts'
 
 export type StampEvent =
   | { phase: 'generating-nonce' }
@@ -56,11 +56,15 @@ export type StampEvent =
 
 export type StampEventCallback = (event: StampEvent) => void
 
+export interface EIP1193Provider {
+  request(args: { method: string; params?: unknown[] }): Promise<unknown>
+}
+
 export interface SDKOptions {
   calendars?: URL[]
   btcRPC?: BitcoinRPC
-  ethRPCs?: Record<number, AbstractProvider>
-  web3Provider?: Eip1193Provider | null
+  ethRPCs?: Record<number, PublicClient>
+  web3Provider?: EIP1193Provider | null
   timeout?: number
   quorum?: number
   nonceSize?: number
@@ -89,22 +93,21 @@ export const DEFAULT_CALENDARS = [
   new URL('http://127.0.0.1:3000/'),
 ]
 
-export const DEFAULT_EAS_ADDRESSES: Record<number, string> = {
+export const DEFAULT_EAS_ADDRESSES: Record<number, Hex> = {
   1: '0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587',
   11155111: '0xC2679fBD37d54388Ce493F1DB75320D236e1815e',
   534352: '0xC47300428b6AD2c7D03BB76D05A176058b47E6B0',
   534351: '0xaEF4103A04090071165F78D45D83A0C0782c2B2a',
 }
 
-export const EAS_SCHEMA_ID =
+export const EAS_SCHEMA_ID: Hex =
   '0x5c5b8b295ff43c8e442be11d569e94a4cd5476f5e23df0f71bdd408df6b9649c'
 
 export default class SDK {
   readonly calendars: URL[]
   btcRPC: BitcoinRPC
-  ethRPCs: Record<number, AbstractProvider>
-  web3Provider: Eip1193Provider | null = null
-  eas: Record<number, EAS>
+  ethRPCs: Record<number, PublicClient>
+  web3Provider: EIP1193Provider | null = null
 
   /**
    * Maximum time to wait for calendar responses in milliseconds.

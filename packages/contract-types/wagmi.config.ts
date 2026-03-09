@@ -12,6 +12,7 @@ export default defineConfig({
         'IL1AnchoringGateway.sol/*.json',
         'IFeeOracle.sol/*.json',
         'IL2AnchoringManager.sol/*.json',
+        'IEAS.sol/*.json',
       ],
     }),
   ],
