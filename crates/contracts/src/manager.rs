@@ -58,6 +58,9 @@ mod inner {
             ///
             event NFTClaimed(address indexed submitter, uint256 indexed tokenId, bytes32 indexed root, uint256 timestamp);
 
+            /// see also submitForL1Anchoring(bytes32 attestationId, address refundAddress).
+            function submitForL1Anchoring(bytes32 attestationId) external payable;
+
             /// Finalize the batch confirmation after receiving the L1 notification. This will
             /// verify the Merkle root and update the confirmed index. This can be called by anyone
             /// after the notification is received to save the cost of L2 execution since the cross

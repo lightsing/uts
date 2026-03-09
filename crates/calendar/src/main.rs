@@ -52,6 +52,7 @@ async fn main() -> eyre::Result<()> {
     info!("Using address: {:?}", key.address());
 
     let provider = ProviderBuilder::new()
+        .with_simple_nonce_management()
         .wallet(EthereumWallet::new(key.clone()))
         .connect_client(
             ClientBuilder::default()

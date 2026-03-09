@@ -4963,6 +4963,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
@@ -6662,6 +6664,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
+name = "uts-beacon-injector"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-rpc-client",
+ "alloy-signer-local",
+ "alloy-sol-types",
+ "config",
+ "eyre",
+ "reqwest 0.13.2",
+ "serde",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uts-bmt",
+ "uts-contracts",
+]
+
+[[package]]
 name = "uts-bmt"
 version = "0.1.1"
 dependencies = [
@@ -6805,7 +6829,6 @@ dependencies = [
  "alloy-signer-local",
  "alloy-sol-types",
  "axum",
- "color-eyre",
  "config",
  "eyre",
  "futures",

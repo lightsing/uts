@@ -201,7 +201,7 @@
       <div class="text-lg sm:text-xl font-bold text-cyan-400 tracking-widest neon-text-cyan flex items-baseline gap-2 mt-3 truncate">
         <span id="metric-l1-fees">N/A</span>
       </div>
-      <p class="text-[10px] text-cyan-700 uppercase mt-2">Total Msg Value on L1</p>
+      <p class="text-[10px] text-cyan-700 uppercase mt-2">Cumulative Msg Value</p>
     </div>
   </div>
 
@@ -211,7 +211,7 @@
       <i data-lucide="calculator" class="w-8 h-8 text-emerald-400 shrink-0"></i>
       <div>
         <h3 class="text-emerald-400 text-sm font-bold tracking-widest uppercase">System_Unit_Economics</h3>
-        <p class="text-xs text-cyan-600 uppercase mt-1">Sum of (L1 Gas + L2 Gas + Cross-Chain Fee) / Total Entries</p>
+        <p class="text-xs text-cyan-600 uppercase mt-1">Sum of (L1 + L2 + Cross-Chain) / <span class="text-fuchsia-400 font-bold mx-1" id="ui-denominator-text">0</span> Total Packed Entries</p>
       </div>
     </div>
     <div class="bg-black border border-emerald-900 px-4 py-2 flex flex-col items-end shrink-0">
@@ -337,7 +337,8 @@
       if (weiStr.includes('e') || weiStr.includes('E')) {
         return Number(weiVal) / 1e18;
       } else {
-        const wei = weiStr.startsWith('0x') ? BigInt(weiStr) : BigInt(weiStr.split('.')[0]); // ignore decimals if any
+        // Ignore possible injected decimals if casted to f64 accidentally by backend JSON
+        const wei = weiStr.startsWith('0x') ? BigInt(weiStr) : BigInt(weiStr.split('.')[0]);
         return Number(wei) / 1e18;
       }
     } catch (e) {
@@ -346,18 +347,23 @@
     }
   };
 
-  // Formats ETH float to a clean, readable string
+  // Formats ETH float. 自动将太小的 ETH 数值转为 Gwei 以节省 UI 空间
   const formatEthValue = (eth) => {
     if (eth === 0) return "0 ETH";
 
-    if (eth >= 1) {
-      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 3, minimumFractionDigits: 2 }).format(eth) + ' ETH';
-    } else if (eth >= 0.0001) {
-      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 5, minimumFractionDigits: 4 }).format(eth) + ' ETH';
-    } else if (eth >= 0.000001) {
-      return eth.toFixed(6) + ' ETH';
+    if (eth >= 0.001) {
+      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 2 }).format(eth) + ' ETH';
     } else {
-      return (eth * 1e9).toFixed(4) + ' Gwei';
+      // 当数值小于 0.001 ETH 时，转换为 Gwei
+      const gwei = eth * 1e9;
+      if (gwei >= 1000) {
+        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(gwei) + ' Gwei';
+      } else if (gwei >= 1) {
+        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(gwei) + ' Gwei';
+      } else {
+        // 如果极其微小，保留 4 位小数的 Gwei
+        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(gwei) + ' Gwei';
+      }
     }
   };
 
@@ -455,12 +461,9 @@
   }
 
   function updateDOM(data) {
-    // Safe updates for top-level metrics
-    const totalEntries = data.total || 0;
-    document.getElementById('metric-total-batches').innerText = formatNumber(totalEntries);
+    document.getElementById('metric-total-batches').innerText = formatNumber(data.total || 0);
     document.getElementById('metric-queued-requests').innerText = formatNumber(data.pending || 0);
 
-    // Retrieve and calculate costs
     const l1GasEth = getEthValue(data.costs?.l1_gas_fee);
     const l2GasEth = getEthValue(data.costs?.l2_gas_fee);
     const crossChainEth = getEthValue(data.costs?.cross_chain_fee);
@@ -469,10 +472,16 @@
     document.getElementById('metric-l2-gas').innerText = formatEthValue(l2GasEth);
     document.getElementById('metric-l1-fees').innerText = formatEthValue(crossChainEth);
 
-    // Calculate the grand total average fee per entry
+    let totalPackedEntries = 0;
+    if (data.latest_batch) {
+      // start_index 是从 1 开始的，例如 start 100, 长度 5，说明截止到了第 104 个请求
+      totalPackedEntries = data.latest_batch.start_index + data.latest_batch.count - 1;
+    }
+    document.getElementById('ui-denominator-text').innerText = formatNumber(totalPackedEntries);
+
     const totalCostEth = l1GasEth + l2GasEth + crossChainEth;
-    if (totalEntries > 0) {
-      const avgEth = totalCostEth / totalEntries;
+    if (totalPackedEntries > 0) {
+      const avgEth = totalCostEth / totalPackedEntries;
       document.getElementById('metric-avg-fee-total').innerText = formatEthValue(avgEth);
     } else {
       document.getElementById('metric-avg-fee-total').innerText = "0 ETH";
@@ -496,7 +505,7 @@
       updatePipelineUI(batch.status);
 
       // Update TX Links (L1 falls back to 1 for chain_id if undefined, L2 takes real l2_chain_id)
-      styleTxLink(document.getElementById('ui-l1-tx'), batch.l1_tx_hash, 1);
+      styleTxLink(document.getElementById('ui-l1-tx'), batch.l1_tx_hash, 11155111);
       styleTxLink(document.getElementById('ui-l2-tx'), batch.l2_tx_hash, batch.l2_chain_id);
 
     } else {

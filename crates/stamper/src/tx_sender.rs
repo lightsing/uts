@@ -130,7 +130,7 @@ impl<P: Provider + 'static> TxSender<P> {
                 let provider = self.eas.provider();
 
                 // binary search the timestamp to find the block number and tx hash
-                const MAX_GET_LOGS_BLOCK: u64 = 100; // getLogs
+                const MAX_GET_LOGS_BLOCK: u64 = 10; // getLogs
                 let block_number = provider.get_block_number().await?;
 
                 let mut low = 0;
