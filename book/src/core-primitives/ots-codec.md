@@ -25,27 +25,27 @@ The codec defines a set of opcodes that describe transformations on byte sequenc
 
 ### Data Opcodes
 
-| OpCode    | Tag    | Description                                 |
-| --------- | ------ | ------------------------------------------- |
-| `APPEND`  | `0xf0` | Concatenate immediate data after the input  |
+| OpCode | Tag | Description |
+|--------|-----|-------------|
+| `APPEND` | `0xf0` | Concatenate immediate data after the input |
 | `PREPEND` | `0xf1` | Concatenate immediate data before the input |
-| `REVERSE` | `0xf2` | Reverse the byte order                      |
-| `HEXLIFY` | `0xf3` | Convert to ASCII hex representation         |
+| `REVERSE` | `0xf2` | Reverse the byte order |
+| `HEXLIFY` | `0xf3` | Convert to ASCII hex representation |
 
 ### Digest Opcodes
 
-| OpCode      | Tag    | Output Size | Description     |
-| ----------- | ------ | ----------- | --------------- |
-| `SHA1`      | `0x02` | 20 bytes    | SHA-1 hash      |
-| `RIPEMD160` | `0x03` | 20 bytes    | RIPEMD-160 hash |
-| `SHA256`    | `0x08` | 32 bytes    | SHA-256 hash    |
-| `KECCAK256` | `0x67` | 32 bytes    | Keccak-256 hash |
+| OpCode | Tag | Output Size | Description |
+|--------|-----|-------------|-------------|
+| `SHA1` | `0x02` | 20 bytes | SHA-1 hash |
+| `RIPEMD160` | `0x03` | 20 bytes | RIPEMD-160 hash |
+| `SHA256` | `0x08` | 32 bytes | SHA-256 hash |
+| `KECCAK256` | `0x67` | 32 bytes | Keccak-256 hash |
 
 ### Control Opcodes
 
-| OpCode        | Tag    | Description                             |
-| ------------- | ------ | --------------------------------------- |
-| `FORK`        | `0xff` | Branch the proof into multiple paths    |
+| OpCode | Tag | Description |
+|--------|-----|-------------|
+| `FORK` | `0xff` | Branch the proof into multiple paths |
 | `ATTESTATION` | `0x00` | Terminal node — contains an attestation |
 
 ## The Timestamp Proof Tree
@@ -136,15 +136,14 @@ pub struct BitcoinAttestation {
 
 When a user submits a digest to a calendar server, the server computes a **commitment** — a deterministic value that binds the digest to the submission time and the server's identity:
 
-```
-commitment = keccak256(timestamp || digest || sig)
-```
+$$
+\text{commitment} = \text{keccak256}(\text{prepend}(ts) \;\|\; \text{append}(sig) \;\|\; \text{keccak256}(digest))
+$$
 
 Where:
-
-- `timestamp` is the Unix timestamp (seconds) when the server received the digest.
-- `sig` is the server's EIP-191 signature over `timestamp || digest`.
-- `digest` is the user's original hash.
+- $ts$ is the Unix timestamp (seconds) of receipt.
+- $sig$ is the server's EIP-191 signature over `timestamp || digest`.
+- $digest$ is the user's original hash.
 
 This commitment becomes the leaf in the Merkle tree.
 

@@ -29,10 +29,10 @@ Without a durable buffer between them, a crash between receiving a digest and bu
 
 The journal uses two RocksDB column families:
 
-| Column Family              | Key                            | Value             | Purpose                                   |
-| -------------------------- | ------------------------------ | ----------------- | ----------------------------------------- |
-| `CF_ENTRIES` (`"entries"`) | `write_index` (u64 big-endian) | Raw entry bytes   | Stores the actual digest commitments      |
-| `CF_META` (`"meta"`)       | `0x00` or `0x01`               | u64 little-endian | Stores `write_index` and `consumed_index` |
+| Column Family | Key | Value | Purpose |
+|--------------|-----|-------|---------|
+| `CF_ENTRIES` (`"entries"`) | `write_index` (u64 big-endian) | Raw entry bytes | Stores the actual digest commitments |
+| `CF_META` (`"meta"`) | `0x00` or `0x01` | u64 little-endian | Stores `write_index` and `consumed_index` |
 
 ## Writer / Reader Pattern
 
@@ -80,9 +80,9 @@ This back-pressure mechanism prevents unbounded memory growth and signals to cli
 
 On startup, the journal reads `write_index` and `consumed_index` from `CF_META` and validates the invariant:
 
-```
-consumed_index <= write_index
-```
+$$
+\text{consumed\_index} \leq \text{write\_index}
+$$
 
 If both are zero (fresh database), the journal starts empty. Otherwise, it resumes from where it left off — any entries between `consumed_index` and `write_index` are re-delivered to the reader.
 
