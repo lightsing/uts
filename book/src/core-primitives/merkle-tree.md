@@ -57,7 +57,7 @@ Input data is always padded to the nearest power of two. If you have 5 leaves, t
 To prevent **second-preimage attacks** (where an internal node could be confused with a leaf), internal nodes are hashed with a distinguishing prefix byte:
 
 $$
-\text{node}(i) = H(\texttt{0x01} \;\|\; \text{left}(i) \;\|\; \text{right}(i))
+\text{node}(i) = H(\mathtt{0x01} \;\|\; \text{left}(i) \;\|\; \text{right}(i))
 $$
 
 The constant `INNER_NODE_PREFIX = 0x01` is prepended before hashing children. Leaf nodes are stored as-is (they are already hashes of user data).
@@ -111,8 +111,8 @@ v_0 = \text{leaf}
 $$
 $$
 v_{i+1} = \begin{cases}
-H(\texttt{0x01} \;\|\; v_i \;\|\; s_i) & \text{if position}_i = \text{Left} \\
-H(\texttt{0x01} \;\|\; s_i \;\|\; v_i) & \text{if position}_i = \text{Right}
+H(\mathtt{0x01} \;\|\; v_i \;\|\; s_i) & \text{if position}_i = \text{Left} \\
+H(\mathtt{0x01} \;\|\; s_i \;\|\; v_i) & \text{if position}_i = \text{Right}
 \end{cases}
 $$
 
