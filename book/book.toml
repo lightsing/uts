@@ -1,8 +1,6 @@
 [book]
 authors = ["UTS Contributors"]
-base_url = "https://book.timestamps.now"
 language = "en"
-multilingual = false
 src = "src"
 title = "UTS: Universal Timestamps"
 
@@ -12,8 +10,8 @@ build-dir = "build"
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
 
-[preprocessor.katex]
-command = "mdbook-katex"
-
 [output.html]
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
+git-repository-icon = "fab-github"
+git-repository-url = "https://github.com/lightsing/uts"
+mathjax-support = true
