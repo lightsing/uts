@@ -46,21 +46,15 @@ If the user overpays, excess ETH is refunded to a configurable refund address (d
 
 The `FeeOracle` calculates the per-item fee for L1 anchoring based on current gas prices:
 
-```
-fee = estimatedCost * feeMultiplier / expectedBatchSize * PRECISION
-```
+\\[ \text{fee} = \text{estimatedCost} \times \text{feeMultiplier} \div \text{expectedBatchSize} \times \text{PRECISION} \\]
 
 Where the estimated batch cost is:
 
-```
-estimatedCost = l1BaseFee * l1Gas  + crossDomainGasPrice * crossDomainGas+ l2BaseFee * l2ExecutionGas
-```
+\\[ \text{estimatedCost} = \text{l1BaseFee} \times \text{l1Gas} + \text{crossDomainGasPrice} \times \text{crossDomainGas} + \text{l2BaseFee} \times \text{l2ExecutionGas} \\]
 
 And L2 execution gas scales with batch size:
 
-```
-l2ExecutionGas = l2ExecutionScalar * batchSize + l2ExecutionOverhead
-```
+\\[ \text{l2ExecutionGas} = \text{l2ExecutionScalar} \times \text{batchSize} + \text{l2ExecutionOverhead} \\]
 
 ### Default Parameters
 

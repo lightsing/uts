@@ -57,9 +57,7 @@ Input data is always padded to the nearest power of two. If you have 5 leaves, t
 
 To prevent **second-preimage attacks** (where an internal node could be confused with a leaf), internal nodes are hashed with a distinguishing prefix byte:
 
-```
-node(i) = H(0x01 || left(i) || right(i))
-```
+\\[ \text{node}(i) = H(\texttt{0x01} \\| \text{left}(i) \\| \text{right}(i)) \\]
 
 The constant `INNER_NODE_PREFIX = 0x01` is prepended before hashing children. Leaf nodes are stored as-is (they are already hashes of user data).
 
@@ -109,21 +107,18 @@ Each entry is a `(NodePosition, &Hash)` pair where `NodePosition` indicates whet
 
 To verify a proof, start with the leaf hash and iteratively combine it with each sibling:
 
-```
-v[0] = leaf
-```
+\\[ v_0 = \text{leaf} \\]
 
-```
-v[i+1] =
-H(0x01} || v_i || s_i), if position[i] = Left \\
-H(0x01} || s_i || v_i), if position[i] = Right
-```
+\\[
+v_{i+1} = \begin{cases}
+H(\texttt{0x01} \\| v_i \\| s_i) & \text{if } \text{position}[i] = \text{Left} \\\\
+H(\texttt{0x01} \\| s_i \\| v_i) & \text{if } \text{position}[i] = \text{Right}
+\end{cases}
+\\]
 
 The proof is valid if and only if the final value equals the known root:
 
-```
-v[n] == root
-```
+\\[ v_n = \text{root} \\]
 
 ## Serialization
 
