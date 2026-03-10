@@ -46,32 +46,32 @@ If the user overpays, excess ETH is refunded to a configurable refund address (d
 
 The `FeeOracle` calculates the per-item fee for L1 anchoring based on current gas prices:
 
-$$
-\text{fee} = \frac{\text{estimatedCost} \times \text{feeMultiplier}}{\text{expectedBatchSize} \times \text{PRECISION}}
-$$
+```
+fee = estimatedCost * feeMultiplier / expectedBatchSize * PRECISION
+```
 
 Where the estimated batch cost is:
 
-$$
-\text{estimatedCost} = \underbrace{l1BaseFee \times l1Gas}_{\text{L1 attestation cost}} + \underbrace{crossDomainGasPrice \times crossDomainGas}_{\text{cross-chain message cost}} + \underbrace{l2BaseFee \times l2ExecutionGas}_{\text{L2 finalization cost}}
-$$
+```
+estimatedCost = l1BaseFee * l1Gas  + crossDomainGasPrice * crossDomainGas+ l2BaseFee * l2ExecutionGas
+```
 
 And L2 execution gas scales with batch size:
 
-$$
-l2ExecutionGas = l2ExecutionScalar \times batchSize + l2ExecutionOverhead
-$$
+```
+l2ExecutionGas = l2ExecutionScalar * batchSize + l2ExecutionOverhead
+```
 
 ### Default Parameters
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `l1GasEstimated` | 350,000 | Gas to attest batch on L1 |
-| `crossDomainGasEstimated` | 110,000 | Gas for L1→L2 message |
-| `l2ExecutionScalar` | 3,500 | Per-item L2 gas |
-| `l2ExecutionOverhead` | 35,000 | Base L2 gas |
-| `expectedBatchSize` | 256 | Assumed items per batch |
-| `feeMultiplier` | 1.5 × 10¹⁸ | Safety margin (1.5×) |
+| Parameter                 | Default    | Description               |
+| ------------------------- | ---------- | ------------------------- |
+| `l1GasEstimated`          | 350,000    | Gas to attest batch on L1 |
+| `crossDomainGasEstimated` | 110,000    | Gas for L1→L2 message     |
+| `l2ExecutionScalar`       | 3,500      | Per-item L2 gas           |
+| `l2ExecutionOverhead`     | 35,000     | Base L2 gas               |
+| `expectedBatchSize`       | 256        | Assumed items per batch   |
+| `feeMultiplier`           | 1.5 × 10¹⁸ | Safety margin (1.5×)      |
 
 The fee oracle reads `l1BaseFee` from Scroll's L1 gas price oracle predeployed at `0x5300000000000000000000000000000000000002`.
 
@@ -105,6 +105,7 @@ function notifyAnchored(
 ```
 
 Guards:
+
 - `msg.sender` must be the L2 Scroll Messenger.
 - `xDomainMessageSender` must be the L1 Gateway.
 - `startIndex` must equal `confirmedIndex` (sequential batches only).

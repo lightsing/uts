@@ -54,6 +54,7 @@ The server signs a binding message using EIP-191 (Ethereum personal sign):
 ```
 
 Where:
+
 - `timestamp` is the Unix time (seconds) of receipt.
 - `digest` is the user's original hash.
 
@@ -63,9 +64,9 @@ The signature is encoded in ERC-2098 compact format (64 bytes instead of 65), pr
 
 The commitment is the value that becomes a leaf in the Merkle tree:
 
-$$
-\text{commitment} = \text{keccak256}\Big(\text{timestamp} \;\|\; \text{digest} \;\|\; \text{signature} \;\|\; \text{keccak256}(\text{digest})\Big)
-$$
+```
+commitment = keccak256(timestamp || digest || signature)
+```
 
 More precisely, the codec builds a `Timestamp` tree:
 
@@ -92,6 +93,7 @@ If the journal is full or in a fatal state, the server returns `503 Service Unav
 ### Response
 
 The server returns:
+
 - The encoded OTS bytes containing the pending timestamp tree.
 - The 32-byte commitment for later retrieval via `GET /digest/{commitment}`.
 
