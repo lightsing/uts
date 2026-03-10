@@ -44,6 +44,7 @@ graph TB
 ```
 
 Navigation is pure arithmetic:
+
 - **Parent** of node `i`: `i >> 1` (right shift)
 - **Sibling** of node `i`: `i ^ 1` (XOR with 1)
 - **Children** of node `i`: `2i` (left) and `2i + 1` (right)
@@ -57,7 +58,7 @@ Input data is always padded to the nearest power of two. If you have 5 leaves, t
 To prevent **second-preimage attacks** (where an internal node could be confused with a leaf), internal nodes are hashed with a distinguishing prefix byte:
 
 $$
-\text{node}(i) = H(\texttt{0x01} \;\|\; \text{left}(i) \;\|\; \text{right}(i))
+\text{node}(i) = H(\mathtt{0x01} || \text{left}(i) || \text{right}(i))
 $$
 
 The constant `INNER_NODE_PREFIX = 0x01` is prepended before hashing children. Leaf nodes are stored as-is (they are already hashes of user data).
@@ -95,10 +96,12 @@ graph TB
 ```
 
 The proof for `leaf₀` consists of two entries:
+
 1. `(Left, leaf₁)` — sibling is to the right, so append it.
 2. `(Left, H(leaf₂ ∥ leaf₃))` — sibling is to the right, so append it.
 
 Each entry is a `(NodePosition, &Hash)` pair where `NodePosition` indicates whether the target is the left or right child:
+
 - **Left** → sibling is on the right → `H(0x01 ∥ target ∥ sibling)`
 - **Right** → sibling is on the left → `H(0x01 ∥ sibling ∥ target)`
 
@@ -109,10 +112,11 @@ To verify a proof, start with the leaf hash and iteratively combine it with each
 $$
 v_0 = \text{leaf}
 $$
+
 $$
 v_{i+1} = \begin{cases}
-H(\texttt{0x01} \;\|\; v_i \;\|\; s_i) & \text{if position}_i = \text{Left} \\
-H(\texttt{0x01} \;\|\; s_i \;\|\; v_i) & \text{if position}_i = \text{Right}
+H(\mathtt{0x01} || v_i || s_i) & \text{if position}_i = \text{Left} \\\\
+H(\mathtt{0x01} || s_i || v_i) & \text{if position}_i = \text{Right}
 \end{cases}
 $$
 

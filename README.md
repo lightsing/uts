@@ -2,6 +2,22 @@
 
 Universal Timestamps is a super set of [opentimestamps](https://opentimestamps.org/).
 
+UTS batches user-submitted digests into Merkle trees and anchors the roots on-chain
+via [EAS](https://attest.org/) attestations, providing trustless, verifiable
+timestamps without relying on a single trusted calendar server.
+
+## Quick Start
+
+```bash
+cargo install uts-cli --version 0.1.0-alpha.0 --locked
+```
+
+## Links
+
+- **Book**: <https://book.timestamps.now/>
+- **Calendar**: <https://lgm1.calendar.test.timestamps.now/>
+- **Relayer**: <https://lich.relayer.test.timestamps.now/>
+
 ## Development
 
 ### Pre-requisites
