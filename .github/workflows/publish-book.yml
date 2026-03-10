@@ -32,4 +32,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: book
           preCommands: mdbook build
-          command: pages deploy ./build --project-name=uts-book --env production
+          command: pages deploy ./build --project-name=uts-book --env production --branch main
