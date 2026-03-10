@@ -15,7 +15,7 @@ The `DetachedTimestamp` struct wraps a `DigestHeader` and a `Timestamp` tree:
 ```rust
 pub struct DigestHeader {
     kind: DigestOp,       // Which hash algorithm (SHA256, Keccak256, etc.)
-    digest: [u8; 32],     // The original hash value (padded to 32 bytes)
+    digest: [u8; 32],     // The original hash value (first N bytes used)
 }
 ```
 
