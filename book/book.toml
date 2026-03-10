@@ -1,9 +1,10 @@
 [book]
-title = "UTS: Universal Timestamps"
 authors = ["UTS Contributors"]
+base_url = "https://book.timestamps.now"
 language = "en"
 multilingual = false
 src = "src"
+title = "UTS: Universal Timestamps"
 
 [build]
 build-dir = "build"
