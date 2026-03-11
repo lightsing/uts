@@ -44,7 +44,11 @@ async def test_get_block_header() -> None:
     }
 
     mock_response = MagicMock()
-    mock_response.json.return_value = {"result": expected_response, "error": None, "id": 1}
+    mock_response.json.return_value = {
+        "result": expected_response,
+        "error": None,
+        "id": 1,
+    }
     mock_response.status_code = 200
 
     with patch.object(rpc._client, "post", new_callable=AsyncMock) as mock_post:

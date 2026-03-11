@@ -6,7 +6,12 @@ import hashlib
 import pytest
 
 from uts_sdk._codec.encoder import Encoder
-from uts_sdk._codec.constants import MAGIC_BYTES, BITCOIN_TAG, PENDING_TAG, EAS_ATTEST_TAG
+from uts_sdk._codec.constants import (
+    MAGIC_BYTES,
+    BITCOIN_TAG,
+    PENDING_TAG,
+    EAS_ATTEST_TAG,
+)
 from uts_sdk._types import (
     AppendStep,
     AttestationStep,

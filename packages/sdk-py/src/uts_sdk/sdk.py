@@ -12,7 +12,12 @@ from yarl import URL
 
 from uts_sdk._codec import Decoder, Encoder
 from uts_sdk._crypto import UnorderedMerkleTree
-from uts_sdk._ethereum import EAS_SCHEMA_ID, NO_EXPIRATION, read_eas_attestation, read_eas_timestamp
+from uts_sdk._ethereum import (
+    EAS_SCHEMA_ID,
+    NO_EXPIRATION,
+    read_eas_attestation,
+    read_eas_timestamp,
+)
 from uts_sdk._rpc import BitcoinRPC
 from uts_sdk._types import (
     AppendStep,
@@ -87,7 +92,9 @@ class SDK:
         nonce_size: int = 32,
         hash_algorithm: Literal["sha256", "keccak256"] = "keccak256",
     ) -> None:
-        self._calendars = [URL(str(c).rstrip("/") + "/") for c in (calendars or DEFAULT_CALENDARS)]
+        self._calendars = [
+            URL(str(c).rstrip("/") + "/") for c in (calendars or DEFAULT_CALENDARS)
+        ]
         self._btc_rpc = BitcoinRPC(btc_rpc_url)
         self._eth_rpc_urls = dict(eth_rpc_urls) if eth_rpc_urls else {}
         self._timeout = timeout
@@ -136,7 +143,9 @@ class SDK:
         import os
 
         calendars = os.environ.get("UTS_CALENDARS")
-        calendars_list = [c.strip() for c in calendars.split(",")] if calendars else None
+        calendars_list = (
+            [c.strip() for c in calendars.split(",")] if calendars else None
+        )
 
         eth_rpc_urls: dict[int, str] = {}
         for key, value in os.environ.items():
@@ -155,7 +164,9 @@ class SDK:
 
         return cls(
             calendars=calendars_list,
-            btc_rpc_url=os.environ.get("UTS_BTC_RPC_URL", "https://bitcoin-rpc.publicnode.com"),
+            btc_rpc_url=os.environ.get(
+                "UTS_BTC_RPC_URL", "https://bitcoin-rpc.publicnode.com"
+            ),
             eth_rpc_urls=eth_rpc_urls or None,
             timeout=float(timeout_str),
             quorum=int(quorum_str) if quorum_str else None,
@@ -171,7 +182,11 @@ class SDK:
         import httpx
 
         digest_headers = [
-            d if isinstance(d, DigestHeader) else DigestHeader(kind=DigestOp.SHA256, digest=d)
+            (
+                d
+                if isinstance(d, DigestHeader)
+                else DigestHeader(kind=DigestOp.SHA256, digest=d)
+            )
             for d in digests
         ]
 
@@ -179,7 +194,9 @@ class SDK:
             await on_progress(StampPhase.QUEUED, 0.0)
 
         nonces = [secrets.token_bytes(self._nonce_size) for _ in digest_headers]
-        nonce_digests = [self._hash(h.digest + n) for h, n in zip(digest_headers, nonces)]
+        nonce_digests = [
+            self._hash(h.digest + n) for h, n in zip(digest_headers, nonces)
+        ]
 
         if on_progress:
             await on_progress(StampPhase.BATCHING, 0.5)
@@ -205,11 +222,15 @@ class SDK:
                 pass
             return None
 
-        results = await asyncio.gather(*[submit_to_calendar(c) for c in self._calendars])
+        results = await asyncio.gather(
+            *[submit_to_calendar(c) for c in self._calendars]
+        )
         successful = [r for r in results if r is not None]
 
         if len(successful) < self._quorum:
-            raise RemoteError(f"Only {len(successful)} calendar responses, need {self._quorum}")
+            raise RemoteError(
+                f"Only {len(successful)} calendar responses, need {self._quorum}"
+            )
 
         merged: Timestamp
         if len(successful) == 1:
@@ -284,7 +305,9 @@ class SDK:
         except Exception as e:
             return UpgradeResult(status=UpgradeStatus.FAILED, original=pending, error=e)
 
-    async def _verify_timestamp(self, stamp: DetachedTimestamp) -> list[AttestationStatus]:
+    async def _verify_timestamp(
+        self, stamp: DetachedTimestamp
+    ) -> list[AttestationStatus]:
         current = stamp.header.digest
         statuses: list[AttestationStatus] = []
 
@@ -315,10 +338,14 @@ class SDK:
             return AttestationStatus(
                 attestation=attestation,
                 status=AttestationStatusKind.UNKNOWN,
-                error=VerifyError(ErrorCode.UNSUPPORTED_ATTESTATION, "Unknown attestation type"),
+                error=VerifyError(
+                    ErrorCode.UNSUPPORTED_ATTESTATION, "Unknown attestation type"
+                ),
             )
 
-    async def _verify_bitcoin(self, digest: bytes, att: BitcoinAttestation) -> AttestationStatus:
+    async def _verify_bitcoin(
+        self, digest: bytes, att: BitcoinAttestation
+    ) -> AttestationStatus:
         try:
             block_hash = await self._btc_rpc.get_block_hash(att.height)
             header = await self._btc_rpc.get_block_header(block_hash)
@@ -358,7 +385,9 @@ class SDK:
             return AttestationStatus(
                 attestation=att,
                 status=AttestationStatusKind.UNKNOWN,
-                error=VerifyError(ErrorCode.GENERAL_ERROR, f"No RPC URL for chain {att.chain_id}"),
+                error=VerifyError(
+                    ErrorCode.GENERAL_ERROR, f"No RPC URL for chain {att.chain_id}"
+                ),
             )
 
         eas_address = DEFAULT_EAS_ADDRESSES.get(att.chain_id)
@@ -380,7 +409,9 @@ class SDK:
                     return AttestationStatus(
                         attestation=att,
                         status=AttestationStatusKind.INVALID,
-                        error=VerifyError(ErrorCode.ATTESTATION_MISMATCH, "No EAS timestamp found"),
+                        error=VerifyError(
+                            ErrorCode.ATTESTATION_MISMATCH, "No EAS timestamp found"
+                        ),
                     )
                 return AttestationStatus(
                     attestation=att,
@@ -394,21 +425,27 @@ class SDK:
                     return AttestationStatus(
                         attestation=att,
                         status=AttestationStatusKind.INVALID,
-                        error=VerifyError(ErrorCode.ATTESTATION_MISMATCH, "Schema mismatch"),
+                        error=VerifyError(
+                            ErrorCode.ATTESTATION_MISMATCH, "Schema mismatch"
+                        ),
                     )
 
                 if on_chain.expiration_time != NO_EXPIRATION:
                     return AttestationStatus(
                         attestation=att,
                         status=AttestationStatusKind.INVALID,
-                        error=VerifyError(ErrorCode.ATTESTATION_MISMATCH, "Has expiration"),
+                        error=VerifyError(
+                            ErrorCode.ATTESTATION_MISMATCH, "Has expiration"
+                        ),
                     )
 
                 if on_chain.revocable:
                     return AttestationStatus(
                         attestation=att,
                         status=AttestationStatusKind.INVALID,
-                        error=VerifyError(ErrorCode.ATTESTATION_MISMATCH, "Is revocable"),
+                        error=VerifyError(
+                            ErrorCode.ATTESTATION_MISMATCH, "Is revocable"
+                        ),
                     )
 
                 return AttestationStatus(
@@ -423,7 +460,9 @@ class SDK:
                 error=VerifyError(ErrorCode.REMOTE_ERROR, str(e)),
             )
 
-    def _aggregate_result(self, statuses: list[AttestationStatus]) -> VerificationResult:
+    def _aggregate_result(
+        self, statuses: list[AttestationStatus]
+    ) -> VerificationResult:
         counts = {k: 0 for k in AttestationStatusKind}
         for s in statuses:
             counts[s.status] += 1

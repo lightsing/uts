@@ -92,7 +92,9 @@ class UnorderedMerkleTree:
             nodes = next_level
             level_size = len(nodes)
 
-        return cls(leaf_tuple, [hash_func(leaf) for leaf in leaves], nodes[0], hash_func)
+        return cls(
+            leaf_tuple, [hash_func(leaf) for leaf in leaves], nodes[0], hash_func
+        )
 
     @property
     def root(self) -> bytes:

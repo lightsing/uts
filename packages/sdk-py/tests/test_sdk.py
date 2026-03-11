@@ -87,7 +87,9 @@ async def test_sdk_upgrade_pending() -> None:
 
 
 def test_sdk_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("UTS_CALENDARS", "https://cal1.example.com,https://cal2.example.com")
+    monkeypatch.setenv(
+        "UTS_CALENDARS", "https://cal1.example.com,https://cal2.example.com"
+    )
     monkeypatch.setenv("UTS_TIMEOUT", "30.0")
     monkeypatch.setenv("UTS_QUORUM", "2")
     monkeypatch.setenv("UTS_HASH_ALGORITHM", "sha256")

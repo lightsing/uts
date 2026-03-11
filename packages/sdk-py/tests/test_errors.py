@@ -35,7 +35,9 @@ class TestUTSError:
 
     def test_error_with_context(self) -> None:
         err = UTSError(
-            ErrorCode.REMOTE_ERROR, "remote error", context={"url": "https://example.com"}
+            ErrorCode.REMOTE_ERROR,
+            "remote error",
+            context={"url": "https://example.com"},
         )
         assert err.context["url"] == "https://example.com"
 

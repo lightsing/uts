@@ -4,7 +4,13 @@
 from __future__ import annotations
 
 from uts_sdk._codec import Decoder, Encoder
-from uts_sdk._crypto import MerkleProof, SiblingNode, UnorderedMerkleTree, keccak256, sha256
+from uts_sdk._crypto import (
+    MerkleProof,
+    SiblingNode,
+    UnorderedMerkleTree,
+    keccak256,
+    sha256,
+)
 from uts_sdk._types import (
     AppendStep,
     Attestation,

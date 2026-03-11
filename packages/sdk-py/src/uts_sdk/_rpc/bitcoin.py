@@ -78,7 +78,10 @@ class BitcoinRPC:
         if response.status_code >= 400:
             raise RemoteError(
                 f"Bitcoin RPC HTTP error: {response.status_code}",
-                context={"status_code": response.status_code, "response": response_data},
+                context={
+                    "status_code": response.status_code,
+                    "response": response_data,
+                },
             )
 
         if response_data.get("error") is not None:
