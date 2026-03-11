@@ -27,7 +27,7 @@ fn benchmark(c: &mut Criterion) {
                     let out = submit_digest_inner(
                         input,
                         &signer,
-                        black_box("https://lgm1.test.timestamps.now/"),
+                        black_box("https://lgm1.calendar.test.timestamps.now/"),
                     );
                     black_box(out)
                 },

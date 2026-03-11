@@ -21,7 +21,7 @@ import (
 )
 
 var DefaultCalendars = []string{
-	"https://lgm1.test.timestamps.now/",
+	"https://lgm1.calendar.test.timestamps.now/",
 }
 
 const (

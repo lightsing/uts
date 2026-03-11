@@ -40,7 +40,7 @@ def test_sdk_options() -> None:
 
 def test_sdk_default_calendars() -> None:
     sdk = SDK()
-    assert "https://lgm1.test.timestamps.now/" in sdk.calendars
+    assert "https://lgm1.calendar.test.timestamps.now/" in sdk.calendars
 
 
 def test_sdk_invalid_hash_algorithm() -> None:
@@ -200,7 +200,7 @@ def test_sdk_from_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 
     sdk = SDK.from_env()
 
-    assert "https://lgm1.test.timestamps.now/" in sdk.calendars
+    assert "https://lgm1.calendar.test.timestamps.now/" in sdk.calendars
     assert sdk.timeout == 10.0
 
 

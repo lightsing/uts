@@ -31,7 +31,7 @@ func main() {
     ctx := context.Background()
 
     sdk := uts.NewSDK(
-        uts.WithCalendars("https://lgm1.test.timestamps.now/"),
+        uts.WithCalendars("https://lgm1.calendar.test.timestamps.now/"),
     )
 
     data := []byte("Hello, UTS!")

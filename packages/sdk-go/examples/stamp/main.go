@@ -57,7 +57,7 @@ func main() {
 	fmt.Printf("Hash (keccak256): %s\n", hex.EncodeToString(hash[:]))
 
 	sdk := uts.NewSDK(
-		uts.WithCalendars("https://lgm1.test.timestamps.now/"),
+		uts.WithCalendars("https://lgm1.calendar.test.timestamps.now/"),
 		uts.WithTimeout(30*time.Second),
 	)
 

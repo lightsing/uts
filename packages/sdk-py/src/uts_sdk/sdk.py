@@ -55,7 +55,7 @@ from uts_sdk._types.timestamp_steps import HexlifyStep, ReverseStep
 from uts_sdk.errors import DecodeError, ErrorCode, RemoteError, VerifyError
 
 DEFAULT_CALENDARS = [
-    "https://lgm1.test.timestamps.now/",
+    "https://lgm1.calendar.test.timestamps.now/",
 ]
 
 DEFAULT_EAS_ADDRESSES: dict[int, Address] = {

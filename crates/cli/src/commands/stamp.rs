@@ -16,7 +16,7 @@ use uts_core::{
 };
 
 static DEFAULT_CALENDARS: LazyLock<Vec<Url>> =
-    LazyLock::new(|| vec![Url::parse("https://lgm1.test.timestamps.now/").unwrap()]);
+    LazyLock::new(|| vec![Url::parse("https://lgm1.calendar.test.timestamps.now/").unwrap()]);
 
 #[derive(Debug, Args)]
 pub struct Stamp {
