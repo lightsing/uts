@@ -101,9 +101,6 @@ export class UnorderedMerkleTree<T extends CHash> {
       }
     }
 
-    // Sort leaves unstable (lexicographical)
-    leavesBlock.sort(compareBytes)
-
     // Copy back to tree nodes
     for (let i = 0; i < len; i++) {
       nodes[len + i] = leavesBlock[i]
