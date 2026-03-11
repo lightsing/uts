@@ -295,10 +295,83 @@ class UnorderedMerkleTree:
     def from_bytes(cls, data: bytes, hash_func: HashFunction) -> Self: ...
 ```
 
-## Main SDK Class
+## RPC Clients
+
+### Bitcoin RPC (`_rpc/bitcoin.py`)
 
 ```python
+@dataclass(frozen=True, slots=True)
+class BitcoinBlockHeader:
+    hash: str
+    confirmations: int
+    height: int
+    merkleroot: str
+    time: int
+    # ... other fields from Bitcoin RPC
+
+class BitcoinRPC:
+    """Async client for Bitcoin JSON-RPC."""
+
+    def __init__(self, url: str = "https://bitcoin-rpc.publicnode.com") -> None: ...
+
+    async def get_block_hash(self, height: int) -> str:
+        """Get block hash by height."""
+
+    async def get_block_header(self, block_hash: str) -> BitcoinBlockHeader:
+        """Get block header by hash."""
+
+    async def call(self, method: str, params: list = []) -> Any:
+        """Low-level RPC call."""
+```
+
+### EAS Client (`_ethereum/eas.py`)
+
+```python
+NO_EXPIRATION = 0
+
+@dataclass(frozen=True, slots=True)
+class OnChainAttestation:
+    uid: str  # hex
+    schema: str  # hex
+    time: int
+    expiration_time: int
+    revocation_time: int
+    ref_uid: str
+    recipient: str
+    attester: str
+    revocable: bool
+    data: str  # hex
+
+async def read_eas_timestamp(
+    web3: AsyncWeb3,
+    eas_address: str,
+    data: bytes,
+) -> int:
+    """Read timestamp from EAS contract using getTimestamp(data)."""
+
+async def read_eas_attestation(
+    web3: AsyncWeb3,
+    eas_address: str,
+    uid: bytes,
+) -> OnChainAttestation:
+    """Read attestation from EAS contract using getAttestation(uid)."""
+
+def decode_content_hash(data: str) -> str:
+    """Decode bytes32 contentHash from attestation data."""
+```
+
+## Main SDK Class
+
+````python
 class SDK:
+    """Universal Timestamps SDK for Python.
+
+    Usage:
+        async with SDK() as sdk:
+            result = await sdk.stamp(digests)
+            status = await sdk.verify(result[0])
+    """
+
     def __init__(
         self,
         *,
@@ -309,39 +382,96 @@ class SDK:
         quorum: int | None = None,
         nonce_size: int = 32,
         hash_algorithm: Literal["sha256", "keccak256"] = "keccak256",
-    ) -> None: ...
+    ) -> None:
+        """
+        Args:
+            calendars: List of calendar server URLs. Default: ["https://lgm1.test.timestamps.now/"]
+            btc_rpc_url: Bitcoin RPC endpoint for verifying Bitcoin attestations.
+            eth_rpc_urls: Mapping of chain_id -> RPC URL for EVM chains.
+            timeout: HTTP timeout in seconds for calendar/RPC calls.
+            quorum: Minimum number of calendar responses required. Default: ceil(len(calendars) * 0.66)
+            nonce_size: Random bytes appended to digests before stamping.
+            hash_algorithm: Hash algorithm for internal Merkle tree. "sha256" or "keccak256".
+        """
 
     async def stamp(
         self,
         *digests: DigestHeader | bytes,
         on_progress: Callable[[StampPhase, float], Awaitable[None]] | None = None,
-    ) -> list[DetachedTimestamp]: ...
+    ) -> list[DetachedTimestamp]:
+        """
+        Submit digests to calendar servers for timestamping.
+
+        Args:
+            digests: Digests to stamp. Can be DigestHeader or raw bytes (assumes SHA256).
+            on_progress: Callback for progress updates. Receives (phase, progress).
+                         progress is 0.0-1.0 for the current phase.
+
+        Returns:
+            List of DetachedTimestamp, one per input digest.
+
+        Raises:
+            RemoteError: If quorum not met.
+        """
 
     async def upgrade(
         self,
         stamp: DetachedTimestamp,
         *,
         keep_pending: bool = False,
-    ) -> list[UpgradeResult]: ...
+    ) -> list[UpgradeResult]:
+        """
+        Upgrade pending attestations to confirmed ones.
+
+        Args:
+            stamp: The detached timestamp to upgrade.
+            keep_pending: If True, keeps original pending attestation alongside upgraded.
+                          If False (default), replaces pending with upgraded on success.
+
+        Returns:
+            List of UpgradeResult, one per pending attestation found.
+        """
 
     async def verify(
         self,
         stamp: DetachedTimestamp,
-    ) -> VerificationResult: ...
+    ) -> VerificationResult:
+        """
+        Verify a detached timestamp against on-chain data.
+
+        Returns:
+            VerificationResult with overall status and per-attestation details.
+        """
 
     @classmethod
-    def from_env(cls) -> SDK: ...
+    def from_env(cls) -> SDK:
+        """
+        Create SDK from environment variables.
+
+        Environment variables:
+            UTS_CALENDARS: Comma-separated list of calendar URLs
+            UTS_BTC_RPC_URL: Bitcoin RPC URL
+            UTS_ETH_RPC_URL_<CHAIN_ID>: Ethereum RPC URL for chain (e.g., UTS_ETH_RPC_URL_1)
+            UTS_TIMEOUT: Timeout in seconds
+            UTS_QUORUM: Minimum calendar responses
+            UTS_HASH_ALGORITHM: "sha256" or "keccak256"
+        """
 
 @dataclass(frozen=True, slots=True)
 class VerificationResult:
+    """Result of verifying a detached timestamp."""
     status: VerifyStatus
     attestations: list[AttestationStatus]
 
     @property
-    def is_valid(self) -> bool: ...
+    def is_valid(self) -> bool:
+        """True if status is VALID or PARTIAL_VALID (at least one valid attestation)."""
+        return self.status in (VerifyStatus.VALID, VerifyStatus.PARTIAL_VALID)
+
     @property
-    def is_pending(self) -> bool: ...
-```
+    def is_pending(self) -> bool:
+        """True if status is PENDING (no valid attestations, but some pending)."""
+        return self.status == VerifyStatus.PENDING
 
 ## Error Handling
 
@@ -374,7 +504,7 @@ class EncodeError(UTSError): ...
 class DecodeError(UTSError): ...
 class RemoteError(UTSError): ...
 class VerifyError(UTSError): ...
-```
+````
 
 ## Dependencies
 
@@ -400,8 +530,19 @@ dev = [
 
 1. **Unit tests**: Each module tested in isolation
 2. **Codec round-trip**: Encode → decode → compare for all types
-3. **Integration tests**: Stamp/verify against test calendar
-4. **Fixture tests**: Decode existing `.ots` files from TS SDK fixtures
+3. **Integration tests**: Stamp/verify against test calendar at `https://lgm1.test.timestamps.now/`
+4. **Fixture tests**: Decode existing `.ots` files from `packages/sdk-ts/test/fixtures/`
+5. **Mocked RPC tests**: Bitcoin and Ethereum RPC calls mocked with `respx` (httpx) and `aioresponses`
+
+## Reference Implementation
+
+The TypeScript SDK at `packages/sdk-ts/` is the reference implementation. Behavior should match exactly unless noted. Key files:
+
+- `src/sdk.ts` - Main SDK class with stamp, verify, upgrade
+- `src/codec/encode.ts`, `src/codec/decode.ts` - Binary codec
+- `src/bmt.ts` - Merkle tree implementation
+- `src/rpc/btc.ts` - Bitcoin RPC client
+- `src/eas.ts` - EAS contract interactions
 
 ## Migration from TypeScript SDK
 
