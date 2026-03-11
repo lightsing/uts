@@ -136,7 +136,8 @@ func (e *Encoder) WriteEASTimestamped(att *types.EASTimestamped) *Encoder {
 }
 
 func (e *Encoder) WriteUnknownAttestation(att *types.UnknownAttestation) *Encoder {
-	e.WriteBytes(att.Tag[:])
+	tag := att.Tag()
+	e.WriteBytes(tag[:])
 	e.WriteLengthPrefixed(att.Data)
 	return e
 }
