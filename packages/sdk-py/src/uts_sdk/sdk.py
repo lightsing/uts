@@ -6,27 +6,20 @@ from __future__ import annotations
 import hashlib
 import secrets
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping, Sequence
+from typing import Any, Awaitable, Callable, Mapping, Sequence
 
 from yarl import URL
 
 from uts_sdk._codec import Decoder, Encoder
 from uts_sdk._crypto import UnorderedMerkleTree
-from uts_sdk._ethereum import (
-    EAS_SCHEMA_ID,
-    NO_EXPIRATION,
-    decode_content_hash,
-    read_eas_attestation,
-    read_eas_timestamp,
-)
+from uts_sdk._ethereum import EAS_SCHEMA_ID, NO_EXPIRATION, read_eas_attestation, read_eas_timestamp
 from uts_sdk._rpc import BitcoinRPC
 from uts_sdk._types import (
     AppendStep,
     Attestation,
-    AttestationStep,
     AttestationStatus,
-    AttestationStatusValid,
-    AttestationStatusError,
+    AttestationStatusKind,
+    AttestationStep,
     BitcoinAttestation,
     DetachedTimestamp,
     DigestHeader,
@@ -34,22 +27,17 @@ from uts_sdk._types import (
     EASTimestamped,
     EASAttestation,
     ForkStep,
+    NodePosition,
     OpCode,
     PendingAttestation,
     PrependStep,
     StampPhase,
     Timestamp,
     UpgradeResult,
-    UpgradeResultFailed,
-    UpgradeResultPending,
-    UpgradeResultUpgraded,
     UpgradeStatus,
     VerifyStatus,
 )
 from uts_sdk.errors import ErrorCode, RemoteError, VerifyError
-
-if TYPE_CHECKING:
-    pass
 
 DEFAULT_CALENDARS = [
     "https://lgm1.test.timestamps.now/",
@@ -180,9 +168,7 @@ class SDK:
         successful = [r for r in results if r is not None]
 
         if len(successful) < self._quorum:
-            raise RemoteError(
-                f"Only {len(successful)} calendar responses, need {self._quorum}",
-            )
+            raise RemoteError(f"Only {len(successful)} calendar responses, need {self._quorum}")
 
         merged: Timestamp
         if len(successful) == 1:
@@ -195,22 +181,17 @@ class SDK:
 
         result_timestamps: list[DetachedTimestamp] = []
         for i, header in enumerate(digest_headers):
-            steps: list[Any] = [
-                AppendStep(data=nonces[i]),
-            ]
+            steps: list[Any] = [AppendStep(data=nonces[i])]
 
             proof = tree.proof_for(nonce_digests[i])
             if proof:
                 for node in proof:
-                    from uts_sdk._types.status import NodePosition
-
                     if node.position == NodePosition.LEFT:
                         steps.append(PrependStep(data=node.sibling))
                     else:
                         steps.append(AppendStep(data=node.sibling))
 
             steps.extend(merged)
-
             result_timestamps.append(DetachedTimestamp(header=header, timestamp=steps))
 
         if on_progress:
@@ -221,6 +202,46 @@ class SDK:
     async def verify(self, stamp: DetachedTimestamp) -> VerificationResult:
         statuses = await self._verify_timestamp(stamp)
         return self._aggregate_result(statuses)
+
+    async def upgrade(
+        self,
+        stamp: DetachedTimestamp,
+        *,
+        keep_pending: bool = False,
+    ) -> list[UpgradeResult]:
+        results: list[UpgradeResult] = []
+        for step in stamp.timestamp:
+            if isinstance(step, AttestationStep) and isinstance(
+                step.attestation, PendingAttestation
+            ):
+                result = await self._upgrade_pending(step.attestation)
+                results.append(result)
+        return results
+
+    async def _upgrade_pending(self, pending: PendingAttestation) -> UpgradeResult:
+        import httpx
+
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                response = await client.get(
+                    str(pending.url).rstrip("/") + "/timestamp",
+                    headers={"Accept": "application/vnd.opentimestamps.v1"},
+                )
+                if response.status_code == 202:
+                    return UpgradeResult(status=UpgradeStatus.PENDING, original=pending)
+                if response.is_success:
+                    decoder = Decoder(response.content)
+                    ts = decoder.read_timestamp()
+                    return UpgradeResult(
+                        status=UpgradeStatus.UPGRADED, original=pending, upgraded=ts
+                    )
+                return UpgradeResult(
+                    status=UpgradeStatus.FAILED,
+                    original=pending,
+                    error=RemoteError(f"Calendar returned {response.status_code}"),
+                )
+        except Exception as e:
+            return UpgradeResult(status=UpgradeStatus.FAILED, original=pending, error=e)
 
     async def _verify_timestamp(self, stamp: DetachedTimestamp) -> list[AttestationStatus]:
         current = stamp.header.digest
@@ -241,18 +262,18 @@ class SDK:
         self, digest: bytes, attestation: Attestation
     ) -> AttestationStatus:
         if isinstance(attestation, PendingAttestation):
-            return AttestationStatusValid(
+            return AttestationStatus(
                 attestation=attestation,
-                status="PENDING",
+                status=AttestationStatusKind.PENDING,
             )
         elif isinstance(attestation, BitcoinAttestation):
             return await self._verify_bitcoin(digest, attestation)
         elif isinstance(attestation, (EASAttestation, EASTimestamped)):
             return await self._verify_eas(digest, attestation)
         else:
-            return AttestationStatusError(
+            return AttestationStatus(
                 attestation=attestation,
-                status="UNKNOWN",
+                status=AttestationStatusKind.UNKNOWN,
                 error=VerifyError(ErrorCode.UNSUPPORTED_ATTESTATION, "Unknown attestation type"),
             )
 
@@ -265,24 +286,24 @@ class SDK:
             merkleroot_bytes = bytes.fromhex(header.merkleroot)
 
             if digest_reversed != merkleroot_bytes:
-                return AttestationStatusError(
+                return AttestationStatus(
                     attestation=att,
-                    status="INVALID",
+                    status=AttestationStatusKind.INVALID,
                     error=VerifyError(
                         ErrorCode.ATTESTATION_MISMATCH,
                         f"Merkle root mismatch at height {att.height}",
                     ),
                 )
 
-            return AttestationStatusValid(
+            return AttestationStatus(
                 attestation=att,
-                status="VALID",
+                status=AttestationStatusKind.VALID,
                 additional_info={"header": header},
             )
         except Exception as e:
-            return AttestationStatusError(
+            return AttestationStatus(
                 attestation=att,
-                status="UNKNOWN",
+                status=AttestationStatusKind.UNKNOWN,
                 error=VerifyError(ErrorCode.REMOTE_ERROR, str(e)),
             )
 
@@ -293,23 +314,19 @@ class SDK:
 
         rpc_url = self._eth_rpc_urls.get(att.chain_id)
         if not rpc_url:
-            return AttestationStatusError(
+            return AttestationStatus(
                 attestation=att,
-                status="UNKNOWN",
-                error=VerifyError(
-                    ErrorCode.GENERAL_ERROR,
-                    f"No RPC URL for chain {att.chain_id}",
-                ),
+                status=AttestationStatusKind.UNKNOWN,
+                error=VerifyError(ErrorCode.GENERAL_ERROR, f"No RPC URL for chain {att.chain_id}"),
             )
 
         eas_address = DEFAULT_EAS_ADDRESSES.get(att.chain_id)
         if not eas_address:
-            return AttestationStatusError(
+            return AttestationStatus(
                 attestation=att,
-                status="UNKNOWN",
+                status=AttestationStatusKind.UNKNOWN,
                 error=VerifyError(
-                    ErrorCode.GENERAL_ERROR,
-                    f"No EAS address for chain {att.chain_id}",
+                    ErrorCode.GENERAL_ERROR, f"No EAS address for chain {att.chain_id}"
                 ),
             )
 
@@ -319,58 +336,53 @@ class SDK:
             if isinstance(att, EASTimestamped):
                 ts = read_eas_timestamp(w3, eas_address, digest)
                 if ts == 0:
-                    return AttestationStatusError(
+                    return AttestationStatus(
                         attestation=att,
-                        status="INVALID",
-                        error=VerifyError(
-                            ErrorCode.ATTESTATION_MISMATCH,
-                            "No EAS timestamp found",
-                        ),
+                        status=AttestationStatusKind.INVALID,
+                        error=VerifyError(ErrorCode.ATTESTATION_MISMATCH, "No EAS timestamp found"),
                     )
-                return AttestationStatusValid(
+                return AttestationStatus(
                     attestation=att,
-                    status="VALID",
+                    status=AttestationStatusKind.VALID,
                     additional_info={"time": ts},
                 )
             else:
                 on_chain = read_eas_attestation(w3, eas_address, att.uid)
 
                 if on_chain.schema != EAS_SCHEMA_ID[2:]:
-                    return AttestationStatusError(
+                    return AttestationStatus(
                         attestation=att,
-                        status="INVALID",
+                        status=AttestationStatusKind.INVALID,
                         error=VerifyError(ErrorCode.ATTESTATION_MISMATCH, "Schema mismatch"),
                     )
 
                 if on_chain.expiration_time != NO_EXPIRATION:
-                    return AttestationStatusError(
+                    return AttestationStatus(
                         attestation=att,
-                        status="INVALID",
+                        status=AttestationStatusKind.INVALID,
                         error=VerifyError(ErrorCode.ATTESTATION_MISMATCH, "Has expiration"),
                     )
 
                 if on_chain.revocable:
-                    return AttestationStatusError(
+                    return AttestationStatus(
                         attestation=att,
-                        status="INVALID",
+                        status=AttestationStatusKind.INVALID,
                         error=VerifyError(ErrorCode.ATTESTATION_MISMATCH, "Is revocable"),
                     )
 
-                return AttestationStatusValid(
+                return AttestationStatus(
                     attestation=att,
-                    status="VALID",
+                    status=AttestationStatusKind.VALID,
                     additional_info={"attestation": on_chain},
                 )
         except Exception as e:
-            return AttestationStatusError(
+            return AttestationStatus(
                 attestation=att,
-                status="UNKNOWN",
+                status=AttestationStatusKind.UNKNOWN,
                 error=VerifyError(ErrorCode.REMOTE_ERROR, str(e)),
             )
 
     def _aggregate_result(self, statuses: list[AttestationStatus]) -> VerificationResult:
-        from uts_sdk._types.status import AttestationStatusKind
-
         counts = {k: 0 for k in AttestationStatusKind}
         for s in statuses:
             counts[s.status] += 1
