@@ -16,5 +16,5 @@
     "noUncheckedSideEffectImports": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
-  "references": [{ "path": "../../packages/sdk/tsconfig.json" }]
+  "references": [{ "path": "../../packages/sdk-ts/tsconfig.json" }]
 }

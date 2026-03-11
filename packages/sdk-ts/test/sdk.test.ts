@@ -26,7 +26,9 @@ describe.skip('Stamp', () => {
     expect(results).toHaveLength(1)
     const result = results[0]
 
-    expect(result.header.digest).toEqual(hexToBytes(testDigest as `0x${string}`))
+    expect(result.header.digest).toEqual(
+      hexToBytes(testDigest as `0x${string}`),
+    )
     expect(result.timestamp).toBeDefined()
     console.debug('Timestamp:', JSON.stringify(result, null, 2))
   })

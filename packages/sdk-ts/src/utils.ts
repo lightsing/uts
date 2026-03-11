@@ -12,10 +12,7 @@ export function getBytes(value: BytesLike): Uint8Array {
   try {
     return hexToBytes(value)
   } catch (e) {
-    throw new Error(
-      `Invalid hex string: ${value}`,
-      { cause: e },
-    )
+    throw new Error(`Invalid hex string: ${value}`, { cause: e })
   }
 }
 

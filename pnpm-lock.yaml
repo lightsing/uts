@@ -46,7 +46,7 @@ importers:
         version: 2.0.1
       '@uts/sdk':
         specifier: workspace:*
-        version: link:../../packages/sdk
+        version: link:../../packages/sdk-ts
       '@vueuse/core':
         specifier: ^14.2.1
         version: 14.2.1(vue@3.5.26(typescript@5.9.3))
@@ -112,7 +112,7 @@ importers:
         specifier: ^2.10.0
         version: 2.10.0(typescript@5.9.3)
 
-  packages/sdk:
+  packages/sdk-ts:
     dependencies:
       '@noble/hashes':
         specifier: ^2.0.1
