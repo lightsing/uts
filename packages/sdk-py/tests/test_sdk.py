@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 
 import pytest
 
@@ -41,7 +42,7 @@ def test_sdk_default_calendars() -> None:
 
 def test_sdk_invalid_hash_algorithm() -> None:
     with pytest.raises(ValueError, match="Unsupported hash algorithm"):
-        SDK(hash_algorithm="md5")
+        SDK(hash_algorithm="md5")  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
@@ -83,3 +84,29 @@ async def test_sdk_upgrade_pending() -> None:
 
         assert len(results) == 1
         assert results[0].original == pending
+
+
+def test_sdk_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("UTS_CALENDARS", "https://cal1.example.com,https://cal2.example.com")
+    monkeypatch.setenv("UTS_TIMEOUT", "30.0")
+    monkeypatch.setenv("UTS_QUORUM", "2")
+    monkeypatch.setenv("UTS_HASH_ALGORITHM", "sha256")
+    monkeypatch.setenv("UTS_ETH_RPC_URL_1", "https://eth.example.com")
+
+    sdk = SDK.from_env()
+
+    assert "https://cal1.example.com/" in sdk.calendars
+    assert "https://cal2.example.com/" in sdk.calendars
+    assert sdk.timeout == 30.0
+    assert sdk.nonce_size == 32
+
+
+def test_sdk_from_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("UTS_CALENDARS", raising=False)
+    monkeypatch.delenv("UTS_TIMEOUT", raising=False)
+    monkeypatch.delenv("UTS_QUORUM", raising=False)
+
+    sdk = SDK.from_env()
+
+    assert "https://lgm1.test.timestamps.now/" in sdk.calendars
+    assert sdk.timeout == 10.0
