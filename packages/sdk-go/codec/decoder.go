@@ -128,7 +128,7 @@ func (d *Decoder) PeekOp() (types.Op, bool) {
 	if d.Remaining() == 0 {
 		return 0, false
 	}
-	return types.NewOp(d.data[d.pos])
+	return types.Op(d.data[d.pos]), true
 }
 
 func (d *Decoder) ReadOp() (types.Op, error) {
@@ -313,7 +313,9 @@ func (d *Decoder) ReadForkStep() (*types.ForkStep, error) {
 		}
 
 		if op == types.OpFORK {
-			d.ReadOp()
+			if _, err := d.ReadOp(); err != nil {
+				return nil, err
+			}
 			ts, err := d.ReadTimestamp()
 			if err != nil {
 				return nil, err
@@ -340,7 +342,13 @@ func (d *Decoder) ReadForkStep() (*types.ForkStep, error) {
 func (d *Decoder) ReadStep() (types.Step, error) {
 	op, ok := d.PeekOp()
 	if !ok {
-		return nil, errors.ErrUnexpectedEof()
+		// Distinguish between true EOF and invalid opcode.
+		if d.Remaining() == 0 {
+			return nil, errors.ErrUnexpectedEof()
+		}
+		// There is data remaining but PeekOp could not decode a valid opcode.
+		// Report a bad opcode error for the offending byte.
+		return nil, errors.ErrBadOpCode(d.data[d.pos])
 	}
 
 	switch op {
@@ -349,7 +357,10 @@ func (d *Decoder) ReadStep() (types.Step, error) {
 	case types.OpAttestation:
 		return d.ReadAttestationStep()
 	default:
-		d.ReadOp()
+		_, err := d.ReadOp()
+		if err != nil {
+			return nil, err
+		}
 		return d.ReadExecutionStep(op)
 	}
 }
