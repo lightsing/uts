@@ -3,7 +3,7 @@ package codec
 import (
 	"io"
 
-	"github.com/uts-dot/sdk-go/errors"
+	"github.com/lightsing/uts/packages/sdk-go/errors"
 )
 
 func EncodeU32(n uint32) []byte {

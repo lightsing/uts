@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/uts-dot/sdk-go/types"
+	"github.com/lightsing/uts/packages/sdk-go/types"
 )
 
 func TestNewEncoder(t *testing.T) {

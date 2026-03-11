@@ -3,8 +3,8 @@ package codec
 import (
 	"bytes"
 
-	"github.com/uts-dot/sdk-go/errors"
-	"github.com/uts-dot/sdk-go/types"
+	"github.com/lightsing/uts/packages/sdk-go/errors"
+	"github.com/lightsing/uts/packages/sdk-go/types"
 )
 
 type Decoder struct {

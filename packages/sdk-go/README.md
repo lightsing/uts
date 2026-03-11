@@ -7,7 +7,7 @@ UTS is a superset of OpenTimestamps that batches user-submitted digests into Mer
 ## Installation
 
 ```bash
-go get github.com/uts-dot/sdk-go
+go get github.com/lightsing/uts/packages/sdk-go
 ```
 
 Requires Go 1.24 or later.
@@ -23,8 +23,8 @@ import (
     "fmt"
     "log"
 
-    "github.com/uts-dot/sdk-go"
-    "github.com/uts-dot/sdk-go/types"
+    "github.com/lightsing/uts/packages/sdk-go"
+    "github.com/lightsing/uts/packages/sdk-go/types"
 )
 
 func main() {
@@ -109,7 +109,7 @@ sdk := uts.NewSDK(
 ### Binary Codec
 
 ```go
-import "github.com/uts-dot/sdk-go/codec"
+import "github.com/lightsing/uts/packages/sdk-go/codec"
 
 encoded, err := codec.EncodeDetachedTimestamp(stamp)
 
@@ -119,7 +119,7 @@ stamp, err := codec.DecodeDetachedTimestamp(encoded)
 ### Hash Operations
 
 ```go
-import "github.com/uts-dot/sdk-go/crypto"
+import "github.com/lightsing/uts/packages/sdk-go/crypto"
 
 hash := crypto.SHA256(data)
 hash := crypto.Keccak256(data)
@@ -128,7 +128,7 @@ hash := crypto.Keccak256(data)
 ### Merkle Tree
 
 ```go
-import "github.com/uts-dot/sdk-go/crypto"
+import "github.com/lightsing/uts/packages/sdk-go/crypto"
 
 tree := crypto.NewMerkleTree(leaves)
 root := tree.Root()

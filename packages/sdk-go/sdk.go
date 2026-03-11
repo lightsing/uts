@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uts-dot/sdk-go/attestation"
-	"github.com/uts-dot/sdk-go/codec"
-	"github.com/uts-dot/sdk-go/crypto"
-	"github.com/uts-dot/sdk-go/errors"
-	"github.com/uts-dot/sdk-go/rpc"
-	"github.com/uts-dot/sdk-go/types"
+	"github.com/lightsing/uts/packages/sdk-go/attestation"
+	"github.com/lightsing/uts/packages/sdk-go/codec"
+	"github.com/lightsing/uts/packages/sdk-go/crypto"
+	"github.com/lightsing/uts/packages/sdk-go/errors"
+	"github.com/lightsing/uts/packages/sdk-go/rpc"
+	"github.com/lightsing/uts/packages/sdk-go/types"
 )
 
 var DefaultCalendars = []string{

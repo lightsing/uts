@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/uts-dot/sdk-go/errors"
-	"github.com/uts-dot/sdk-go/types"
+	"github.com/lightsing/uts/packages/sdk-go/errors"
+	"github.com/lightsing/uts/packages/sdk-go/types"
 )
 
 func TestDecoder_Remaining(t *testing.T) {

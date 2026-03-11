@@ -1,4 +1,4 @@
-module github.com/uts-dot/sdk-go
+module github.com/lightsing/uts/packages/sdk-go
 
 go 1.24.0
 

@@ -3,7 +3,7 @@ package attestation
 import (
 	"context"
 
-	"github.com/uts-dot/sdk-go/types"
+	"github.com/lightsing/uts/packages/sdk-go/types"
 )
 
 func Verify(ctx context.Context, btcRPC BitcoinRPCClient, easClient EASClient, digest []byte, att types.Attestation) *types.AttestationStatus {

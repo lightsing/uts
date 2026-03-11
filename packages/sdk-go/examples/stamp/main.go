@@ -8,10 +8,10 @@ import (
 	"os"
 	"time"
 
-	uts "github.com/uts-dot/sdk-go"
-	"github.com/uts-dot/sdk-go/codec"
-	"github.com/uts-dot/sdk-go/crypto"
-	"github.com/uts-dot/sdk-go/types"
+	uts "github.com/lightsing/uts/packages/sdk-go"
+	"github.com/lightsing/uts/packages/sdk-go/codec"
+	"github.com/lightsing/uts/packages/sdk-go/crypto"
+	"github.com/lightsing/uts/packages/sdk-go/types"
 )
 
 func main() {

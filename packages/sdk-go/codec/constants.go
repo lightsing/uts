@@ -1,6 +1,6 @@
 package codec
 
-import "github.com/uts-dot/sdk-go/types"
+import "github.com/lightsing/uts/packages/sdk-go/types"
 
 const (
 	OpSHA1        byte = 0x02

@@ -1,7 +1,7 @@
 package uts
 
 import (
-	"github.com/uts-dot/sdk-go/errors"
+	"github.com/lightsing/uts/packages/sdk-go/errors"
 )
 
 type ErrorCode = errors.ErrorCode

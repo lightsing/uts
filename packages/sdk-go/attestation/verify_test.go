@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/uts-dot/sdk-go/rpc"
-	"github.com/uts-dot/sdk-go/types"
+	"github.com/lightsing/uts/packages/sdk-go/rpc"
+	"github.com/lightsing/uts/packages/sdk-go/types"
 )
 
 type mockVerifyClients struct {
