@@ -4,13 +4,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic, TypeVar
+
+from eth_typing import Address, ChecksumAddress
+from web3 import AsyncBaseProvider, AsyncWeb3
 
 NO_EXPIRATION = 0
 
 EAS_SCHEMA_ID = "0x5c5b8b295ff43c8e442be11d569e94a4cd5476f5e23df0f71bdd408df6b9649c"
 
-EAS_ABI = [
+_EAS_ABI: list[dict[str, Any]] = [
     {
         "anonymous": False,
         "inputs": [
@@ -72,55 +75,41 @@ class OnChainAttestation:
     data: str
 
 
-def read_eas_timestamp(
-    w3: Any,
-    eas_address: str,
-    data: bytes,
-) -> int:
-    """Read timestamp from EAS contract using getTimestamp(data)."""
-    contract = w3.eth.contract(address=eas_address, abi=EAS_ABI)
-
-    padded_data = data.ljust(32, b"\x00") if len(data) < 32 else data[:32]
-
-    result = contract.functions.getTimestamp(padded_data).call()
-    return int(result)
+AsyncProviderT = TypeVar("AsyncProviderT", bound=AsyncBaseProvider)
 
 
-def read_eas_attestation(
-    w3: Any,
-    eas_address: str,
-    uid: bytes,
-) -> OnChainAttestation:
-    """Read attestation from EAS contract using getAttestation(uid)."""
-    contract = w3.eth.contract(address=eas_address, abi=EAS_ABI)
+class EasContract(Generic[AsyncProviderT]):
+    """Helper class for interacting with EAS contract."""
 
-    if len(uid) != 32:
-        raise ValueError(f"UID must be 32 bytes, got {len(uid)}")
+    def __init__(
+        self, w3: AsyncWeb3[AsyncProviderT], eas_address: Address | ChecksumAddress
+    ) -> None:
+        self._w3 = w3
+        self._contract = w3.eth.contract(address=eas_address, abi=_EAS_ABI)
 
-    result = contract.functions.getAttestation(uid).call()
+    async def get_timestamp(self, data: bytes) -> int:
+        """Read timestamp from EAS contract using getTimestamp(data)."""
+        padded_data = data.ljust(32, b"\x00") if len(data) < 32 else data[:32]
 
-    return OnChainAttestation(
-        uid=result[0].hex(),
-        schema=result[1].hex(),
-        time=int(result[2]),
-        expiration_time=int(result[3]),
-        revocation_time=int(result[4]),
-        ref_uid=result[5].hex(),
-        recipient=result[6],
-        attester=result[7],
-        revocable=bool(result[8]),
-        data=result[9].hex() if isinstance(result[9], bytes) else result[9],
-    )
+        result = await self._contract.functions.getTimestamp(padded_data).call()
+        return int(result)
 
+    async def get_attestation(self, uid: bytes) -> OnChainAttestation:
+        """Read attestation from EAS contract using getAttestation(uid)."""
+        if len(uid) != 32:
+            raise ValueError(f"UID must be 32 bytes, got {len(uid)}")
 
-def decode_content_hash(data: str | bytes) -> bytes:
-    """Decode bytes32 contentHash from attestation data."""
-    if isinstance(data, str):
-        if data.startswith("0x"):
-            data = data[2:]
-        data = bytes.fromhex(data)
+        result = await self._contract.functions.getAttestation(uid).call()
 
-    if len(data) < 32:
-        raise ValueError(f"Data too short for content hash: {len(data)}")
-
-    return data[:32]
+        return OnChainAttestation(
+            uid=result[0].hex(),
+            schema=result[1].hex(),
+            time=int(result[2]),
+            expiration_time=int(result[3]),
+            revocation_time=int(result[4]),
+            ref_uid=result[5].hex(),
+            recipient=result[6],
+            attester=result[7],
+            revocable=bool(result[8]),
+            data=result[9].hex() if isinstance(result[9], bytes) else result[9],
+        )

@@ -3,22 +3,11 @@
 
 from __future__ import annotations
 
-from .eas import (
-    EAS_ABI,
-    EAS_SCHEMA_ID,
-    NO_EXPIRATION,
-    OnChainAttestation,
-    decode_content_hash,
-    read_eas_attestation,
-    read_eas_timestamp,
-)
+from .eas import EAS_SCHEMA_ID, NO_EXPIRATION, EasContract, OnChainAttestation
 
 __all__ = [
-    "EAS_ABI",
+    "EasContract",
     "EAS_SCHEMA_ID",
     "NO_EXPIRATION",
     "OnChainAttestation",
-    "decode_content_hash",
-    "read_eas_attestation",
-    "read_eas_timestamp",
 ]

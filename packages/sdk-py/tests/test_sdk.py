@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import hashlib
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from uts_sdk import (
     SDK,
     AttestationStatusKind,
     AttestationStep,
+    BitcoinAttestation,
     DetachedTimestamp,
     DigestHeader,
     DigestOp,
     PendingAttestation,
+    UpgradeStatus,
     VerifyStatus,
 )
 
@@ -70,7 +74,8 @@ async def test_sdk_verify_pending() -> None:
 
 
 @pytest.mark.asyncio
-async def test_sdk_upgrade_pending() -> None:
+async def test_sdk_upgrade_pending_still_pending() -> None:
+    """Test upgrade when attestation is still pending (202 response)."""
     digest = hashlib.sha256(b"test data").digest()
     header = DigestHeader(kind=DigestOp.SHA256, digest=digest)
 
@@ -78,11 +83,97 @@ async def test_sdk_upgrade_pending() -> None:
     step = AttestationStep(attestation=pending)
     stamp = DetachedTimestamp(header=header, timestamp=[step])
 
-    async with SDK() as sdk:
-        results = await sdk.upgrade(stamp)
+    mock_response = MagicMock()
+    mock_response.status_code = 202
 
-        assert len(results) == 1
-        assert results[0].original == pending
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        async with SDK() as sdk:
+            results = await sdk.upgrade(stamp)
+
+            assert len(results) == 1
+            assert results[0].status == UpgradeStatus.PENDING
+            assert results[0].original == pending
+
+
+@pytest.mark.asyncio
+async def test_sdk_upgrade_pending_not_found() -> None:
+    """Test upgrade when attestation not found (404 response)."""
+    digest = hashlib.sha256(b"test data").digest()
+    header = DigestHeader(kind=DigestOp.SHA256, digest=digest)
+
+    pending = PendingAttestation(url="https://calendar.example.com")
+    step = AttestationStep(attestation=pending)
+    stamp = DetachedTimestamp(header=header, timestamp=[step])
+
+    mock_response = MagicMock()
+    mock_response.status_code = 404
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        async with SDK() as sdk:
+            results = await sdk.upgrade(stamp)
+
+            assert len(results) == 1
+            assert results[0].status == UpgradeStatus.PENDING
+
+
+@pytest.mark.asyncio
+async def test_sdk_upgrade_pending_failed() -> None:
+    """Test upgrade when calendar returns an error (500 response)."""
+    digest = hashlib.sha256(b"test data").digest()
+    header = DigestHeader(kind=DigestOp.SHA256, digest=digest)
+
+    pending = PendingAttestation(url="https://calendar.example.com")
+    step = AttestationStep(attestation=pending)
+    stamp = DetachedTimestamp(header=header, timestamp=[step])
+
+    mock_response = MagicMock()
+    mock_response.status_code = 500
+    mock_response.is_success = False
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        async with SDK() as sdk:
+            results = await sdk.upgrade(stamp)
+
+            assert len(results) == 1
+            assert results[0].status == UpgradeStatus.FAILED
+
+
+@pytest.mark.asyncio
+async def test_sdk_upgrade_pending_network_error() -> None:
+    """Test upgrade when network error occurs."""
+    digest = hashlib.sha256(b"test data").digest()
+    header = DigestHeader(kind=DigestOp.SHA256, digest=digest)
+
+    pending = PendingAttestation(url="https://calendar.example.com")
+    step = AttestationStep(attestation=pending)
+    stamp = DetachedTimestamp(header=header, timestamp=[step])
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=httpx.RequestError("Connection refused"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        async with SDK() as sdk:
+            results = await sdk.upgrade(stamp)
+
+            assert len(results) == 1
+            assert results[0].status == UpgradeStatus.FAILED
 
 
 def test_sdk_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -111,3 +202,20 @@ def test_sdk_from_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert "https://lgm1.test.timestamps.now/" in sdk.calendars
     assert sdk.timeout == 10.0
+
+
+@pytest.mark.asyncio
+async def test_sdk_verify_bitcoin_attestation() -> None:
+    """Test verification of Bitcoin attestation with mocked RPC."""
+    digest = hashlib.sha256(b"test data").digest()
+    header = DigestHeader(kind=DigestOp.SHA256, digest=digest)
+
+    btc_att = BitcoinAttestation(height=800000)
+    step = AttestationStep(attestation=btc_att)
+    stamp = DetachedTimestamp(header=header, timestamp=[step])
+
+    async with SDK() as sdk:
+        result = await sdk.verify(stamp)
+
+        assert len(result.attestations) == 1
+        assert result.attestations[0].attestation == btc_att

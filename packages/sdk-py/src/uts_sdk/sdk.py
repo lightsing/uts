@@ -7,8 +7,11 @@ import secrets
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Literal, cast
+from typing import Literal
 
+import httpx
+from eth_typing import Address, HexStr
+from web3 import Web3
 from yarl import URL
 
 from uts_sdk._codec import Decoder
@@ -18,8 +21,7 @@ from uts_sdk._crypto.utils import keccak256, sha256
 from uts_sdk._ethereum import (
     EAS_SCHEMA_ID,
     NO_EXPIRATION,
-    read_eas_attestation,
-    read_eas_timestamp,
+    EasContract,
 )
 from uts_sdk._rpc import BitcoinRPC
 from uts_sdk._types import (
@@ -49,18 +51,35 @@ from uts_sdk._types import (
     UpgradeStatus,
     VerifyStatus,
 )
-from uts_sdk.errors import ErrorCode, RemoteError, VerifyError
+from uts_sdk._types.timestamp_steps import HexlifyStep, ReverseStep
+from uts_sdk.errors import DecodeError, ErrorCode, RemoteError, VerifyError
 
 DEFAULT_CALENDARS = [
     "https://lgm1.test.timestamps.now/",
 ]
 
-DEFAULT_EAS_ADDRESSES: dict[int, str] = {
-    1: "0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587",
-    11155111: "0xC2679fBD37d54388Ce493F1DB75320D236e1815e",
-    534352: "0xC47300428b6AD2c7D03BB76D05A176058b47E6B0",
-    534351: "0xaEF4103A04090071165F78D45D83A0C0782c2B2a",
+DEFAULT_EAS_ADDRESSES: dict[int, Address] = {
+    1: Address(
+        Web3.to_bytes(hexstr=HexStr("0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587"))
+    ),
+    11155111: Address(
+        Web3.to_bytes(hexstr=HexStr("0xC2679fBD37d54388Ce493F1DB75320D236e1815e"))
+    ),
+    534352: Address(
+        Web3.to_bytes(hexstr=HexStr("0xC47300428b6AD2c7D03BB76D05A176058b47E6B0"))
+    ),
+    534351: Address(
+        Web3.to_bytes(hexstr=HexStr("0xaEF4103A04090071165F78D45D83A0C0782c2B2a"))
+    ),
 }
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarError:
+    """Error from a calendar server submission."""
+
+    url: str
+    error: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,9 +180,12 @@ class SDK:
 
         timeout_str = os.environ.get("UTS_TIMEOUT", "10.0")
         quorum_str = os.environ.get("UTS_QUORUM")
-        hash_algo = os.environ.get("UTS_HASH_ALGORITHM", "keccak256")
-        if hash_algo not in ("sha256", "keccak256"):
-            hash_algo = "keccak256"
+
+        hash_algo_env = os.environ.get("UTS_HASH_ALGORITHM", "keccak256")
+        if hash_algo_env == "sha256":
+            hash_algorithm: Literal["sha256", "keccak256"] = "sha256"
+        else:
+            hash_algorithm = "keccak256"
 
         return cls(
             calendars=calendars_list,
@@ -173,7 +195,7 @@ class SDK:
             eth_rpc_urls=eth_rpc_urls or None,
             timeout=float(timeout_str),
             quorum=int(quorum_str) if quorum_str else None,
-            hash_algorithm=cast(Literal["sha256", "keccak256"], hash_algo),
+            hash_algorithm=hash_algorithm,
         )
 
     async def stamp(
@@ -183,8 +205,6 @@ class SDK:
     ) -> list[DetachedTimestamp]:
         """Stamp digests by submitting to calendar servers."""
         import asyncio
-
-        import httpx
 
         digest_headers = [
             (
@@ -213,7 +233,15 @@ class SDK:
         if on_progress:
             await on_progress(StampPhase.AGGREGATING, 0.5)
 
-        async def submit_to_calendar(calendar: URL) -> Timestamp | None:
+        calendar_errors: list[CalendarError] = []
+
+        async def submit_to_calendar(
+            calendar: URL,
+        ) -> tuple[Timestamp | None, CalendarError | None]:
+            """Submit root to a calendar server.
+
+            Returns (timestamp, None) on success, (None, error) on failure.
+            """
             try:
                 async with httpx.AsyncClient(timeout=self._timeout) as client:
                     response = await client.post(
@@ -223,19 +251,39 @@ class SDK:
                     )
                     if response.is_success:
                         decoder = Decoder(response.content)
-                        return decoder.read_timestamp()
-            except Exception:
-                pass
-            return None
+                        ts = decoder.read_timestamp()
+                        return ts, None
+                    return None, CalendarError(
+                        url=str(calendar),
+                        error=f"HTTP {response.status_code}: {response.text[:200]}",
+                    )
+            except httpx.TimeoutException as e:
+                return None, CalendarError(url=str(calendar), error=f"Timeout: {e}")
+            except httpx.RequestError as e:
+                return None, CalendarError(
+                    url=str(calendar), error=f"Network error: {e}"
+                )
+            except DecodeError as e:
+                return None, CalendarError(
+                    url=str(calendar), error=f"Decode error: {e}"
+                )
 
         results = await asyncio.gather(
             *[submit_to_calendar(c) for c in self._calendars]
         )
-        successful = [r for r in results if r is not None]
+
+        successful: list[Timestamp] = []
+        for ts, err in results:
+            if ts is not None:
+                successful.append(ts)
+            elif err is not None:
+                calendar_errors.append(err)
 
         if len(successful) < self._quorum:
+            error_details = "; ".join(f"{e.url}: {e.error}" for e in calendar_errors)
             raise RemoteError(
-                f"Only {len(successful)} calendar responses, need {self._quorum}"
+                f"Quorum not reached: {len(successful)}/{self._quorum} calendars responded. "
+                f"Errors: {error_details}"
             )
 
         merged: Timestamp = (
@@ -316,10 +364,6 @@ class SDK:
 
         for i, step in enumerate(timestamp):
             match step:
-                case AppendStep() | PrependStep():
-                    current = self._execute_step(current, step)
-                case SHA256Step() | SHA1Step() | RIPEMD160Step() | Keccak256Step():
-                    current = self._execute_step(current, step)
                 case ForkStep(steps=branches):
                     for branch in branches:
                         branch_results = await self._upgrade_timestamp(
@@ -335,6 +379,8 @@ class SDK:
                                 timestamp[i] = ForkStep(steps=[[step], result.upgraded])
                             else:
                                 timestamp[i : i + 1] = result.upgraded
+                case _:
+                    current = self._execute_step(current, step)
 
         return results
 
@@ -342,7 +388,6 @@ class SDK:
         self, commitment: bytes, pending: PendingAttestation
     ) -> UpgradeResult:
         """Upgrade a single pending attestation."""
-        import httpx
 
         commitment_hex = commitment.hex()
         try:
@@ -375,10 +420,6 @@ class SDK:
 
         for step in timestamp:
             match step:
-                case AppendStep() | PrependStep():
-                    current = self._execute_step(current, step)
-                case SHA256Step() | SHA1Step() | RIPEMD160Step() | Keccak256Step():
-                    current = self._execute_step(current, step)
                 case ForkStep(steps=branches):
                     for branch in branches:
                         branch_results = await self._verify_timestamp(current, branch)
@@ -386,6 +427,8 @@ class SDK:
                 case AttestationStep(attestation=att):
                     status = await self._verify_attestation(current, att)
                     attestations.append(status)
+                case _:
+                    current = self._execute_step(current, step)
 
         return attestations
 
@@ -398,6 +441,10 @@ class SDK:
                 return current + data
             case PrependStep(data=data):
                 return data + current
+            case ReverseStep():
+                return current[::-1]
+            case HexlifyStep():
+                return current.hex().encode()
             case SHA256Step():
                 return sha256(current)
             case Keccak256Step():
@@ -472,7 +519,7 @@ class SDK:
         self, digest: bytes, att: EASAttestation | EASTimestamped
     ) -> AttestationStatus:
         """Verify an EAS attestation."""
-        from web3 import Web3
+        from web3 import AsyncWeb3
 
         rpc_url = self._eth_rpc_urls.get(att.chain_id)
         if not rpc_url:
@@ -495,10 +542,11 @@ class SDK:
             )
 
         try:
-            w3 = Web3(Web3.HTTPProvider(rpc_url))
+            w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(rpc_url))
+            eas = EasContract(w3, eas_address)
 
             if isinstance(att, EASTimestamped):
-                ts = read_eas_timestamp(w3, eas_address, digest)
+                ts = await eas.get_timestamp(digest)
                 if ts == 0:
                     return AttestationStatus(
                         attestation=att,
@@ -513,7 +561,7 @@ class SDK:
                     additional_info={"time": ts},
                 )
             else:
-                on_chain = read_eas_attestation(w3, eas_address, att.uid)
+                on_chain = await eas.get_attestation(att.uid)
 
                 if on_chain.schema != EAS_SCHEMA_ID[2:]:
                     return AttestationStatus(

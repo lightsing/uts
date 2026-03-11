@@ -67,15 +67,6 @@ def _next_power_of_two(n: int) -> int:
     return p
 
 
-def _compare_bytes(a: bytes, b: bytes) -> int:
-    """Compare two byte strings lexicographically."""
-    min_len = min(len(a), len(b))
-    for i in range(min_len):
-        if a[i] != b[i]:
-            return a[i] - b[i]
-    return len(a) - len(b)
-
-
 class UnorderedMerkleTree:
     """Flat, fixed-size Merkle tree with sorted leaves.
 
@@ -107,23 +98,26 @@ class UnorderedMerkleTree:
         leaves: Sequence[bytes],
         hash_func: Callable[[bytes], bytes],
     ) -> Self:
-        """Build a Merkle tree from leaves."""
+        """Build a Merkle tree from pre-hashed leaves.
+
+        Leaves must already be hashed digests (e.g., output of SHA256/Keccak256).
+        This matches the Rust BMT API where leaves are `Output<D>` (hash outputs).
+        """
         if len(leaves) == 0:
             raise ValueError("Merkle tree must have at least one leaf")
 
         raw_len = len(leaves)
         tree_len = _next_power_of_two(raw_len)
-        nodes = [b"\x00" * 32] * (2 * tree_len)  # Index 0 unused, so 2*len
+        nodes = [b"\x00" * 32] * (2 * tree_len)
 
-        # Hash and sort leaves
-        hashed_leaves = [(hash_func(leaf), leaf) for leaf in leaves]
-        hashed_leaves.sort(key=lambda x: x[0])
+        # Sort leaves lexicographically (they're already hashed digests)
+        sorted_leaves = sorted(leaves)
 
-        # Map original leaf -> index in sorted hashed leaves
+        # Map leaf -> index in sorted leaves
         leaf_indices: dict[bytes, int] = {}
-        for i, (hashed, orig_leaf) in enumerate(hashed_leaves):
-            nodes[tree_len + i] = hashed
-            leaf_indices[orig_leaf] = i
+        for i, leaf in enumerate(sorted_leaves):
+            nodes[tree_len + i] = leaf
+            leaf_indices[leaf] = i
 
         # Pad remaining leaf slots with zeros
         for i in range(raw_len, tree_len):

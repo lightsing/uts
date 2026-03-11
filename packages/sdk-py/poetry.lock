@@ -2952,4 +2952,4 @@ dev = ["black", "mypy", "pytest", "pytest-asyncio", "pytest-cov", "ruff"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4"
-content-hash = "a222d0f435abb73047fc12240c74193cfce502050b90a62b2be2cbc36c1996c8"
+content-hash = "071ce505b9bc8db385d1d16a43c464cb1913ccc42ce6bdda247d2cae829792e3"
