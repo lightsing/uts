@@ -4,20 +4,10 @@
 from __future__ import annotations
 
 import re
-from typing import Self
+from typing import TYPE_CHECKING
 
-from uts_sdk._types import (
-    AppendStep,
-    AttestationStep,
-    BitcoinAttestation,
-    EASTimestamped,
-    EASAttestation,
-    ExecutionStep,
-    ForkStep,
-    PendingAttestation,
-    PrependStep,
-    UnknownAttestation,
-)
+from typing_extensions import Self
+
 from uts_sdk.errors import EncodeError, ErrorCode
 
 from .constants import (
@@ -29,7 +19,22 @@ from .constants import (
     PENDING_TAG,
 )
 
-_SAFE_URL_RE = re.compile(r"^https?://[\s\w./:-]+$")
+if TYPE_CHECKING:
+    from uts_sdk._types import (
+        AttestationStep,
+        BitcoinAttestation,
+        DetachedTimestamp,
+        DigestHeader,
+        EASAttestation,
+        EASTimestamped,
+        ExecutionStep,
+        ForkStep,
+        PendingAttestation,
+        Step,
+        Timestamp,
+    )
+
+_SAFE_URL_RE = re.compile(r"^https?://[^\s]+$")
 
 
 class Encoder:
@@ -123,12 +128,14 @@ class Encoder:
         self.write_byte(version)
         return self
 
-    def write_header(self, header) -> Self:
+    def write_header(self, header: DigestHeader) -> Self:
         self.write_byte(header.kind.to_op_code().value)
         self.write_bytes(header.digest)
         return self
 
     def write_execution_step(self, step: ExecutionStep) -> Self:
+        from uts_sdk._types import AppendStep, PrependStep
+
         self.write_byte(step.op.value)
         if isinstance(step, (AppendStep, PrependStep)):
             self.write_length_prefixed(step.data)
@@ -161,12 +168,22 @@ class Encoder:
         return self
 
     def write_eas_attestation(self, att: EASAttestation | EASTimestamped) -> Self:
+        from uts_sdk._types import EASAttestation
+
         self.write_u64(att.chain_id)
         if isinstance(att, EASAttestation):
             self.write_bytes(att.uid)
         return self
 
     def write_attestation_step(self, step: AttestationStep) -> Self:
+        from uts_sdk._types import (
+            BitcoinAttestation,
+            EASAttestation,
+            EASTimestamped,
+            PendingAttestation,
+            UnknownAttestation,
+        )
+
         self.write_byte(0x00)
 
         att = step.attestation
@@ -200,7 +217,9 @@ class Encoder:
             )
         return self
 
-    def write_step(self, step) -> Self:
+    def write_step(self, step: Step) -> Self:
+        from uts_sdk._types import AttestationStep, ForkStep
+
         if isinstance(step, ForkStep):
             return self.write_fork_step(step)
         elif isinstance(step, AttestationStep):
@@ -208,13 +227,13 @@ class Encoder:
         else:
             return self.write_execution_step(step)
 
-    def write_timestamp(self, timestamp) -> Self:
+    def write_timestamp(self, timestamp: Timestamp) -> Self:
         for step in timestamp:
             self.write_step(step)
         return self
 
     @classmethod
-    def encode_detached(cls, ots) -> bytes:
+    def encode_detached(cls, ots: DetachedTimestamp) -> bytes:
         encoder = cls()
         encoder.write_magic()
         encoder.write_header(ots.header)

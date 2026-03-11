@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from uts_sdk._rpc.bitcoin import BitcoinBlockHeader, BitcoinRPC
+import pytest
+
+from uts_sdk._rpc.bitcoin import BitcoinRPC
 
 
 @pytest.mark.asyncio

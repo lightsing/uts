@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from types import TracebackType
 from typing import Any
 from urllib.parse import urlparse
 
@@ -65,7 +66,7 @@ class BitcoinRPC:
             raise RemoteError(
                 f"Bitcoin RPC network error: {e}",
                 context={"method": method, "params": params},
-            )
+            ) from e
 
         try:
             response_data = response.json()
@@ -73,7 +74,7 @@ class BitcoinRPC:
             raise RemoteError(
                 "Bitcoin RPC invalid JSON response",
                 context={"status_code": response.status_code, "error": str(e)},
-            )
+            ) from e
 
         if response.status_code >= 400:
             raise RemoteError(
@@ -124,5 +125,10 @@ class BitcoinRPC:
     async def __aenter__(self) -> BitcoinRPC:
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         await self.close()

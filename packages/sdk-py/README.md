@@ -11,9 +11,9 @@ pip install uts-python-sdk
 ## Usage
 
 ```python
-from uts_sdk import UTS
+from uts_sdk import SDK
 
-async with UTS() as client:
+async with SDK() as client:
     stamp = await client.stamp(b"Hello, World!")
-    result = await client.verify(stamp)
+    result = await client.verify(stamp[0])
 ```

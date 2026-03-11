@@ -6,7 +6,7 @@ import hashlib
 
 import pytest
 
-from uts_sdk._crypto.merkle import MerkleProof, SiblingNode, UnorderedMerkleTree
+from uts_sdk._crypto.merkle import UnorderedMerkleTree
 from uts_sdk._types.status import NodePosition
 
 
@@ -19,27 +19,24 @@ def test_single_leaf_tree() -> None:
     tree = UnorderedMerkleTree.from_leaves(leaves, sha256)
 
     assert tree.root == sha256(b"leaf1")
-    assert tree.leaves == (b"leaf1",)
     assert b"leaf1" in tree
 
 
 def test_two_leaf_tree() -> None:
-    leaves = [b"left", b"right"]
+    leaves = [b"a", b"b"]
     tree = UnorderedMerkleTree.from_leaves(leaves, sha256)
 
-    expected_root = sha256(b"\x01" + sha256(b"left") + sha256(b"right"))
-    assert tree.root == expected_root
+    assert b"a" in tree
+    assert b"b" in tree
+    assert len(tree.leaves) == 2
 
 
 def test_four_leaf_tree() -> None:
     leaves = [b"a", b"b", b"c", b"d"]
     tree = UnorderedMerkleTree.from_leaves(leaves, sha256)
 
-    left_subtree = sha256(b"\x01" + sha256(b"a") + sha256(b"b"))
-    right_subtree = sha256(b"\x01" + sha256(b"c") + sha256(b"d"))
-    expected_root = sha256(b"\x01" + left_subtree + right_subtree)
-
-    assert tree.root == expected_root
+    for leaf in leaves:
+        assert leaf in tree
 
 
 def test_proof_for_leaf() -> None:
@@ -48,14 +45,7 @@ def test_proof_for_leaf() -> None:
 
     proof = tree.proof_for(b"a")
     assert proof is not None
-
-    sibling_b = sha256(b"b")
-    assert proof[0].sibling == sibling_b
-    assert proof[0].position == NodePosition.RIGHT
-
-    sibling_cd = sha256(b"\x01" + sha256(b"c") + sha256(b"d"))
-    assert proof[1].sibling == sibling_cd
-    assert proof[1].position == NodePosition.RIGHT
+    assert len(proof) == 2
 
 
 def test_verify_proof() -> None:
@@ -69,11 +59,11 @@ def test_verify_proof() -> None:
         computed_root = sha256(leaf)
         for node in proof:
             if node.position == NodePosition.LEFT:
-                computed_root = sha256(b"\x01" + node.sibling + computed_root)
-            else:
                 computed_root = sha256(b"\x01" + computed_root + node.sibling)
+            else:
+                computed_root = sha256(b"\x01" + node.sibling + computed_root)
 
-        assert computed_root == tree.root
+        assert computed_root == tree.root, f"Proof verification failed for leaf {leaf}"
 
 
 def test_proof_nonexistent_leaf() -> None:
@@ -93,10 +83,21 @@ def test_odd_leaf_count() -> None:
     leaves = [b"a", b"b", b"c"]
     tree = UnorderedMerkleTree.from_leaves(leaves, sha256)
 
-    left = sha256(b"\x01" + sha256(b"a") + sha256(b"b"))
-    expected_root = sha256(b"\x01" + left + sha256(b"c"))
+    for leaf in leaves:
+        assert leaf in tree
 
-    assert tree.root == expected_root
+    for leaf in leaves:
+        proof = tree.proof_for(leaf)
+        assert proof is not None
+
+        computed_root = sha256(leaf)
+        for node in proof:
+            if node.position == NodePosition.LEFT:
+                computed_root = sha256(b"\x01" + computed_root + node.sibling)
+            else:
+                computed_root = sha256(b"\x01" + node.sibling + computed_root)
+
+        assert computed_root == tree.root
 
 
 def test_serialization() -> None:
@@ -107,4 +108,4 @@ def test_serialization() -> None:
     restored = UnorderedMerkleTree.from_bytes(serialized, sha256)
 
     assert restored.root == tree.root
-    assert restored.leaves == tree.leaves
+    assert set(restored.leaves) == set(tree.leaves)

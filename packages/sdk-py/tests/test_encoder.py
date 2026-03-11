@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+
 import pytest
 
-from uts_sdk._codec.encoder import Encoder
 from uts_sdk._codec.constants import (
-    MAGIC_BYTES,
     BITCOIN_TAG,
-    PENDING_TAG,
     EAS_ATTEST_TAG,
+    MAGIC_BYTES,
+    PENDING_TAG,
 )
+from uts_sdk._codec.encoder import Encoder
 from uts_sdk._types import (
     AppendStep,
     AttestationStep,
@@ -19,21 +20,21 @@ from uts_sdk._types import (
     DetachedTimestamp,
     DigestHeader,
     DigestOp,
-    EASTimestamped,
     EASAttestation,
+    EASTimestamped,
     ForkStep,
+    HexlifyStep,
+    Keccak256Step,
     PendingAttestation,
     PrependStep,
+    ReverseStep,
     RIPEMD160Step,
     SHA1Step,
     SHA256Step,
-    Keccak256Step,
-    ReverseStep,
-    HexlifyStep,
-    UnknownAttestation,
     Timestamp,
+    UnknownAttestation,
 )
-from uts_sdk.errors import EncodeError, ErrorCode
+from uts_sdk.errors import EncodeError
 
 
 class TestEncoderBasics:
@@ -205,7 +206,6 @@ class TestEncoderPendingAttestationErrors:
             encoder.write_pending_attestation(att)
 
     def test_url_exceeds_max_length(self) -> None:
-        encoder = Encoder()
         long_url = "https://example.com/" + "a" * 1000
         with pytest.raises(ValueError, match="URL exceeds maximum"):
             PendingAttestation(url=long_url)

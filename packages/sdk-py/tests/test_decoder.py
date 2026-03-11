@@ -3,29 +3,25 @@
 from __future__ import annotations
 
 import hashlib
+
 import pytest
 
-from uts_sdk._codec.decoder import Decoder
 from uts_sdk._codec.constants import MAGIC_BYTES
+from uts_sdk._codec.decoder import Decoder
 from uts_sdk._types import (
     AppendStep,
     AttestationStep,
-    BitcoinAttestation,
     DigestOp,
-    EASTimestamped,
-    EASAttestation,
-    ForkStep,
-    PendingAttestation,
+    HexlifyStep,
+    Keccak256Step,
     PrependStep,
+    ReverseStep,
     RIPEMD160Step,
     SHA1Step,
     SHA256Step,
-    Keccak256Step,
-    ReverseStep,
-    HexlifyStep,
     UnknownAttestation,
 )
-from uts_sdk.errors import DecodeError, ErrorCode
+from uts_sdk.errors import DecodeError
 
 
 class TestDecoderBasics:

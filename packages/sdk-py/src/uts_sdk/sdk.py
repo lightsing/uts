@@ -3,15 +3,18 @@
 
 from __future__ import annotations
 
-import hashlib
 import secrets
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Literal, Mapping, Sequence
+from types import TracebackType
+from typing import Literal, cast
 
 from yarl import URL
 
-from uts_sdk._codec import Decoder, Encoder
+from uts_sdk._codec import Decoder
 from uts_sdk._crypto import UnorderedMerkleTree
+from uts_sdk._crypto.merkle import INTERNAL_PREFIX
+from uts_sdk._crypto.utils import keccak256, sha256
 from uts_sdk._ethereum import (
     EAS_SCHEMA_ID,
     NO_EXPIRATION,
@@ -29,14 +32,18 @@ from uts_sdk._types import (
     DetachedTimestamp,
     DigestHeader,
     DigestOp,
-    EASTimestamped,
     EASAttestation,
+    EASTimestamped,
     ForkStep,
+    Keccak256Step,
     NodePosition,
-    OpCode,
     PendingAttestation,
     PrependStep,
+    RIPEMD160Step,
+    SHA1Step,
+    SHA256Step,
     StampPhase,
+    Step,
     Timestamp,
     UpgradeResult,
     UpgradeStatus,
@@ -119,27 +126,23 @@ class SDK:
 
     def _hash(self, data: bytes) -> bytes:
         if self._hash_algorithm == "sha256":
-            return hashlib.sha256(data).digest()
-        return hashlib.sha3_256(data).digest()
+            return sha256(data)
+        return keccak256(data)
 
     async def __aenter__(self) -> SDK:
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         await self._btc_rpc.close()
 
     @classmethod
     def from_env(cls) -> SDK:
-        """Create SDK from environment variables.
-
-        Environment variables:
-            UTS_CALENDARS: Comma-separated list of calendar URLs
-            UTS_BTC_RPC_URL: Bitcoin RPC URL
-            UTS_ETH_RPC_URL_<CHAIN_ID>: Ethereum RPC URL for chain
-            UTS_TIMEOUT: Timeout in seconds
-            UTS_QUORUM: Minimum calendar responses
-            UTS_HASH_ALGORITHM: "sha256" or "keccak256"
-        """
+        """Create SDK from environment variables."""
         import os
 
         calendars = os.environ.get("UTS_CALENDARS")
@@ -170,7 +173,7 @@ class SDK:
             eth_rpc_urls=eth_rpc_urls or None,
             timeout=float(timeout_str),
             quorum=int(quorum_str) if quorum_str else None,
-            hash_algorithm=hash_algo,
+            hash_algorithm=cast(Literal["sha256", "keccak256"], hash_algo),
         )
 
     async def stamp(
@@ -178,7 +181,9 @@ class SDK:
         *digests: DigestHeader | bytes,
         on_progress: Callable[[StampPhase, float], Awaitable[None]] | None = None,
     ) -> list[DetachedTimestamp]:
+        """Stamp digests by submitting to calendar servers."""
         import asyncio
+
         import httpx
 
         digest_headers = [
@@ -195,7 +200,8 @@ class SDK:
 
         nonces = [secrets.token_bytes(self._nonce_size) for _ in digest_headers]
         nonce_digests = [
-            self._hash(h.digest + n) for h, n in zip(digest_headers, nonces)
+            self._hash(h.digest + n)
+            for h, n in zip(digest_headers, nonces, strict=True)
         ]
 
         if on_progress:
@@ -232,26 +238,48 @@ class SDK:
                 f"Only {len(successful)} calendar responses, need {self._quorum}"
             )
 
-        merged: Timestamp
-        if len(successful) == 1:
-            merged = successful[0]
-        else:
-            merged = [ForkStep(steps=successful)]
+        merged: Timestamp = (
+            successful[0] if len(successful) == 1 else [ForkStep(steps=successful)]
+        )
 
         if on_progress:
             await on_progress(StampPhase.ATTESTING, 1.0)
 
+        # Build timestamps with proper Merkle proof steps
         result_timestamps: list[DetachedTimestamp] = []
-        for i, header in enumerate(digest_headers):
-            steps: list[Any] = [AppendStep(data=nonces[i])]
+        hash_step = (
+            SHA256Step() if self._hash_algorithm == "sha256" else Keccak256Step()
+        )
 
+        for i, header in enumerate(digest_headers):
+            # Start with: APPEND nonce, then HASH
+            steps: list[Step] = [
+                AppendStep(data=nonces[i]),
+                hash_step,
+            ]
+
+            # Add Merkle proof steps with inner-node prefix
             proof = tree.proof_for(nonce_digests[i])
             if proof:
                 for node in proof:
                     if node.position == NodePosition.LEFT:
-                        steps.append(PrependStep(data=node.sibling))
+                        # Sibling is right child: PREPEND prefix, APPEND sibling, HASH
+                        steps.extend(
+                            [
+                                PrependStep(data=INTERNAL_PREFIX),
+                                AppendStep(data=node.sibling),
+                                hash_step,
+                            ]
+                        )
                     else:
-                        steps.append(AppendStep(data=node.sibling))
+                        # Sibling is left child: PREPEND sibling, PREPEND prefix, HASH
+                        steps.extend(
+                            [
+                                PrependStep(data=node.sibling),
+                                PrependStep(data=INTERNAL_PREFIX),
+                                hash_step,
+                            ]
+                        )
 
             steps.extend(merged)
             result_timestamps.append(DetachedTimestamp(header=header, timestamp=steps))
@@ -262,7 +290,8 @@ class SDK:
         return result_timestamps
 
     async def verify(self, stamp: DetachedTimestamp) -> VerificationResult:
-        statuses = await self._verify_timestamp(stamp)
+        """Verify a detached timestamp."""
+        statuses = await self._verify_timestamp(stamp.header.digest, stamp.timestamp)
         return self._aggregate_result(statuses)
 
     async def upgrade(
@@ -271,25 +300,58 @@ class SDK:
         *,
         keep_pending: bool = False,
     ) -> list[UpgradeResult]:
+        """Upgrade pending attestations in a timestamp."""
+        return await self._upgrade_timestamp(
+            stamp.header.digest, stamp.timestamp, keep_pending
+        )
+
+    async def _upgrade_timestamp(
+        self,
+        current: bytes,
+        timestamp: Timestamp,
+        keep_pending: bool,
+    ) -> list[UpgradeResult]:
+        """Recursively upgrade pending attestations."""
         results: list[UpgradeResult] = []
-        for step in stamp.timestamp:
-            if isinstance(step, AttestationStep) and isinstance(
-                step.attestation, PendingAttestation
-            ):
-                result = await self._upgrade_pending(step.attestation)
-                results.append(result)
+
+        for i, step in enumerate(timestamp):
+            match step:
+                case AppendStep() | PrependStep():
+                    current = self._execute_step(current, step)
+                case SHA256Step() | SHA1Step() | RIPEMD160Step() | Keccak256Step():
+                    current = self._execute_step(current, step)
+                case ForkStep(steps=branches):
+                    for branch in branches:
+                        branch_results = await self._upgrade_timestamp(
+                            current, branch, keep_pending
+                        )
+                        results.extend(branch_results)
+                case AttestationStep(attestation=att):
+                    if isinstance(att, PendingAttestation):
+                        result = await self._upgrade_pending(current, att)
+                        results.append(result)
+                        if result.status == UpgradeStatus.UPGRADED and result.upgraded:
+                            if keep_pending:
+                                timestamp[i] = ForkStep(steps=[[step], result.upgraded])
+                            else:
+                                timestamp[i : i + 1] = result.upgraded
+
         return results
 
-    async def _upgrade_pending(self, pending: PendingAttestation) -> UpgradeResult:
+    async def _upgrade_pending(
+        self, commitment: bytes, pending: PendingAttestation
+    ) -> UpgradeResult:
+        """Upgrade a single pending attestation."""
         import httpx
 
+        commitment_hex = commitment.hex()
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await client.get(
-                    str(pending.url).rstrip("/") + "/timestamp",
+                    f"{pending.url.rstrip('/')}/timestamp/{commitment_hex}",
                     headers={"Accept": "application/vnd.opentimestamps.v1"},
                 )
-                if response.status_code == 202:
+                if response.status_code == 202 or response.status_code == 404:
                     return UpgradeResult(status=UpgradeStatus.PENDING, original=pending)
                 if response.is_success:
                     decoder = Decoder(response.content)
@@ -306,25 +368,54 @@ class SDK:
             return UpgradeResult(status=UpgradeStatus.FAILED, original=pending, error=e)
 
     async def _verify_timestamp(
-        self, stamp: DetachedTimestamp
+        self, current: bytes, timestamp: Timestamp
     ) -> list[AttestationStatus]:
-        current = stamp.header.digest
-        statuses: list[AttestationStatus] = []
+        """Verify timestamp steps and return attestation statuses."""
+        attestations: list[AttestationStatus] = []
 
-        for step in stamp.timestamp:
-            if isinstance(step, AppendStep):
-                current = current + step.data
-            elif isinstance(step, PrependStep):
-                current = step.data + current
-            elif isinstance(step, AttestationStep):
-                status = await self._verify_attestation(current, step.attestation)
-                statuses.append(status)
+        for step in timestamp:
+            match step:
+                case AppendStep() | PrependStep():
+                    current = self._execute_step(current, step)
+                case SHA256Step() | SHA1Step() | RIPEMD160Step() | Keccak256Step():
+                    current = self._execute_step(current, step)
+                case ForkStep(steps=branches):
+                    for branch in branches:
+                        branch_results = await self._verify_timestamp(current, branch)
+                        attestations.extend(branch_results)
+                case AttestationStep(attestation=att):
+                    status = await self._verify_attestation(current, att)
+                    attestations.append(status)
 
-        return statuses
+        return attestations
+
+    def _execute_step(self, current: bytes, step: Step) -> bytes:
+        """Execute a single timestamp step."""
+        import hashlib
+
+        match step:
+            case AppendStep(data=data):
+                return current + data
+            case PrependStep(data=data):
+                return data + current
+            case SHA256Step():
+                return sha256(current)
+            case Keccak256Step():
+                return keccak256(current)
+            case SHA1Step():
+                return hashlib.sha1(current).digest()
+            case RIPEMD160Step():
+                return hashlib.new("ripemd160", current).digest()
+            case _:
+                raise VerifyError(
+                    ErrorCode.INVALID_STRUCTURE,
+                    f"Unsupported step type: {type(step).__name__}",
+                )
 
     async def _verify_attestation(
         self, digest: bytes, attestation: Attestation
     ) -> AttestationStatus:
+        """Verify a single attestation."""
         if isinstance(attestation, PendingAttestation):
             return AttestationStatus(
                 attestation=attestation,
@@ -346,14 +437,16 @@ class SDK:
     async def _verify_bitcoin(
         self, digest: bytes, att: BitcoinAttestation
     ) -> AttestationStatus:
+        """Verify a Bitcoin attestation."""
         try:
             block_hash = await self._btc_rpc.get_block_hash(att.height)
             header = await self._btc_rpc.get_block_header(block_hash)
 
-            digest_reversed = digest[::-1]
-            merkleroot_bytes = bytes.fromhex(header.merkleroot)
+            # Bitcoin displays hashes in reversed byte order (little-endian for display)
+            # The merkleroot from RPC is in display format, so reverse it for comparison
+            merkleroot_bytes = bytes.fromhex(header.merkleroot)[::-1]
 
-            if digest_reversed != merkleroot_bytes:
+            if digest != merkleroot_bytes:
                 return AttestationStatus(
                     attestation=att,
                     status=AttestationStatusKind.INVALID,
@@ -378,6 +471,7 @@ class SDK:
     async def _verify_eas(
         self, digest: bytes, att: EASAttestation | EASTimestamped
     ) -> AttestationStatus:
+        """Verify an EAS attestation."""
         from web3 import Web3
 
         rpc_url = self._eth_rpc_urls.get(att.chain_id)
@@ -463,7 +557,8 @@ class SDK:
     def _aggregate_result(
         self, statuses: list[AttestationStatus]
     ) -> VerificationResult:
-        counts = {k: 0 for k in AttestationStatusKind}
+        """Aggregate attestation statuses into overall verification result."""
+        counts = dict.fromkeys(AttestationStatusKind, 0)
         for s in statuses:
             counts[s.status] += 1
 

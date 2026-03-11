@@ -5,22 +5,20 @@ from __future__ import annotations
 import pytest
 
 from uts_sdk import (
-    AttestationStatus,
     AttestationStatusKind,
     BitcoinAttestation,
-    EASTimestamped,
     EASAttestation,
+    EASTimestamped,
     OpCode,
     PendingAttestation,
-    UpgradeResult,
-    UpgradeStatus,
     UnknownAttestation,
+    UpgradeStatus,
     VerifyStatus,
 )
 from uts_sdk._types.attestations import attestation_kind
 from uts_sdk._types.digest import DigestHeader, DigestOp
-from uts_sdk._types.timestamp_steps import ForkStep
 from uts_sdk._types.ops import DIGEST_OPS, SECURE_DIGEST_OPS
+from uts_sdk._types.timestamp_steps import ForkStep
 
 
 class TestPendingAttestation:
@@ -113,7 +111,7 @@ class TestDigestHeader:
 
 class TestForkStep:
     def test_valid_fork(self) -> None:
-        from uts_sdk import Timestamp, SHA256Step, AttestationStep, PendingAttestation
+        from uts_sdk import AttestationStep, PendingAttestation, SHA256Step, Timestamp
 
         ts1: Timestamp = [SHA256Step()]
         ts2: Timestamp = [
@@ -124,7 +122,7 @@ class TestForkStep:
         assert len(fork.steps) == 2
 
     def test_single_branch_fails(self) -> None:
-        from uts_sdk import Timestamp, SHA256Step
+        from uts_sdk import SHA256Step, Timestamp
 
         ts: Timestamp = [SHA256Step()]
         with pytest.raises(ValueError, match="at least 2 branches"):

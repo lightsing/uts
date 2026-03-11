@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
-from uts_sdk._crypto.utils import sha256, keccak256, sha1, ripemd160, HashFunction
+from uts_sdk._crypto.utils import HashFunction, keccak256, ripemd160, sha1, sha256
 
 
 class TestHashFunctions:
@@ -16,9 +16,11 @@ class TestHashFunctions:
 
     def test_keccak256(self) -> None:
         result = keccak256(b"hello")
-        expected = hashlib.sha3_256(b"hello").digest()
-        assert result == expected
         assert len(result) == 32
+        assert (
+            result.hex()
+            == "1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8"
+        )
 
     def test_sha1(self) -> None:
         result = sha1(b"hello")

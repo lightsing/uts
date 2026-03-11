@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Literal
 
-from .ops import OpCode, SECURE_DIGEST_OPS
+from .ops import OpCode
 
 if TYPE_CHECKING:
     from .timestamp_steps import Timestamp
@@ -52,7 +52,8 @@ class DigestHeader:
         expected = expected_lengths[self.kind]
         if len(self.digest) != expected:
             raise ValueError(
-                f"Digest length mismatch for {self.kind.value}: expected {expected}, got {len(self.digest)}"
+                f"Digest length mismatch for {self.kind.value}: "
+                f"expected {expected}, got {len(self.digest)}"
             )
 
 

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING
 
 from uts_sdk._types import (
     AppendStep,
@@ -13,16 +13,16 @@ from uts_sdk._types import (
     DetachedTimestamp,
     DigestHeader,
     DigestOp,
-    EASTimestamped,
     EASAttestation,
+    EASTimestamped,
     ForkStep,
     HexlifyStep,
     Keccak256Step,
     OpCode,
     PendingAttestation,
     PrependStep,
-    RIPEMD160Step,
     ReverseStep,
+    RIPEMD160Step,
     SHA1Step,
     SHA256Step,
     Step,
@@ -44,7 +44,7 @@ from .constants import (
 if TYPE_CHECKING:
     pass
 
-_SAFE_URL_RE = re.compile(r"^https?://[\s\w./:-]+$")
+_SAFE_URL_RE = re.compile(r"^https?://[^\s]+$")
 
 
 def _op_from_code(code: int) -> OpCode | None:
@@ -81,7 +81,8 @@ class Decoder:
         if self._offset + required > self._length:
             raise DecodeError(
                 ErrorCode.UNEXPECTED_EOF,
-                f"Unexpected end of stream: needed {required} bytes but only {self.remaining} available",
+                f"Unexpected end of stream: needed {required} bytes "
+                f"but only {self.remaining} available",
                 offset=self._offset,
             )
 
@@ -295,7 +296,7 @@ class Decoder:
                 ErrorCode.INVALID_URI,
                 f"Invalid UTF-8 in URL: {e}",
                 offset=self._offset,
-            )
+            ) from e
 
         if len(url) > MAX_URI_LEN:
             raise DecodeError(

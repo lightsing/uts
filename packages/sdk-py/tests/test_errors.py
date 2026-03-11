@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
 from uts_sdk.errors import (
-    UTSError,
-    EncodeError,
     DecodeError,
-    RemoteError,
-    VerifyError,
+    EncodeError,
     ErrorCode,
+    RemoteError,
+    UTSError,
+    VerifyError,
 )
 
 

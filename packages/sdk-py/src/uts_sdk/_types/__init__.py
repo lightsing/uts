@@ -6,8 +6,8 @@ from __future__ import annotations
 from .attestations import (
     Attestation,
     BitcoinAttestation,
-    EASTimestamped,
     EASAttestation,
+    EASTimestamped,
     PendingAttestation,
     UnknownAttestation,
     attestation_kind,
@@ -27,19 +27,21 @@ from .timestamp_steps import (
     AppendStep,
     AttestationStep,
     DataStep,
-    DigestOp as DigestOpStep,
     ExecutionStep,
     ForkStep,
     HexlifyStep,
     Keccak256Step,
     PrependStep,
-    RIPEMD160Step,
     ReverseStep,
+    RIPEMD160Step,
     SHA1Step,
     SHA256Step,
     Step,
     Timestamp,
     UnaryOp,
+)
+from .timestamp_steps import (
+    DigestOp as DigestOpStep,
 )
 
 __all__ = [
