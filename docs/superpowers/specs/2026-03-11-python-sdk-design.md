@@ -106,6 +106,49 @@ class EASTimestamped:
 Attestation = PendingAttestation | BitcoinAttestation | EASAttestation | EASTimestamped
 ```
 
+### Status Types
+
+```python
+from enum import Enum, auto
+
+class NodePosition(Enum):
+    LEFT = "left"    # sibling is right child, APPEND sibling hash
+    RIGHT = "right"  # sibling is left child, PREPEND sibling hash
+
+class VerifyStatus(Enum):
+    VALID = "valid"
+    PARTIAL_VALID = "partial_valid"
+    INVALID = "invalid"
+    PENDING = "pending"
+
+class UpgradeStatus(Enum):
+    UPGRADED = "upgraded"
+    PENDING = "pending"
+    FAILED = "failed"
+
+class StampPhase(Enum):
+    GENERATING_NONCE = "generating_nonce"
+    BUILDING_MERKLE_TREE = "building_merkle_tree"
+    BROADCASTING = "broadcasting"
+    CALENDAR_RESPONSE = "calendar_response"
+    BUILDING_PROOF = "building_proof"
+    COMPLETE = "complete"
+
+@dataclass(frozen=True, slots=True)
+class AttestationStatus:
+    attestation: Attestation
+    status: VerifyStatus
+    error: Exception | None = None
+    additional_info: dict[str, object] | None = None
+
+@dataclass(frozen=True, slots=True)
+class UpgradeResult:
+    status: UpgradeStatus
+    original: PendingAttestation
+    upgraded: Timestamp | None = None
+    error: Exception | None = None
+```
+
 ### Timestamp Steps
 
 ```python
@@ -388,6 +431,10 @@ from uts_sdk._types import (
     DigestHeader,
     VerifyStatus,
     AttestationStatus,
+    UpgradeStatus,
+    UpgradeResult,
+    StampPhase,
+    NodePosition,
 )
 from uts_sdk._codec import Encoder, Decoder
 from uts_sdk._crypto import UnorderedMerkleTree
@@ -408,6 +455,10 @@ __all__ = [
     "DigestHeader",
     "VerifyStatus",
     "AttestationStatus",
+    "UpgradeStatus",
+    "UpgradeResult",
+    "StampPhase",
+    "NodePosition",
     "Encoder",
     "Decoder",
     "UnorderedMerkleTree",
