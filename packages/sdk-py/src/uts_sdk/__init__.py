@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from uts_sdk._codec import Decoder, Encoder
-from uts_sdk._crypto import UnorderedMerkleTree
+from uts_sdk._crypto import MerkleProof, SiblingNode, UnorderedMerkleTree, keccak256, sha256
 from uts_sdk._types import (
     Attestation,
     AttestationStatus,
@@ -58,6 +58,10 @@ __all__ = [
     "Encoder",
     "Decoder",
     "UnorderedMerkleTree",
+    "MerkleProof",
+    "SiblingNode",
+    "sha256",
+    "keccak256",
     "UTSError",
     "EncodeError",
     "DecodeError",

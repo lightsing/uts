@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Callable, overload
+from typing import Callable, Self, overload
 
 from uts_sdk._types.status import NodePosition
 
@@ -36,7 +36,6 @@ class MerkleProof(Sequence[SiblingNode]):
     def __getitem__(self, index: slice) -> Sequence[SiblingNode]: ...
 
     def __getitem__(self, index: int | slice) -> SiblingNode | Sequence[SiblingNode]:
-        return self._siblings[index]
         return self._siblings[index]
 
 
@@ -136,17 +135,14 @@ class UnorderedMerkleTree:
                 )
 
             next_level = []
-            next_indices = []
             for i in range(0, level_size - 1, 2):
                 left = nodes[i]
                 right = nodes[i + 1]
                 combined = INTERNAL_PREFIX + left + right
                 next_level.append(self._hash_func(combined))
-                next_indices.append(i // 2)
 
             if level_size % 2 == 1:
                 next_level.append(nodes[-1])
-                next_indices.append(level_size // 2)
 
             index = index // 2
             nodes = next_level
@@ -185,6 +181,3 @@ class UnorderedMerkleTree:
         root = data[offset : offset + 32]
 
         return cls(tuple(leaves), [hash_func(leaf) for leaf in leaves], root, hash_func)
-
-
-from typing import Self  # noqa: E402

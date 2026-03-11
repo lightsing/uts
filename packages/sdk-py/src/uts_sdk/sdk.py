@@ -6,7 +6,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Mapping, Sequence
+from typing import Any, Awaitable, Callable, Literal, Mapping, Sequence
 
 from yarl import URL
 
@@ -85,7 +85,7 @@ class SDK:
         timeout: float = 10.0,
         quorum: int | None = None,
         nonce_size: int = 32,
-        hash_algorithm: str = "keccak256",
+        hash_algorithm: Literal["sha256", "keccak256"] = "keccak256",
     ) -> None:
         self._calendars = [URL(str(c).rstrip("/") + "/") for c in (calendars or DEFAULT_CALENDARS)]
         self._btc_rpc = BitcoinRPC(btc_rpc_url)
@@ -120,6 +120,47 @@ class SDK:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self._btc_rpc.close()
+
+    @classmethod
+    def from_env(cls) -> SDK:
+        """Create SDK from environment variables.
+
+        Environment variables:
+            UTS_CALENDARS: Comma-separated list of calendar URLs
+            UTS_BTC_RPC_URL: Bitcoin RPC URL
+            UTS_ETH_RPC_URL_<CHAIN_ID>: Ethereum RPC URL for chain
+            UTS_TIMEOUT: Timeout in seconds
+            UTS_QUORUM: Minimum calendar responses
+            UTS_HASH_ALGORITHM: "sha256" or "keccak256"
+        """
+        import os
+
+        calendars = os.environ.get("UTS_CALENDARS")
+        calendars_list = [c.strip() for c in calendars.split(",")] if calendars else None
+
+        eth_rpc_urls: dict[int, str] = {}
+        for key, value in os.environ.items():
+            if key.startswith("UTS_ETH_RPC_URL_"):
+                try:
+                    chain_id = int(key[len("UTS_ETH_RPC_URL_") :])
+                    eth_rpc_urls[chain_id] = value
+                except ValueError:
+                    pass
+
+        timeout_str = os.environ.get("UTS_TIMEOUT", "10.0")
+        quorum_str = os.environ.get("UTS_QUORUM")
+        hash_algo = os.environ.get("UTS_HASH_ALGORITHM", "keccak256")
+        if hash_algo not in ("sha256", "keccak256"):
+            hash_algo = "keccak256"
+
+        return cls(
+            calendars=calendars_list,
+            btc_rpc_url=os.environ.get("UTS_BTC_RPC_URL", "https://bitcoin-rpc.publicnode.com"),
+            eth_rpc_urls=eth_rpc_urls or None,
+            timeout=float(timeout_str),
+            quorum=int(quorum_str) if quorum_str else None,
+            hash_algorithm=hash_algo,
+        )
 
     async def stamp(
         self,

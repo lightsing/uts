@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from .attestations import Attestation
+from .attestations import Attestation, PendingAttestation
 
 if TYPE_CHECKING:
     from .timestamp_steps import Timestamp
@@ -73,6 +73,6 @@ class UpgradeResult:
     """Result of upgrading a pending attestation."""
 
     status: UpgradeStatus
-    original: Attestation
+    original: PendingAttestation
     upgraded: Timestamp | None = None
     error: Exception | None = None
