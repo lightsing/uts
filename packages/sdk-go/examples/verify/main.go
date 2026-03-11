@@ -14,7 +14,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: verify <timestamp.uts>")
+		fmt.Println("Usage: verify <timestamp.ots>")
 		os.Exit(1)
 	}
 

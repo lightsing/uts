@@ -14,7 +14,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: upgrade <timestamp.uts> [output.uts]")
+		fmt.Println("Usage: upgrade <timestamp.ots> [output.ots]")
 		fmt.Println("\nUpgrades pending attestations in a timestamp by fetching")
 		fmt.Println("completed attestations from calendar servers.")
 		os.Exit(1)

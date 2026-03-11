@@ -16,8 +16,8 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: stamp <file> [output.uts]")
-		fmt.Println("       stamp --sample [output.uts]")
+		fmt.Println("Usage: stamp <file> [output.ots]")
+		fmt.Println("       stamp --sample [output.ots]")
 		os.Exit(1)
 	}
 
@@ -31,14 +31,14 @@ func main() {
 		if len(os.Args) > 2 {
 			outputFile = os.Args[2]
 		} else {
-			outputFile = "sample.uts"
+			outputFile = "sample.ots"
 		}
 	} else {
 		inputFile := os.Args[1]
 		if len(os.Args) > 2 {
 			outputFile = os.Args[2]
 		} else {
-			outputFile = inputFile + ".uts"
+			outputFile = inputFile + ".ots"
 		}
 
 		var err error
