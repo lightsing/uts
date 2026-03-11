@@ -107,14 +107,20 @@ func (a *PendingAttestation) Valid() bool {
 }
 
 type UnknownAttestation struct {
-	Tag  [TagSize]byte
+	tag  [TagSize]byte
 	Data []byte
 }
 
 func (a *UnknownAttestation) Kind() AttestationKind { return KindUnknown }
+func (a *UnknownAttestation) Tag() [TagSize]byte    { return a.tag }
+
+func NewUnknownAttestation(tag [TagSize]byte, data []byte) *UnknownAttestation {
+	return &UnknownAttestation{tag: tag, Data: data}
+}
 
 func (a *UnknownAttestation) String() string {
-	return fmt.Sprintf("Unknown Attestation with tag %s", hex.EncodeToString(a.Tag[:]))
+	tag := a.Tag()
+	return fmt.Sprintf("Unknown Attestation with tag %s", hex.EncodeToString(tag[:]))
 }
 
 func AttestationKindFromTag(tag [TagSize]byte) AttestationKind {

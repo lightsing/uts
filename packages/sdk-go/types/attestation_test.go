@@ -163,17 +163,14 @@ func TestUnknownAttestation(t *testing.T) {
 	tag := [TagSize]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
 	data := []byte("somedata")
 
-	att := &UnknownAttestation{
-		Tag:  tag,
-		Data: data,
-	}
+	att := NewUnknownAttestation(tag, data)
 
 	if att.Kind() != KindUnknown {
 		t.Errorf("UnknownAttestation.Kind() = %v, want %v", att.Kind(), KindUnknown)
 	}
 
-	if att.Tag != tag {
-		t.Errorf("UnknownAttestation.Tag = %v, want %v", att.Tag, tag)
+	if att.Tag() != tag {
+		t.Errorf("UnknownAttestation.Tag() = %v, want %v", att.Tag(), tag)
 	}
 
 	if string(att.Data) != string(data) {
