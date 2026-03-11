@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/uts-dot/sdk-go"
+	"github.com/uts-dot/sdk-go/errors"
 	"github.com/uts-dot/sdk-go/types"
 )
 
@@ -235,10 +235,10 @@ func TestDecoder_ReadMagic(t *testing.T) {
 	}{
 		{"valid magic", validMagic, 0x01, false, nil},
 		{"invalid magic", append([]byte{0x00, 0x01, 0x02, 0x03}, make([]byte, 28)...), 0, true, func(err error) bool {
-			return err.(*uts.DecodeError).Code == uts.ErrCodeBadMagic
+			return err.(*errors.DecodeError).Code == errors.ErrCodeBadMagic
 		}},
 		{"empty", []byte{}, 0, true, func(err error) bool {
-			return err.(*uts.DecodeError).Code == uts.ErrCodeUnexpectedEof
+			return err.(*errors.DecodeError).Code == errors.ErrCodeUnexpectedEof
 		}},
 	}
 

@@ -3,7 +3,7 @@ package codec
 import (
 	"bytes"
 
-	"github.com/uts-dot/sdk-go"
+	"github.com/uts-dot/sdk-go/errors"
 	"github.com/uts-dot/sdk-go/types"
 )
 
@@ -22,14 +22,14 @@ func (d *Decoder) Remaining() int {
 
 func (d *Decoder) checkBounds(n int) error {
 	if d.pos+n > len(d.data) {
-		return uts.ErrUnexpectedEof()
+		return errors.ErrUnexpectedEof()
 	}
 	return nil
 }
 
 func (d *Decoder) CheckEOF() error {
 	if d.Remaining() > 0 {
-		return uts.NewDecodeError(uts.ErrCodeInvalidData, "expected end of stream but bytes remain", nil)
+		return errors.NewDecodeError(errors.ErrCodeInvalidData, "expected end of stream but bytes remain", nil)
 	}
 	return nil
 }
@@ -65,10 +65,10 @@ func (d *Decoder) ReadU32() (uint32, error) {
 		val := uint32(b & 0x7f)
 		if shift >= 28 {
 			if shift == 28 && val > 0x0f {
-				return 0, uts.ErrLEB128Overflow(32)
+				return 0, errors.ErrLEB128Overflow(32)
 			}
 			if shift > 28 {
-				return 0, uts.ErrLEB128Overflow(32)
+				return 0, errors.ErrLEB128Overflow(32)
 			}
 		}
 
@@ -97,10 +97,10 @@ func (d *Decoder) ReadU64() (uint64, error) {
 		val := uint64(b & 0x7f)
 		if shift >= 63 {
 			if shift == 63 && val > 0x01 {
-				return 0, uts.ErrLEB128Overflow(64)
+				return 0, errors.ErrLEB128Overflow(64)
 			}
 			if shift > 63 {
-				return 0, uts.ErrLEB128Overflow(64)
+				return 0, errors.ErrLEB128Overflow(64)
 			}
 		}
 
@@ -138,7 +138,7 @@ func (d *Decoder) ReadOp() (types.Op, error) {
 	}
 	op, ok := types.NewOp(b)
 	if !ok {
-		return 0, uts.ErrBadOpCode(b)
+		return 0, errors.ErrBadOpCode(b)
 	}
 	return op, nil
 }
@@ -149,7 +149,7 @@ func (d *Decoder) ReadMagic() (byte, error) {
 		return 0, err
 	}
 	if !bytes.Equal(magic, MagicBytes) {
-		return 0, uts.ErrBadMagic()
+		return 0, errors.ErrBadMagic()
 	}
 	return d.ReadByte()
 }
@@ -162,7 +162,7 @@ func (d *Decoder) ReadHeader() (*types.DigestHeader, error) {
 
 	digestOp := types.DigestOp(op)
 	if !digestOp.Valid() {
-		return nil, uts.ErrExpectedDigestOp(op.String())
+		return nil, errors.ErrExpectedDigestOp(op.String())
 	}
 
 	digestLen := digestOp.OutputSize()
@@ -182,10 +182,10 @@ func (d *Decoder) readPendingAttestation() (*types.PendingAttestation, error) {
 
 	uri := string(uriBytes)
 	if len(uri) > types.MaxURILen {
-		return nil, uts.ErrUriTooLong()
+		return nil, errors.ErrUriTooLong()
 	}
 	if !types.ValidateURI(uri) {
-		return nil, uts.ErrInvalidUriChar()
+		return nil, errors.ErrInvalidUriChar()
 	}
 
 	return &types.PendingAttestation{URI: uri}, nil
@@ -248,7 +248,7 @@ func (d *Decoder) ReadAttestationStep() (*types.AttestationStep, error) {
 		return nil, err
 	}
 	if op != types.OpAttestation {
-		return nil, uts.NewDecodeError(uts.ErrCodeInvalidData,
+		return nil, errors.NewDecodeError(errors.ErrCodeInvalidData,
 			"expected ATTESTATION op", map[string]interface{}{"op": op.String()})
 	}
 
@@ -299,7 +299,7 @@ func (d *Decoder) ReadExecutionStep(op types.Op) (types.Step, error) {
 	case types.OpRIPEMD160:
 		return types.NewRIPEMD160Step(nil), nil
 	default:
-		return nil, uts.ErrBadOpCode(byte(op))
+		return nil, errors.ErrBadOpCode(byte(op))
 	}
 }
 
@@ -309,7 +309,7 @@ func (d *Decoder) ReadForkStep() (*types.ForkStep, error) {
 	for {
 		op, ok := d.PeekOp()
 		if !ok {
-			return nil, uts.ErrUnexpectedEof()
+			return nil, errors.ErrUnexpectedEof()
 		}
 
 		if op == types.OpFORK {
@@ -330,7 +330,7 @@ func (d *Decoder) ReadForkStep() (*types.ForkStep, error) {
 	}
 
 	if len(branches) < 2 {
-		return nil, uts.NewDecodeError(uts.ErrCodeInvalidData,
+		return nil, errors.NewDecodeError(errors.ErrCodeInvalidData,
 			"fork step must have at least 2 branches", nil)
 	}
 
@@ -340,7 +340,7 @@ func (d *Decoder) ReadForkStep() (*types.ForkStep, error) {
 func (d *Decoder) ReadStep() (types.Step, error) {
 	op, ok := d.PeekOp()
 	if !ok {
-		return nil, uts.ErrUnexpectedEof()
+		return nil, errors.ErrUnexpectedEof()
 	}
 
 	switch op {
@@ -380,7 +380,7 @@ func DecodeDetachedTimestamp(data []byte) (*types.DetachedTimestamp, error) {
 		return nil, err
 	}
 	if version != 0x01 {
-		return nil, uts.ErrBadVersion()
+		return nil, errors.ErrBadVersion()
 	}
 
 	header, err := dec.ReadHeader()

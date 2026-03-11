@@ -3,7 +3,7 @@ package codec
 import (
 	"strings"
 
-	"github.com/uts-dot/sdk-go"
+	"github.com/uts-dot/sdk-go/errors"
 	"github.com/uts-dot/sdk-go/types"
 )
 
@@ -96,7 +96,7 @@ func (e *Encoder) WriteExecutionStep(step types.Step) *Encoder {
 
 func (e *Encoder) WriteForkStep(step *types.ForkStep) error {
 	if len(step.Branches) < 2 {
-		return uts.NewEncodeError(uts.ErrCodeInvalidData, "FORK step must have at least 2 branches", nil)
+		return errors.NewEncodeError(errors.ErrCodeInvalidData, "FORK step must have at least 2 branches", nil)
 	}
 	for _, branch := range step.Branches[:len(step.Branches)-1] {
 		e.WriteOp(types.OpFORK)
@@ -110,10 +110,10 @@ func (e *Encoder) WriteForkStep(step *types.ForkStep) error {
 func (e *Encoder) WritePendingAttestation(att *types.PendingAttestation) error {
 	uri := strings.TrimSuffix(att.URI, "/")
 	if len(uri) > types.MaxURILen {
-		return uts.NewEncodeError(uts.ErrCodeUriTooLong, "URI exceeds maximum length", nil)
+		return errors.NewEncodeError(errors.ErrCodeUriTooLong, "URI exceeds maximum length", nil)
 	}
 	if !types.ValidateURI(uri) {
-		return uts.NewEncodeError(uts.ErrCodeInvalidUriChar, "invalid character in URI", nil)
+		return errors.NewEncodeError(errors.ErrCodeInvalidUriChar, "invalid character in URI", nil)
 	}
 	e.WriteLengthPrefixed([]byte(uri))
 	return nil

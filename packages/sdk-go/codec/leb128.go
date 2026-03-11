@@ -3,7 +3,7 @@ package codec
 import (
 	"io"
 
-	"github.com/uts-dot/sdk-go"
+	"github.com/uts-dot/sdk-go/errors"
 )
 
 func EncodeU32(n uint32) []byte {
@@ -35,10 +35,10 @@ func DecodeU32(r io.Reader) (uint32, error) {
 		val := uint32(b[0] & 0x7f)
 		if shift >= 28 {
 			if shift == 28 && val > 0x0f {
-				return 0, uts.ErrLEB128Overflow(32)
+				return 0, errors.ErrLEB128Overflow(32)
 			}
 			if shift > 28 {
-				return 0, uts.ErrLEB128Overflow(32)
+				return 0, errors.ErrLEB128Overflow(32)
 			}
 		}
 
@@ -83,10 +83,10 @@ func DecodeU64(r io.Reader) (uint64, error) {
 		val := uint64(b[0] & 0x7f)
 		if shift >= 63 {
 			if shift == 63 && val > 0x01 {
-				return 0, uts.ErrLEB128Overflow(64)
+				return 0, errors.ErrLEB128Overflow(64)
 			}
 			if shift > 63 {
-				return 0, uts.ErrLEB128Overflow(64)
+				return 0, errors.ErrLEB128Overflow(64)
 			}
 		}
 
