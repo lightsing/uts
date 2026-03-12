@@ -202,10 +202,14 @@ func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*type
 		var nonceDigest [crypto.HashSize]byte
 		switch s.hashAlgorithm {
 		case HashSHA256:
-			data := append(digest, nonce...)
+			data := make([]byte, len(digest)+len(nonce))
+			copy(data, digest)
+			copy(data[len(digest):], nonce)
 			nonceDigest = crypto.SHA256(data)
 		case HashKeccak256:
-			data := append(digest, nonce...)
+			data := make([]byte, len(digest)+len(nonce))
+			copy(data, digest)
+			copy(data[len(digest):], nonce)
 			nonceDigest = crypto.Keccak256(data)
 		default:
 			return nil, errors.NewSDKError(errors.ErrCodeUnsupported, fmt.Sprintf("unsupported hash algorithm: %s", s.hashAlgorithm), nil)
