@@ -38,18 +38,19 @@ const (
 	HashKeccak256 HashAlgorithm = "keccak256"
 )
 
-const maxHttpResponseBytes = 1024 * 1024
+const DefaultMaxHttpResponseBytes = 1024 * 1024
 
 type SDK struct {
-	calendars     []string
-	btcRPC        attestation.BitcoinRPCClient
-	ethRPC        *rpc.EthereumClient
-	timeout       time.Duration
-	quorum        int
-	nonceSize     int
-	hashAlgorithm HashAlgorithm
-	httpClient    *http.Client
-	logger        *logging.Logger
+	calendars            []string
+	btcRPC               attestation.BitcoinRPCClient
+	ethRPC               *rpc.EthereumClient
+	timeout              time.Duration
+	quorum               int
+	nonceSize            int
+	hashAlgorithm        HashAlgorithm
+	httpClient           *http.Client
+	maxHttpResponseBytes int64
+	logger               *logging.Logger
 }
 
 type Option func(*SDK) error
@@ -112,6 +113,13 @@ func WithLogger(logger *logging.Logger) Option {
 	}
 }
 
+func WithMaxHttpResponseBytes(n int64) Option {
+	return func(s *SDK) error {
+		s.maxHttpResponseBytes = n
+		return nil
+	}
+}
+
 func NewSDK(opts ...Option) (*SDK, error) {
 	calendars := make([]string, len(DefaultCalendars))
 	copy(calendars, DefaultCalendars)
@@ -124,7 +132,8 @@ func NewSDK(opts ...Option) (*SDK, error) {
 		httpClient: &http.Client{
 			Timeout: DefaultTimeout,
 		},
-		logger: logging.NewDefaultLogger(logging.LevelInfo),
+		logger:               logging.NewDefaultLogger(logging.LevelInfo),
+		maxHttpResponseBytes: DefaultMaxHttpResponseBytes,
 	}
 
 	for _, opt := range opts {
@@ -211,9 +220,9 @@ func (s *SDK) requestAttestation(ctx context.Context, calendarURL string, root [
 		)
 	}
 
-	reader := io.LimitReader(resp.Body, maxHttpResponseBytes+1)
+	reader := io.LimitReader(resp.Body, s.maxHttpResponseBytes+1)
 	data, err := io.ReadAll(reader)
-	if len(data) > maxHttpResponseBytes {
+	if int64(len(data)) > s.maxHttpResponseBytes {
 		return nil, errors.NewRemoteError(fmt.Sprintf("response from %s is too large", calendarURL), nil)
 	}
 	if err != nil {
@@ -554,9 +563,9 @@ func (s *SDK) upgradeAttestation(ctx context.Context, commitment []byte, att *ty
 		)
 	}
 
-	reader := io.LimitReader(resp.Body, maxHttpResponseBytes+1)
+	reader := io.LimitReader(resp.Body, s.maxHttpResponseBytes+1)
 	data, err := io.ReadAll(reader)
-	if len(data) > maxHttpResponseBytes {
+	if int64(len(data)) > s.maxHttpResponseBytes {
 		return nil, errors.NewRemoteError(fmt.Sprintf("response from %s is too large", att.URI), nil)
 	}
 	if err != nil {
