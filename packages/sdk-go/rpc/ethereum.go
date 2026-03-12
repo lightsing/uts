@@ -29,6 +29,13 @@ var (
 		534352:   common.HexToAddress("0xC47300428b6AD2c7D03BB76D05A176058b47E6B0"),
 		11155111: common.HexToAddress("0xC47300428b6AD2c7D03BB76D05A176058b47E6B0"),
 	}
+
+	DefaultRpcURLs = map[uint64]string{
+		1:        "https://0xrpc.io/eth",
+		534351:   "https://sepolia-rpc.scroll.io",
+		534352:   "https://rpc.scroll.io",
+		11155111: "https://0xrpc.io/sepolia",
+	}
 )
 
 type Attestation struct {
@@ -50,9 +57,14 @@ type EthereumClient struct {
 }
 
 func NewEthereumClient() *EthereumClient {
-	return &EthereumClient{
+	client := &EthereumClient{
 		clients: make(map[uint64]*ethclient.Client),
 	}
+	for chainID, rpcURL := range DefaultRpcURLs {
+		_ = client.AddChain(chainID, rpcURL)
+		// TODO: warn if any of the default chains fail to connect, but don't fail entirely
+	}
+	return client
 }
 
 func (c *EthereumClient) AddChain(chainID uint64, rpcURL string) error {
@@ -165,13 +177,13 @@ func (c *EthereumClient) GetTimestamp(ctx context.Context, chainID uint64, data 
 		return 0, fmt.Errorf("contract call failed: %w", err)
 	}
 
-	var timestamp *big.Int
+	var timestamp uint64
 	err = parsedABI.UnpackIntoInterface(&timestamp, "getTimestamp", result)
 	if err != nil {
 		return 0, fmt.Errorf("failed to unpack result: %w", err)
 	}
 
-	return timestamp.Uint64(), nil
+	return timestamp, nil
 }
 
 func (c *EthereumClient) Close() {

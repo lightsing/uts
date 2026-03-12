@@ -21,7 +21,7 @@ import (
 )
 
 var DefaultCalendars = []string{
-	"https://lgm1.calendar.test.timestamps.now/",
+	"https://lgm1.calendar.test.timestamps.now",
 }
 
 const (
@@ -108,6 +108,11 @@ func NewSDK(opts ...Option) *SDK {
 
 	for _, opt := range opts {
 		opt(s)
+	}
+
+	// trim trailing slashes from calendar URLs
+	for i, url := range s.calendars {
+		s.calendars[i] = string(bytes.TrimRight([]byte(url), "/"))
 	}
 
 	s.httpClient.Timeout = s.timeout
