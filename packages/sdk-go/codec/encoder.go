@@ -1,9 +1,11 @@
 package codec
 
 import (
+	"context"
 	"strings"
 
 	"github.com/lightsing/uts/packages/sdk-go/errors"
+	"github.com/lightsing/uts/packages/sdk-go/logging"
 	"github.com/lightsing/uts/packages/sdk-go/types"
 )
 
@@ -186,6 +188,8 @@ func (e *Encoder) WriteStep(step types.Step) error {
 }
 
 func (e *Encoder) WriteTimestamp(ts types.Timestamp) error {
+	logger := logging.Default()
+	logger.Trace(context.Background(), "Encoder: WriteTimestamp", "steps", len(ts))
 	for _, step := range ts {
 		if err := e.WriteStep(step); err != nil {
 			return err
@@ -195,11 +199,15 @@ func (e *Encoder) WriteTimestamp(ts types.Timestamp) error {
 }
 
 func EncodeDetachedTimestamp(ots *types.DetachedTimestamp) ([]byte, error) {
+	logger := logging.Default()
+	logger.Trace(context.Background(), "EncodeDetachedTimestamp: encoding", "digest_len", len(ots.Header.DigestBytes()))
 	enc := NewEncoder()
 	enc.WriteVersionedMagic(0x01)
 	enc.WriteHeader(ots.Header)
 	if err := enc.WriteTimestamp(ots.Timestamp); err != nil {
 		return nil, err
 	}
-	return enc.Bytes(), nil
+	result := enc.Bytes()
+	logger.Trace(context.Background(), "EncodeDetachedTimestamp: complete", "output_len", len(result))
+	return result, nil
 }

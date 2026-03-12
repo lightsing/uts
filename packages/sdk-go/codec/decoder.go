@@ -2,8 +2,10 @@ package codec
 
 import (
 	"bytes"
+	"context"
 
 	"github.com/lightsing/uts/packages/sdk-go/errors"
+	"github.com/lightsing/uts/packages/sdk-go/logging"
 	"github.com/lightsing/uts/packages/sdk-go/types"
 )
 
@@ -128,7 +130,8 @@ func (d *Decoder) PeekOp() (types.Op, bool) {
 	if d.Remaining() == 0 {
 		return 0, false
 	}
-	return types.Op(d.data[d.pos]), true
+	b := d.data[d.pos]
+	return types.NewOp(b)
 }
 
 func (d *Decoder) ReadOp() (types.Op, error) {
@@ -366,6 +369,8 @@ func (d *Decoder) ReadStep() (types.Step, error) {
 }
 
 func (d *Decoder) ReadTimestamp() (types.Timestamp, error) {
+	logger := logging.Default()
+	logger.Trace(context.Background(), "Decoder: ReadTimestamp", "remaining", d.Remaining())
 	steps := make(types.Timestamp, 0)
 
 	for d.Remaining() > 0 {
@@ -380,10 +385,13 @@ func (d *Decoder) ReadTimestamp() (types.Timestamp, error) {
 		}
 	}
 
+	logger.Trace(context.Background(), "Decoder: ReadTimestamp complete", "steps", len(steps))
 	return steps, nil
 }
 
 func DecodeDetachedTimestamp(data []byte) (*types.DetachedTimestamp, error) {
+	logger := logging.Default()
+	logger.Trace(context.Background(), "DecodeDetachedTimestamp: decoding", "input_len", len(data))
 	dec := NewDecoder(data)
 
 	version, err := dec.ReadMagic()
@@ -399,10 +407,11 @@ func DecodeDetachedTimestamp(data []byte) (*types.DetachedTimestamp, error) {
 		return nil, err
 	}
 
-	timestamp, err := dec.ReadTimestamp()
+	ts, err := dec.ReadTimestamp()
 	if err != nil {
 		return nil, err
 	}
 
-	return types.NewDetachedTimestamp(header, timestamp), nil
+	logger.Trace(context.Background(), "DecodeDetachedTimestamp: complete", "steps", len(ts))
+	return types.NewDetachedTimestamp(header, ts), nil
 }

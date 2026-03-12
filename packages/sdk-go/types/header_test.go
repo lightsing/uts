@@ -115,25 +115,23 @@ func TestNewDigestHeader(t *testing.T) {
 }
 
 func TestDigestHeaderDigestBytes(t *testing.T) {
-	digest := make([]byte, 32)
-	for i := range digest {
-		digest[i] = byte(i)
-	}
-
 	tests := []struct {
-		name      string
-		kind      DigestOp
-		wantLen   int
-		wantBytes []byte
+		name    string
+		kind    DigestOp
+		wantLen int
 	}{
-		{"SHA256", DigestSHA256, 32, digest},
-		{"SHA1", DigestSHA1, 20, digest[:20]},
-		{"RIPEMD160", DigestRIPEMD160, 20, digest[:20]},
-		{"KECCAK256", DigestKECCAK256, 32, digest},
+		{"SHA256", DigestSHA256, 32},
+		{"SHA1", DigestSHA1, 20},
+		{"RIPEMD160", DigestRIPEMD160, 20},
+		{"KECCAK256", DigestKECCAK256, 32},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			digest := make([]byte, tt.wantLen)
+			for i := range digest {
+				digest[i] = byte(i)
+			}
 			header, err := NewDigestHeader(tt.kind, digest)
 			if err != nil {
 				t.Fatalf("NewDigestHeader() error = %v", err)
@@ -142,7 +140,7 @@ func TestDigestHeaderDigestBytes(t *testing.T) {
 			if len(got) != tt.wantLen {
 				t.Errorf("DigestBytes() length = %v, want %v", len(got), tt.wantLen)
 			}
-			if !bytes.Equal(got, tt.wantBytes[:tt.wantLen]) {
+			if !bytes.Equal(got, digest) {
 				t.Errorf("DigestBytes() content mismatch")
 			}
 		})

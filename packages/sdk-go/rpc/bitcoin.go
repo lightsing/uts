@@ -2,17 +2,21 @@ package rpc
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/lightsing/uts/packages/sdk-go/logging"
 )
 
 type BitcoinRPC struct {
 	url        string
 	httpClient *http.Client
+	logger     *logging.Logger
 }
 
 type BlockHeader struct {
@@ -48,26 +52,38 @@ func NewBitcoinRPC(url string) *BitcoinRPC {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		logger: logging.Default(),
 	}
 }
 
+func (c *BitcoinRPC) SetLogger(logger *logging.Logger) {
+	c.logger = logger
+}
+
 func (c *BitcoinRPC) GetBlockHash(height int64) (string, error) {
+	c.logger.Debug(context.Background(), "BitcoinRPC: GetBlockHash", "height", height)
 	var result string
 	if err := c.call("getblockhash", []interface{}{height}, &result); err != nil {
+		c.logger.Warn(context.Background(), "BitcoinRPC: GetBlockHash failed", "height", height, "error", err)
 		return "", fmt.Errorf("getblockhash: %w", err)
 	}
+	c.logger.Trace(context.Background(), "BitcoinRPC: GetBlockHash success", "height", height, "hash", result)
 	return result, nil
 }
 
 func (c *BitcoinRPC) GetBlockHeader(hash string) (*BlockHeader, error) {
+	c.logger.Debug(context.Background(), "BitcoinRPC: GetBlockHeader", "hash", hash)
 	var result BlockHeader
 	if err := c.call("getblockheader", []interface{}{hash}, &result); err != nil {
+		c.logger.Warn(context.Background(), "BitcoinRPC: GetBlockHeader failed", "hash", hash, "error", err)
 		return nil, fmt.Errorf("getblockheader: %w", err)
 	}
+	c.logger.Trace(context.Background(), "BitcoinRPC: GetBlockHeader success", "hash", hash, "height", result.Height, "time", result.Time)
 	return &result, nil
 }
 
 func (c *BitcoinRPC) call(method string, params []interface{}, result interface{}) error {
+	c.logger.Trace(context.Background(), "BitcoinRPC: calling", "method", method)
 	req := jsonRPCRequest{
 		Jsonrpc: "2.0",
 		Method:  method,
@@ -103,6 +119,7 @@ func (c *BitcoinRPC) call(method string, params []interface{}, result interface{
 	}
 
 	if rpcResp.Error != nil {
+		c.logger.Warn(context.Background(), "BitcoinRPC: RPC error", "method", method, "code", rpcResp.Error.Code, "message", rpcResp.Error.Message)
 		return fmt.Errorf("rpc error %d: %s", rpcResp.Error.Code, rpcResp.Error.Message)
 	}
 

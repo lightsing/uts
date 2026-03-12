@@ -16,6 +16,7 @@ import (
 	"github.com/lightsing/uts/packages/sdk-go/codec"
 	"github.com/lightsing/uts/packages/sdk-go/crypto"
 	"github.com/lightsing/uts/packages/sdk-go/errors"
+	"github.com/lightsing/uts/packages/sdk-go/logging"
 	"github.com/lightsing/uts/packages/sdk-go/rpc"
 	"github.com/lightsing/uts/packages/sdk-go/types"
 )
@@ -46,6 +47,7 @@ type SDK struct {
 	nonceSize     int
 	hashAlgorithm HashAlgorithm
 	httpClient    *http.Client
+	logger        *logging.Logger
 }
 
 type Option func(*SDK)
@@ -95,6 +97,12 @@ func WithHashAlgorithm(alg HashAlgorithm) Option {
 	}
 }
 
+func WithLogger(logger *logging.Logger) Option {
+	return func(s *SDK) {
+		s.logger = logger
+	}
+}
+
 func NewSDK(opts ...Option) *SDK {
 	s := &SDK{
 		calendars:     DefaultCalendars,
@@ -104,13 +112,13 @@ func NewSDK(opts ...Option) *SDK {
 		httpClient: &http.Client{
 			Timeout: DefaultTimeout,
 		},
+		logger: logging.NewDefaultLogger(logging.LevelInfo),
 	}
 
 	for _, opt := range opts {
 		opt(s)
 	}
 
-	// trim trailing slashes from calendar URLs
 	for i, url := range s.calendars {
 		s.calendars[i] = string(bytes.TrimRight([]byte(url), "/"))
 	}
@@ -124,6 +132,13 @@ func NewSDK(opts ...Option) *SDK {
 	if s.ethRPC == nil {
 		s.ethRPC = rpc.NewEthereumClient()
 	}
+
+	s.logger.Debug(context.Background(), "SDK initialized",
+		"calendars", len(s.calendars),
+		"timeout", s.timeout,
+		"quorum", s.quorum,
+		"hash_algorithm", s.hashAlgorithm,
+	)
 
 	return s
 }
@@ -190,15 +205,20 @@ func (s *SDK) requestAttestation(ctx context.Context, calendarURL string, root [
 }
 
 func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*types.DetachedTimestamp, error) {
+	s.logger.Trace(ctx, "Stamp: enter", "digest_count", len(headers))
+
 	if len(headers) == 0 {
 		return nil, errors.NewSDKError(errors.ErrCodeEmptyRequests, "at least one digest header is required", nil)
 	}
+
+	s.logger.Debug(ctx, "Stamp: generating nonces", "count", len(headers))
 	nonces := make([][]byte, len(headers))
 	nonceDigests := make([][crypto.HashSize]byte, len(headers))
 
 	for i, header := range headers {
 		nonce := make([]byte, s.nonceSize)
 		if _, err := rand.Read(nonce); err != nil {
+			s.logger.Error(ctx, "Stamp: failed to generate nonce", "index", i, "error", err)
 			return nil, errors.NewSDKError(errors.ErrCodeGeneric, "failed to generate nonce", map[string]interface{}{"error": err.Error()})
 		}
 		nonces[i] = nonce
@@ -222,12 +242,15 @@ func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*type
 		nonceDigests[i] = nonceDigest
 	}
 
+	s.logger.Debug(ctx, "Stamp: building merkle tree")
 	tree := crypto.NewMerkleTree(nonceDigests)
 	root := tree.Root()
+	s.logger.Trace(ctx, "Stamp: merkle tree built", "root", hex.EncodeToString(root[:]))
 
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
+	s.logger.Debug(ctx, "Stamp: submitting to calendars", "count", len(s.calendars), "quorum", s.quorum)
 	respChan := make(chan calendarResponse, len(s.calendars))
 	var wg sync.WaitGroup
 
@@ -235,7 +258,13 @@ func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*type
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
+			s.logger.Trace(ctx, "Stamp: requesting attestation", "calendar", url)
 			ts, err := s.requestAttestation(ctx, url, root[:])
+			if err != nil {
+				s.logger.Debug(ctx, "Stamp: calendar error", "calendar", url, "error", err)
+			} else {
+				s.logger.Debug(ctx, "Stamp: calendar success", "calendar", url)
+			}
 			respChan <- calendarResponse{timestamp: ts, err: err, url: url}
 		}(calURL)
 	}
@@ -252,7 +281,9 @@ func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*type
 		}
 	}
 
+	s.logger.Debug(ctx, "Stamp: responses received", "success", len(successfulResponses), "quorum", s.quorum)
 	if len(successfulResponses) < s.quorum {
+		s.logger.Warn(ctx, "Stamp: quorum not reached", "success", len(successfulResponses), "quorum", s.quorum)
 		return nil, errors.NewRemoteError(
 			fmt.Sprintf("only received %d valid responses from calendars, which does not meet the quorum of %d",
 				len(successfulResponses), s.quorum),
@@ -264,6 +295,7 @@ func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*type
 	if len(successfulResponses) == 1 {
 		mergedTimestamp = successfulResponses[0]
 	} else {
+		s.logger.Trace(ctx, "Stamp: merging multiple responses into fork", "count", len(successfulResponses))
 		mergedTimestamp = types.Timestamp{
 			types.NewForkStep(successfulResponses),
 		}
@@ -359,10 +391,12 @@ func (s *SDK) executeStep(input []byte, step types.Step) ([]byte, error) {
 }
 
 func (s *SDK) verifyTimestamp(ctx context.Context, input []byte, ts types.Timestamp) ([]*types.AttestationStatus, error) {
+	s.logger.Trace(ctx, "verifyTimestamp: enter", "input_len", len(input), "steps", len(ts))
 	var attestations []*types.AttestationStatus
 	current := input
 
-	for _, step := range ts {
+	for i, step := range ts {
+		s.logger.Trace(ctx, "verifyTimestamp: processing step", "index", i, "step_type", fmt.Sprintf("%T", step))
 		switch st := step.(type) {
 		case *types.AppendStep:
 			var err error
@@ -405,6 +439,7 @@ func (s *SDK) verifyTimestamp(ctx context.Context, input []byte, ts types.Timest
 		case *types.RIPEMD160Step:
 			return nil, fmt.Errorf("RIPEMD160 not supported")
 		case *types.ForkStep:
+			s.logger.Trace(ctx, "verifyTimestamp: entering fork", "branches", len(st.Branches))
 			for _, branch := range st.Branches {
 				results, err := s.verifyTimestamp(ctx, current, branch)
 				if err != nil {
@@ -413,25 +448,31 @@ func (s *SDK) verifyTimestamp(ctx context.Context, input []byte, ts types.Timest
 				attestations = append(attestations, results...)
 			}
 		case *types.AttestationStep:
+			s.logger.Debug(ctx, "verifyTimestamp: verifying attestation", "type", fmt.Sprintf("%T", st.Attestation))
 			status := attestation.Verify(ctx, s.btcRPC, s.ethRPC, current, st.Attestation)
+			s.logger.Debug(ctx, "verifyTimestamp: attestation result", "status", status.Status)
 			attestations = append(attestations, status)
 		default:
 			return nil, fmt.Errorf("unsupported step type: %T", step)
 		}
 	}
 
+	s.logger.Trace(ctx, "verifyTimestamp: complete", "attestations", len(attestations))
 	return attestations, nil
 }
 
 func (s *SDK) Verify(ctx context.Context, stamp *types.DetachedTimestamp) (*types.VerificationResult, error) {
+	s.logger.Trace(ctx, "Verify: enter", "digest_len", len(stamp.Header.DigestBytes()))
 	input := stamp.Header.DigestBytes()
 
 	attestations, err := s.verifyTimestamp(ctx, input, stamp.Timestamp)
 	if err != nil {
+		s.logger.Warn(ctx, "Verify: failed", "error", err)
 		return nil, err
 	}
 
 	status := s.aggregateResult(attestations)
+	s.logger.Debug(ctx, "Verify: complete", "status", status, "attestations", len(attestations))
 	return types.NewVerificationResult(status, attestations), nil
 }
 
@@ -463,6 +504,7 @@ func (s *SDK) aggregateResult(attestations []*types.AttestationStatus) types.Ver
 
 func (s *SDK) upgradeAttestation(ctx context.Context, commitment []byte, att *types.PendingAttestation) (types.Timestamp, error) {
 	url := att.URI + "/timestamp/" + hex.EncodeToString(commitment)
+	s.logger.Trace(ctx, "upgradeAttestation: fetching", "url", url)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -477,6 +519,7 @@ func (s *SDK) upgradeAttestation(ctx context.Context, commitment []byte, att *ty
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
+		s.logger.Debug(ctx, "upgradeAttestation: not found", "uri", att.URI)
 		return nil, nil
 	}
 
@@ -496,11 +539,13 @@ func (s *SDK) upgradeAttestation(ctx context.Context, commitment []byte, att *ty
 		return nil, errors.NewRemoteError(fmt.Sprintf("failed to read response from %s", att.URI), err)
 	}
 
+	s.logger.Debug(ctx, "upgradeAttestation: received timestamp", "uri", att.URI, "bytes", len(data))
 	dec := codec.NewDecoder(data)
 	return dec.ReadTimestamp()
 }
 
 func (s *SDK) upgradeTimestamp(ctx context.Context, input []byte, ts types.Timestamp, keepPending bool) ([]*types.UpgradeResult, error) {
+	s.logger.Trace(ctx, "upgradeTimestamp: enter", "input_len", len(input), "steps", len(ts), "keep_pending", keepPending)
 	current := input
 	var results []*types.UpgradeResult
 
@@ -517,6 +562,7 @@ func (s *SDK) upgradeTimestamp(ctx context.Context, input []byte, ts types.Times
 			}
 
 		case *types.ForkStep:
+			s.logger.Trace(ctx, "upgradeTimestamp: entering fork", "branches", len(st.Branches))
 			for _, branch := range st.Branches {
 				branchResults, err := s.upgradeTimestamp(ctx, current, branch, keepPending)
 				if err != nil {
@@ -531,8 +577,10 @@ func (s *SDK) upgradeTimestamp(ctx context.Context, input []byte, ts types.Times
 				continue
 			}
 
+			s.logger.Debug(ctx, "upgradeTimestamp: upgrading pending attestation", "uri", pendingAtt.URI)
 			upgraded, err := s.upgradeAttestation(ctx, current, pendingAtt)
 			if err != nil {
+				s.logger.Warn(ctx, "upgradeTimestamp: upgrade failed", "uri", pendingAtt.URI, "error", err)
 				results = append(results, &types.UpgradeResult{
 					Status: types.UpgradeFailed,
 					Error:  err,
@@ -541,12 +589,14 @@ func (s *SDK) upgradeTimestamp(ctx context.Context, input []byte, ts types.Times
 			}
 
 			if upgraded == nil {
+				s.logger.Debug(ctx, "upgradeTimestamp: still pending", "uri", pendingAtt.URI)
 				results = append(results, &types.UpgradeResult{
 					Status: types.UpgradePending,
 				})
 				continue
 			}
 
+			s.logger.Debug(ctx, "upgradeTimestamp: upgraded", "uri", pendingAtt.URI, "steps", len(upgraded))
 			if keepPending {
 				ts[i] = types.NewForkStep([]types.Timestamp{
 					{st},
@@ -567,10 +617,18 @@ func (s *SDK) upgradeTimestamp(ctx context.Context, input []byte, ts types.Times
 		}
 	}
 
+	s.logger.Trace(ctx, "upgradeTimestamp: complete", "results", len(results))
 	return results, nil
 }
 
 func (s *SDK) Upgrade(ctx context.Context, stamp *types.DetachedTimestamp, keepPending bool) ([]*types.UpgradeResult, error) {
+	s.logger.Trace(ctx, "Upgrade: enter", "keep_pending", keepPending)
 	input := stamp.Header.DigestBytes()
-	return s.upgradeTimestamp(ctx, input, stamp.Timestamp, keepPending)
+	results, err := s.upgradeTimestamp(ctx, input, stamp.Timestamp, keepPending)
+	if err != nil {
+		s.logger.Warn(ctx, "Upgrade: failed", "error", err)
+		return nil, err
+	}
+	s.logger.Debug(ctx, "Upgrade: complete", "results", len(results))
+	return results, nil
 }

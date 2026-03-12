@@ -1,6 +1,11 @@
 package crypto
 
-import "errors"
+import (
+	"context"
+	"errors"
+
+	"github.com/lightsing/uts/packages/sdk-go/logging"
+)
 
 const InnerNodePrefix = 0x01
 
@@ -22,6 +27,8 @@ type MerkleTree struct {
 }
 
 func NewMerkleTree(leaves [][HashSize]byte) *MerkleTree {
+	logger := logging.Default()
+	logger.Trace(context.Background(), "NewMerkleTree: creating", "leaves", len(leaves))
 	if len(leaves) == 0 {
 		panic("Cannot create Merkle tree with zero leaves")
 	}
@@ -40,6 +47,7 @@ func NewMerkleTree(leaves [][HashSize]byte) *MerkleTree {
 		nodes[i] = hashInnerNode(left, right)
 	}
 
+	logger.Trace(context.Background(), "NewMerkleTree: created", "tree_len", treeLen)
 	return &MerkleTree{
 		nodes: nodes,
 		len:   treeLen,
@@ -74,6 +82,8 @@ func (t *MerkleTree) Contains(leaf [HashSize]byte) bool {
 }
 
 func (t *MerkleTree) GetProof(leaf [HashSize]byte) ([]ProofStep, error) {
+	logger := logging.Default()
+	logger.Trace(context.Background(), "MerkleTree: GetProof")
 	leaves := t.Leaves()
 	leafIndex := -1
 	for i, l := range leaves {
@@ -109,10 +119,13 @@ func (t *MerkleTree) GetProof(leaf [HashSize]byte) ([]ProofStep, error) {
 		current = current / 2
 	}
 
+	logger.Trace(context.Background(), "MerkleTree: GetProof complete", "steps", len(proof))
 	return proof, nil
 }
 
 func VerifyProof(leaf [HashSize]byte, proof []ProofStep, root [HashSize]byte) bool {
+	logger := logging.Default()
+	logger.Trace(context.Background(), "VerifyProof", "steps", len(proof))
 	current := leaf
 
 	for _, step := range proof {
@@ -128,7 +141,9 @@ func VerifyProof(leaf [HashSize]byte, proof []ProofStep, root [HashSize]byte) bo
 		current = hashInnerNode(left, right)
 	}
 
-	return current == root
+	result := current == root
+	logger.Trace(context.Background(), "VerifyProof: complete", "valid", result)
+	return result
 }
 
 func nextPowerOfTwo(n int) int {

@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/lightsing/uts/packages/sdk-go/logging"
 )
 
 var (
@@ -54,22 +55,31 @@ type Attestation struct {
 type EthereumClient struct {
 	mu      sync.RWMutex
 	clients map[uint64]*ethclient.Client
+	logger  *logging.Logger
 }
 
 func NewEthereumClient() *EthereumClient {
 	client := &EthereumClient{
 		clients: make(map[uint64]*ethclient.Client),
+		logger:  logging.Default(),
 	}
 	for chainID, rpcURL := range DefaultRpcURLs {
 		_ = client.AddChain(chainID, rpcURL)
-		// TODO: warn if any of the default chains fail to connect, but don't fail entirely
 	}
 	return client
 }
 
+func (c *EthereumClient) SetLogger(logger *logging.Logger) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.logger = logger
+}
+
 func (c *EthereumClient) AddChain(chainID uint64, rpcURL string) error {
+	c.logger.Debug(context.Background(), "EthereumClient: AddChain", "chain_id", chainID, "url", rpcURL)
 	client, err := ethclient.Dial(rpcURL)
 	if err != nil {
+		c.logger.Warn(context.Background(), "EthereumClient: AddChain failed", "chain_id", chainID, "error", err)
 		return fmt.Errorf("failed to connect to RPC: %w", err)
 	}
 
@@ -87,6 +97,7 @@ func (c *EthereumClient) GetClient(chainID uint64) (*ethclient.Client, bool) {
 }
 
 func (c *EthereumClient) GetEASAttestation(ctx context.Context, chainID uint64, uid [32]byte) (*Attestation, error) {
+	c.logger.Debug(ctx, "EthereumClient: GetEASAttestation", "chain_id", chainID, "uid", common.Bytes2Hex(uid[:]))
 	client, ok := c.GetClient(chainID)
 	if !ok {
 		return nil, fmt.Errorf("no client configured for chain %d", chainID)
@@ -112,6 +123,7 @@ func (c *EthereumClient) GetEASAttestation(ctx context.Context, chainID uint64, 
 		Data: callData,
 	}, nil)
 	if err != nil {
+		c.logger.Warn(ctx, "EthereumClient: GetEASAttestation contract call failed", "chain_id", chainID, "error", err)
 		return nil, fmt.Errorf("contract call failed: %w", err)
 	}
 
@@ -145,10 +157,12 @@ func (c *EthereumClient) GetEASAttestation(ctx context.Context, chainID uint64, 
 	att.Revocable = rawAtt.Revocable
 	att.Data = rawAtt.Data
 
+	c.logger.Trace(ctx, "EthereumClient: GetEASAttestation success", "chain_id", chainID, "time", att.Time, "attester", att.Attester.Hex())
 	return &att, nil
 }
 
 func (c *EthereumClient) GetTimestamp(ctx context.Context, chainID uint64, data [32]byte) (uint64, error) {
+	c.logger.Debug(ctx, "EthereumClient: GetTimestamp", "chain_id", chainID, "data", common.Bytes2Hex(data[:]))
 	client, ok := c.GetClient(chainID)
 	if !ok {
 		return 0, fmt.Errorf("no client configured for chain %d", chainID)
@@ -174,6 +188,7 @@ func (c *EthereumClient) GetTimestamp(ctx context.Context, chainID uint64, data 
 		Data: callData,
 	}, nil)
 	if err != nil {
+		c.logger.Warn(ctx, "EthereumClient: GetTimestamp contract call failed", "chain_id", chainID, "error", err)
 		return 0, fmt.Errorf("contract call failed: %w", err)
 	}
 
@@ -183,6 +198,7 @@ func (c *EthereumClient) GetTimestamp(ctx context.Context, chainID uint64, data 
 		return 0, fmt.Errorf("failed to unpack result: %w", err)
 	}
 
+	c.logger.Trace(ctx, "EthereumClient: GetTimestamp success", "chain_id", chainID, "timestamp", timestamp)
 	return timestamp, nil
 }
 
