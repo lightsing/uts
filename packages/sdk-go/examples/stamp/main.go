@@ -1,0 +1,100 @@
+package main
+
+import (
+	"context"
+	"encoding/hex"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	uts "github.com/lightsing/uts/packages/sdk-go"
+	"github.com/lightsing/uts/packages/sdk-go/codec"
+	"github.com/lightsing/uts/packages/sdk-go/crypto"
+	"github.com/lightsing/uts/packages/sdk-go/types"
+)
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: stamp <file> [output.ots]")
+		fmt.Println("       stamp --sample [output.ots]")
+		os.Exit(1)
+	}
+
+	var data []byte
+	var outputFile string
+	var useSample bool
+
+	if os.Args[1] == "--sample" {
+		useSample = true
+		data = []byte("Hello, Universal Timestamps!")
+		if len(os.Args) > 2 {
+			outputFile = os.Args[2]
+		} else {
+			outputFile = "sample.ots"
+		}
+	} else {
+		inputFile := os.Args[1]
+		if len(os.Args) > 2 {
+			outputFile = os.Args[2]
+		} else {
+			outputFile = inputFile + ".ots"
+		}
+
+		var err error
+		data, err = os.ReadFile(inputFile)
+		if err != nil {
+			log.Fatalf("Failed to read file: %v", err)
+		}
+	}
+
+	hash := crypto.Keccak256(data)
+	if useSample {
+		fmt.Printf("Sample data: %q\n", string(data))
+	} else {
+		fmt.Printf("File: %s (%d bytes)\n", os.Args[1], len(data))
+	}
+	fmt.Printf("Hash (keccak256): %s\n", hex.EncodeToString(hash[:]))
+
+	sdk, err := uts.NewSDK(
+		uts.WithCalendars("https://lgm1.calendar.test.timestamps.now/"),
+		uts.WithTimeout(30*time.Second),
+	)
+	if err != nil {
+		log.Fatalf("Failed to create SDK: %v", err)
+	}
+
+	header, err := types.NewDigestHeader(types.DigestKECCAK256, hash[:])
+	if err != nil {
+		log.Fatalf("Failed to create digest header: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	stamps, err := sdk.Stamp(ctx, []*types.DigestHeader{header})
+	if err != nil {
+		log.Fatalf("Failed to stamp: %v", err)
+	}
+
+	if len(stamps) == 0 {
+		log.Fatal("No stamps returned")
+	}
+
+	stamp := stamps[0]
+	fmt.Printf("\nTimestamp created with %d steps\n", len(stamp.Timestamp))
+	for i, step := range stamp.Timestamp {
+		fmt.Printf("  %d: %s\n", i+1, step)
+	}
+
+	encoded, err := codec.EncodeDetachedTimestamp(stamp)
+	if err != nil {
+		log.Fatalf("Failed to encode timestamp: %v", err)
+	}
+
+	if err := os.WriteFile(outputFile, encoded, 0644); err != nil {
+		log.Fatalf("Failed to write output file: %v", err)
+	}
+
+	fmt.Printf("\nTimestamp saved to: %s (%d bytes)\n", outputFile, len(encoded))
+}

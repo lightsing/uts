@@ -91,7 +91,7 @@ export const DEFAULT_CALENDARS = [
   // new URL('https://b.pool.opentimestamps.org/'),
   // new URL('https://a.pool.eternitywall.com/'),
   // new URL('https://ots.btc.catallaxy.com/'),
-  new URL('https://lgm1.test.timestamps.now/'),
+  new URL('https://lgm1.calendar.test.timestamps.now/'),
 ]
 
 export const DEFAULT_EAS_ADDRESSES: Record<number, Hex> = {

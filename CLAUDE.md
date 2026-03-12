@@ -35,6 +35,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Test entire monorepo**: `pnpm run test` (runs all TypeScript tests)
 - **Lint entire monorepo**: `pnpm run lint`
 
+## Ground Truth Reference
+
+**IMPORTANT**: The Rust codebase (`crates/`) is the authoritative reference implementation. When implementing features in TypeScript, Python, Go, or other languages:
+
+1. **Always check the Rust implementation first** - `crates/core/` for types and codec, `crates/bmt/` for Merkle tree
+2. **TypeScript and Python SDKs may be outdated** - They exist for reference but may not reflect current Rust implementation
+3. **When in doubt, trust Rust** - Binary format, attestation types, error codes, and algorithm details should match Rust exactly
+
+### Key Rust Modules to Reference
+
+- **Types & Codec**: `crates/core/src/codec/v1/` - All timestamp and attestation types
+- **Attestations**: `crates/core/src/codec/v1/attestation.rs` - All attestation type definitions
+- **Errors**: `crates/core/src/error.rs` - Error codes and types
+- **Merkle Tree**: `crates/bmt/src/lib.rs` - Binary Merkle Tree implementation
+- **Verifier**: `crates/core/src/verifier/` - Attestation verification logic
+
 ## High-Level Architecture
 
 The Universal Timestamps (UTS) project is a multi-language monorepo implementing a decentralized timestamping protocol that extends OpenTimestamps with Ethereum Attestation Service (EAS) integration.

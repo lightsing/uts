@@ -410,8 +410,8 @@
 
     // Setup dynamic API docs based on the domain loading this page
     const origin = window.location.origin;
-    document.getElementById('curl-digest').innerText = `$ curl -X POST \\\n  --data-binary @my_hash.bin \\\n  ${origin}/digest \\\n  --output pending_proof.uts`;
-    document.getElementById('curl-timestamp').innerText = `$ curl -X GET \\\n  ${origin}/timestamp/0x123...abc \\\n  --output completed_proof.uts`;
+    document.getElementById('curl-digest').innerText = `$ curl -X POST \\\n  --data-binary @my_hash.bin \\\n  ${origin}/digest \\\n  --output pending_proof.ots`;
+    document.getElementById('curl-timestamp').innerText = `$ curl -X GET \\\n  ${origin}/timestamp/0x123...abc \\\n  --output completed_proof.ots`;
 
     // Initial fetch and start polling
     fetchMetrics();
