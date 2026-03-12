@@ -141,6 +141,7 @@ func nextPowerOfTwo(n int) int {
 	n |= n >> 4
 	n |= n >> 8
 	n |= n >> 16
+	n |= n >> 32
 	return n + 1
 }
 
