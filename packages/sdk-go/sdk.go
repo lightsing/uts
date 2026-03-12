@@ -401,7 +401,7 @@ func (s *SDK) verifyTimestamp(ctx context.Context, input []byte, ts types.Timest
 			return nil, fmt.Errorf("RIPEMD160 not supported")
 		case *types.ForkStep:
 			for _, branch := range st.Branches {
-				results, err := s.verifyTimestamp(ctx, input, branch)
+				results, err := s.verifyTimestamp(ctx, current, branch)
 				if err != nil {
 					return nil, err
 				}
@@ -513,7 +513,7 @@ func (s *SDK) upgradeTimestamp(ctx context.Context, input []byte, ts types.Times
 
 		case *types.ForkStep:
 			for _, branch := range st.Branches {
-				branchResults, err := s.upgradeTimestamp(ctx, input, branch, keepPending)
+				branchResults, err := s.upgradeTimestamp(ctx, current, branch, keepPending)
 				if err != nil {
 					return nil, err
 				}
