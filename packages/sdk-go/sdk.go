@@ -38,6 +38,8 @@ const (
 	HashKeccak256 HashAlgorithm = "keccak256"
 )
 
+const maxHttpResponseBytes = 1024 * 1024
+
 type SDK struct {
 	calendars     []string
 	btcRPC        attestation.BitcoinRPCClient
@@ -104,8 +106,11 @@ func WithLogger(logger *logging.Logger) Option {
 }
 
 func NewSDK(opts ...Option) *SDK {
+	calendars := make([]string, len(DefaultCalendars))
+	copy(calendars, DefaultCalendars)
+
 	s := &SDK{
-		calendars:     DefaultCalendars,
+		calendars:     calendars,
 		timeout:       DefaultTimeout,
 		nonceSize:     DefaultNonceSize,
 		hashAlgorithm: DefaultHashAlgorithm,
@@ -191,9 +196,9 @@ func (s *SDK) requestAttestation(ctx context.Context, calendarURL string, root [
 		)
 	}
 
-	reader := io.LimitReader(resp.Body, 1024*1024) // Limit to 1MB
+	reader := io.LimitReader(resp.Body, maxHttpResponseBytes)
 	data, err := io.ReadAll(reader)
-	if err == io.EOF && len(data) == 1024*1024 {
+	if err == io.EOF && len(data) == maxHttpResponseBytes {
 		return nil, errors.NewRemoteError(fmt.Sprintf("response from %s is too large", calendarURL), nil)
 	}
 	if err != nil {
@@ -243,7 +248,11 @@ func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*type
 	}
 
 	s.logger.Debug(ctx, "Stamp: building merkle tree")
-	tree := crypto.NewMerkleTree(nonceDigests)
+	tree, err := crypto.NewMerkleTree(nonceDigests)
+	if err != nil {
+		s.logger.Error(ctx, "Stamp: failed to build merkle tree", "error", err)
+		return nil, errors.NewSDKError(errors.ErrCodeGeneric, "failed to build merkle tree", map[string]interface{}{"error": err.Error()})
+	}
 	root := tree.Root()
 	s.logger.Trace(ctx, "Stamp: merkle tree built", "root", hex.EncodeToString(root[:]))
 
@@ -530,9 +539,9 @@ func (s *SDK) upgradeAttestation(ctx context.Context, commitment []byte, att *ty
 		)
 	}
 
-	reader := io.LimitReader(resp.Body, 1024*1024) // Limit to 1MB
+	reader := io.LimitReader(resp.Body, maxHttpResponseBytes) // Limit to 1MB
 	data, err := io.ReadAll(reader)
-	if err == io.EOF && len(data) == 1024*1024 {
+	if err == io.EOF && len(data) > maxHttpResponseBytes {
 		return nil, errors.NewRemoteError(fmt.Sprintf("response from %s is too large", att.URI), nil)
 	}
 	if err != nil {

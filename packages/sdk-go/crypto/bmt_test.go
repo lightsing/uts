@@ -12,7 +12,10 @@ func TestNewMerkleTree(t *testing.T) {
 		SHA256([]byte("leaf4")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	if tree.len != 4 {
 		t.Errorf("expected len 4, got %d", tree.len)
@@ -35,7 +38,10 @@ func TestNewMerkleTreeNonPowerOfTwo(t *testing.T) {
 		SHA256([]byte("leaf3")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	if tree.len != 4 {
 		t.Errorf("expected len 4 (next power of two), got %d", tree.len)
@@ -54,7 +60,10 @@ func TestMerkleTreeRoot(t *testing.T) {
 		SHA256([]byte("leaf4")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	leftHash := hashInnerNode(leaves[0], leaves[1])
 	rightHash := hashInnerNode(leaves[2], leaves[3])
@@ -74,7 +83,10 @@ func TestMerkleTreeContains(t *testing.T) {
 		SHA256([]byte("leaf4")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	if !tree.Contains(leaves[0]) {
 		t.Error("expected tree to contain leaves[0]")
@@ -98,7 +110,10 @@ func TestMerkleTreeGetProof(t *testing.T) {
 		SHA256([]byte("date")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	for _, leaf := range leaves {
 		proof, err := tree.GetProof(leaf)
@@ -119,10 +134,13 @@ func TestMerkleTreeGetProofNotFound(t *testing.T) {
 		SHA256([]byte("leaf2")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	notInTree := SHA256([]byte("not_in_tree"))
-	_, err := tree.GetProof(notInTree)
+	_, err = tree.GetProof(notInTree)
 	if err == nil {
 		t.Error("expected error for leaf not in tree")
 	}
@@ -136,7 +154,10 @@ func TestVerifyProof(t *testing.T) {
 		SHA256([]byte("date")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	for _, leaf := range leaves {
 		proof, _ := tree.GetProof(leaf)
@@ -162,7 +183,10 @@ func TestProofStructure(t *testing.T) {
 		SHA256([]byte("leaf3")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	proof, _ := tree.GetProof(leaves[0])
 	if len(proof) != 2 {
@@ -180,7 +204,10 @@ func TestSingleNodeTree(t *testing.T) {
 		SHA256([]byte("single")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	if tree.len != 1 {
 		t.Errorf("expected len 1, got %d", tree.len)
@@ -240,7 +267,10 @@ func TestAsRawBytes(t *testing.T) {
 		SHA256([]byte("leaf4")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 	raw := tree.AsRawBytes()
 
 	expectedLen := len(tree.nodes) * HashSize
@@ -257,7 +287,10 @@ func TestMerkleTreeFromRawBytes(t *testing.T) {
 		SHA256([]byte("leaf4")),
 	}
 
-	original := NewMerkleTree(leaves)
+	original, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 	raw := original.AsRawBytes()
 
 	reconstructed := MerkleTreeFromRawBytes(raw)
@@ -286,7 +319,10 @@ func TestLargeTree(t *testing.T) {
 		leaves[i] = SHA256([]byte{byte(i >> 8), byte(i)})
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	if tree.len != 1024 {
 		t.Errorf("expected len 1024, got %d", tree.len)
@@ -311,7 +347,10 @@ func TestNonPowerOfTwoPadding(t *testing.T) {
 		SHA256([]byte("leaf3")),
 	}
 
-	tree := NewMerkleTree(leaves)
+	tree, err := NewMerkleTree(leaves)
+	if err != nil {
+		t.Fatalf("failed to create Merkle tree: %v", err)
+	}
 
 	if tree.len != 4 {
 		t.Errorf("expected len 4 (padded), got %d", tree.len)

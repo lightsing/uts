@@ -26,11 +26,11 @@ type MerkleTree struct {
 	len   int
 }
 
-func NewMerkleTree(leaves [][HashSize]byte) *MerkleTree {
+func NewMerkleTree(leaves [][HashSize]byte) (*MerkleTree, error) {
 	logger := logging.Default()
 	logger.Trace(context.Background(), "NewMerkleTree: creating", "leaves", len(leaves))
 	if len(leaves) == 0 {
-		panic("Cannot create Merkle tree with zero leaves")
+		return nil, errors.New("cannot create Merkle tree with zero leaves")
 	}
 
 	rawLen := len(leaves)
@@ -51,7 +51,7 @@ func NewMerkleTree(leaves [][HashSize]byte) *MerkleTree {
 	return &MerkleTree{
 		nodes: nodes,
 		len:   treeLen,
-	}
+	}, nil
 }
 
 func hashInnerNode(left, right [HashSize]byte) [HashSize]byte {
