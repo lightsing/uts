@@ -74,7 +74,9 @@ func (h *DigestHeader) Kind() DigestOp {
 }
 
 func (h *DigestHeader) DigestBytes() []byte {
-	return h.digest
+	d := make([]byte, len(h.digest))
+	copy(d, h.digest)
+	return d
 }
 
 func (h *DigestHeader) String() string {
