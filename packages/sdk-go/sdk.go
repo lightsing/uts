@@ -110,6 +110,8 @@ func NewSDK(opts ...Option) *SDK {
 		opt(s)
 	}
 
+	s.httpClient.Timeout = s.timeout
+
 	if s.quorum == 0 {
 		s.quorum = int(math.Ceil(float64(len(s.calendars)) * 0.66))
 	}
