@@ -173,7 +173,9 @@ func NewSDK(opts ...Option) (*SDK, error) {
 }
 
 func (s *SDK) Calendars() []string {
-	return s.calendars
+	calendars := make([]string, len(s.calendars))
+	copy(calendars, s.calendars)
+	return calendars
 }
 
 func (s *SDK) Timeout() time.Duration {
