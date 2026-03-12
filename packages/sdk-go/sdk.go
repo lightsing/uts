@@ -207,6 +207,8 @@ func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*type
 		case HashKeccak256:
 			data := append(digest, nonce...)
 			nonceDigest = crypto.Keccak256(data)
+		default:
+			return nil, errors.NewSDKError(errors.ErrCodeUnsupported, fmt.Sprintf("unsupported hash algorithm: %s", s.hashAlgorithm), nil)
 		}
 		nonceDigests[i] = nonceDigest
 	}
