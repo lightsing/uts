@@ -461,7 +461,11 @@ func (s *SDK) upgradeAttestation(ctx context.Context, commitment []byte, att *ty
 		)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	reader := io.LimitReader(resp.Body, 1024*1024) // Limit to 1MB
+	data, err := io.ReadAll(reader)
+	if err == io.EOF && len(data) == 1024*1024 {
+		return nil, errors.NewRemoteError(fmt.Sprintf("response from %s is too large", att.URI), nil)
+	}
 	if err != nil {
 		return nil, errors.NewRemoteError(fmt.Sprintf("failed to read response from %s", att.URI), err)
 	}
