@@ -52,60 +52,67 @@ type SDK struct {
 	logger        *logging.Logger
 }
 
-type Option func(*SDK)
+type Option func(*SDK) error
 
 func WithCalendars(urls ...string) Option {
-	return func(s *SDK) {
+	return func(s *SDK) error {
 		s.calendars = urls
+		return nil
 	}
 }
 
 func WithBitcoinRPC(client attestation.BitcoinRPCClient) Option {
-	return func(s *SDK) {
+	return func(s *SDK) error {
 		s.btcRPC = client
+		return nil
 	}
 }
 
 func WithEthereumRPC(chainID uint64, rpcURL string) Option {
-	return func(s *SDK) {
+	return func(s *SDK) error {
 		if s.ethRPC == nil {
 			s.ethRPC = rpc.NewEthereumClient()
 		}
-		s.ethRPC.AddChain(chainID, rpcURL)
+		return s.ethRPC.AddChain(chainID, rpcURL)
 	}
 }
 
 func WithTimeout(d time.Duration) Option {
-	return func(s *SDK) {
+	return func(s *SDK) error {
 		s.timeout = d
+		return nil
 	}
 }
 
 func WithQuorum(n int) Option {
-	return func(s *SDK) {
+	return func(s *SDK) error {
 		s.quorum = n
+		return nil
 	}
 }
 
 func WithNonceSize(n int) Option {
-	return func(s *SDK) {
+	return func(s *SDK) error {
 		s.nonceSize = n
+		return nil
 	}
 }
 
 func WithHashAlgorithm(alg HashAlgorithm) Option {
-	return func(s *SDK) {
+	return func(s *SDK) error {
 		s.hashAlgorithm = alg
+		return nil
 	}
 }
 
 func WithLogger(logger *logging.Logger) Option {
-	return func(s *SDK) {
+	return func(s *SDK) error {
 		s.logger = logger
+		return nil
 	}
 }
 
-func NewSDK(opts ...Option) *SDK {
+func NewSDK(opts ...Option) (*SDK, error) {
 	calendars := make([]string, len(DefaultCalendars))
 	copy(calendars, DefaultCalendars)
 
@@ -121,7 +128,9 @@ func NewSDK(opts ...Option) *SDK {
 	}
 
 	for _, opt := range opts {
-		opt(s)
+		if err := opt(s); err != nil {
+			return nil, err
+		}
 	}
 
 	for i, url := range s.calendars {
@@ -136,6 +145,12 @@ func NewSDK(opts ...Option) *SDK {
 
 	if s.ethRPC == nil {
 		s.ethRPC = rpc.NewEthereumClient()
+		for chainID, rpcURL := range rpc.DefaultRpcURLs {
+			err := s.ethRPC.AddChain(chainID, rpcURL)
+			if err != nil {
+				s.logger.Warn(context.Background(), "Failed to add default Ethereum chain", "chain_id", chainID, "url", rpcURL, "error", err)
+			}
+		}
 	}
 
 	s.logger.Debug(context.Background(), "SDK initialized",
@@ -145,7 +160,7 @@ func NewSDK(opts ...Option) *SDK {
 		"hash_algorithm", s.hashAlgorithm,
 	)
 
-	return s
+	return s, nil
 }
 
 func (s *SDK) Calendars() []string {

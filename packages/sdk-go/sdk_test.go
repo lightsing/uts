@@ -146,7 +146,10 @@ func TestNewSDK(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sdk := NewSDK(tt.opts...)
+			sdk, err := NewSDK(tt.opts...)
+			if err != nil {
+				t.Fatalf("NewSDK() error = %v", err)
+			}
 
 			if got := len(sdk.Calendars()); got != tt.wantCalendars {
 				t.Errorf("NewSDK() calendars = %v, want %v", got, tt.wantCalendars)
@@ -174,7 +177,10 @@ func TestWithBitcoinRPC(t *testing.T) {
 		},
 	}
 
-	sdk := NewSDK(WithBitcoinRPC(mockBTC))
+	sdk, err := NewSDK(WithBitcoinRPC(mockBTC))
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 	if sdk.btcRPC == nil {
 		t.Error("WithBitcoinRPC() did not set btcRPC")
 	}
@@ -186,14 +192,20 @@ func TestWithBitcoinRPC(t *testing.T) {
 }
 
 func TestWithEthereumRPC(t *testing.T) {
-	sdk := NewSDK()
+	sdk, err := NewSDK()
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 	if sdk.ethRPC == nil {
 		t.Error("NewSDK() should initialize ethRPC")
 	}
 }
 
 func TestSDK_SetBitcoinRPC(t *testing.T) {
-	sdk := NewSDK()
+	sdk, err := NewSDK()
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 	mockBTC := &mockBitcoinRPC{}
 
 	sdk.SetBitcoinRPC(mockBTC)
@@ -203,7 +215,10 @@ func TestSDK_SetBitcoinRPC(t *testing.T) {
 }
 
 func TestSDK_SetEthereumRPC(t *testing.T) {
-	sdk := NewSDK()
+	sdk, err := NewSDK()
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 	mockEth := rpc.NewEthereumClient()
 
 	sdk.SetEthereumRPC(mockEth)
@@ -213,7 +228,10 @@ func TestSDK_SetEthereumRPC(t *testing.T) {
 }
 
 func TestExecuteStep(t *testing.T) {
-	sdk := NewSDK()
+	sdk, err := NewSDK()
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	tests := []struct {
 		name       string
@@ -298,7 +316,10 @@ func TestExecuteStep(t *testing.T) {
 }
 
 func TestAggregateResult(t *testing.T) {
-	sdk := NewSDK()
+	sdk, err := NewSDK()
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	tests := []struct {
 		name         string
@@ -539,7 +560,10 @@ func TestStamp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sdk := NewSDK(tt.opts...)
+			sdk, err := NewSDK(tt.opts...)
+			if err != nil {
+				t.Fatalf("NewSDK() error = %v", err)
+			}
 
 			results, err := sdk.Stamp(context.Background(), tt.headers)
 			if tt.wantErr {
@@ -568,10 +592,13 @@ func TestRequestAttestation_MalformedResponse(t *testing.T) {
 	}))
 	defer malformedServer.Close()
 
-	sdk := NewSDK(
+	sdk, err := NewSDK(
 		WithCalendars(malformedServer.URL),
 		WithTimeout(5*time.Second),
 	)
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	header, err := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
 	if err != nil {
@@ -616,7 +643,10 @@ func TestUpgradeAttestation_CommitmentCalculation(t *testing.T) {
 		},
 	)
 
-	sdk := NewSDK(WithTimeout(5 * time.Second))
+	sdk, err := NewSDK(WithTimeout(5 * time.Second))
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	_, _ = sdk.Upgrade(context.Background(), stamp, false)
 
@@ -661,7 +691,10 @@ func TestUpgrade_ConcurrentCalendars(t *testing.T) {
 		},
 	)
 
-	sdk := NewSDK(WithTimeout(5 * time.Second))
+	sdk, err := NewSDK(WithTimeout(5 * time.Second))
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	for i := 0; i < 10; i++ {
 		results, err := sdk.Upgrade(context.Background(), stamp, false)
@@ -687,11 +720,14 @@ func TestStamp_NonceGeneration(t *testing.T) {
 	server := createMockCalendarServer(t, ts)
 	defer server.Close()
 
-	sdk := NewSDK(
+	sdk, err := NewSDK(
 		WithCalendars(server.URL),
 		WithTimeout(5*time.Second),
 		WithNonceSize(16),
 	)
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	header1, err := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
 	if err != nil {
@@ -754,7 +790,10 @@ func TestVerify_WithHexlifyStep(t *testing.T) {
 		},
 	)
 
-	sdk := NewSDK()
+	sdk, err := NewSDK()
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	result, err := sdk.Verify(context.Background(), stamp)
 	if err != nil {
@@ -783,7 +822,10 @@ func TestVerify_WithReverseStep(t *testing.T) {
 		},
 	)
 
-	sdk := NewSDK()
+	sdk, err := NewSDK()
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	result, err := sdk.Verify(context.Background(), stamp)
 	if err != nil {
@@ -806,7 +848,10 @@ func TestUpgrade_EmptyTimestamp(t *testing.T) {
 		types.Timestamp{},
 	)
 
-	sdk := NewSDK()
+	sdk, err := NewSDK()
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	results, err := sdk.Upgrade(context.Background(), stamp, false)
 	if err != nil {
@@ -827,11 +872,14 @@ func TestStamp_Keccak256Hash(t *testing.T) {
 	server := createMockCalendarServer(t, ts)
 	defer server.Close()
 
-	sdk := NewSDK(
+	sdk, err := NewSDK(
 		WithCalendars(server.URL),
 		WithTimeout(5*time.Second),
 		WithHashAlgorithm(HashKeccak256),
 	)
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	header, err := types.NewDigestHeader(types.DigestKECCAK256, make([]byte, 32))
 	if err != nil {
@@ -883,10 +931,13 @@ func TestRequestAttestation_HTTPErrorStatus(t *testing.T) {
 			}))
 			defer server.Close()
 
-			sdk := NewSDK(
+			sdk, err := NewSDK(
 				WithCalendars(server.URL),
 				WithTimeout(5*time.Second),
 			)
+			if err != nil {
+				t.Fatalf("NewSDK() error = %v", err)
+			}
 
 			header, err := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
 			if err != nil {
@@ -909,7 +960,10 @@ func TestRequestAttestation_HTTPErrorStatus(t *testing.T) {
 }
 
 func TestVerify_NilStamp(t *testing.T) {
-	sdk := NewSDK()
+	sdk, err := NewSDK()
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	defer func() {
 		if r := recover(); r == nil {
@@ -932,10 +986,13 @@ func TestStamp_LargeDigestCount(t *testing.T) {
 	server := createMockCalendarServer(t, ts)
 	defer server.Close()
 
-	sdk := NewSDK(
+	sdk, err := NewSDK(
 		WithCalendars(server.URL),
 		WithTimeout(30*time.Second),
 	)
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	numDigests := 100
 	headers := make([]*types.DigestHeader, numDigests)
@@ -990,7 +1047,10 @@ func TestUpgrade_MultiplePendingAttestations(t *testing.T) {
 		},
 	)
 
-	sdk := NewSDK(WithTimeout(5 * time.Second))
+	sdk, err := NewSDK(WithTimeout(5 * time.Second))
+	if err != nil {
+		t.Fatalf("NewSDK() error = %v", err)
+	}
 
 	results, err := sdk.Upgrade(context.Background(), stamp, false)
 	if err != nil {

@@ -63,9 +63,6 @@ func NewEthereumClient() *EthereumClient {
 		clients: make(map[uint64]*ethclient.Client),
 		logger:  logging.Default(),
 	}
-	for chainID, rpcURL := range DefaultRpcURLs {
-		_ = client.AddChain(chainID, rpcURL)
-	}
 	return client
 }
 

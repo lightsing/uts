@@ -50,9 +50,12 @@ func main() {
 		return
 	}
 
-	sdk := uts.NewSDK(
+	sdk, err := uts.NewSDK(
 		uts.WithTimeout(30 * time.Second),
 	)
+	if err != nil {
+		log.Fatalf("Failed to create SDK: %v", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()

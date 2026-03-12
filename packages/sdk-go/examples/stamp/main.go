@@ -56,10 +56,13 @@ func main() {
 	}
 	fmt.Printf("Hash (keccak256): %s\n", hex.EncodeToString(hash[:]))
 
-	sdk := uts.NewSDK(
+	sdk, err := uts.NewSDK(
 		uts.WithCalendars("https://lgm1.calendar.test.timestamps.now/"),
 		uts.WithTimeout(30*time.Second),
 	)
+	if err != nil {
+		log.Fatalf("Failed to create SDK: %v", err)
+	}
 
 	header, err := types.NewDigestHeader(types.DigestKECCAK256, hash[:])
 	if err != nil {
