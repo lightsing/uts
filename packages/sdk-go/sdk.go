@@ -169,7 +169,11 @@ func (s *SDK) requestAttestation(ctx context.Context, calendarURL string, root [
 		)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	reader := io.LimitReader(resp.Body, 1024*1024) // Limit to 1MB
+	data, err := io.ReadAll(reader)
+	if err == io.EOF && len(data) == 1024*1024 {
+		return nil, errors.NewRemoteError(fmt.Sprintf("response from %s is too large", calendarURL), nil)
+	}
 	if err != nil {
 		return nil, errors.NewRemoteError(fmt.Sprintf("failed to read response from %s", calendarURL), err)
 	}
