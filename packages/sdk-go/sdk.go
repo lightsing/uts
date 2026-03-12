@@ -314,9 +314,15 @@ func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*type
 func (s *SDK) executeStep(input []byte, step types.Step) ([]byte, error) {
 	switch st := step.(type) {
 	case *types.AppendStep:
-		return append(input, st.Data...), nil
+		data := make([]byte, len(input)+len(st.Data))
+		copy(data, input)
+		copy(data[len(input):], st.Data)
+		return data, nil
 	case *types.PrependStep:
-		return append(st.Data, input...), nil
+		data := make([]byte, len(input)+len(st.Data))
+		copy(data, st.Data)
+		copy(data[len(st.Data):], input)
+		return data, nil
 	case *types.ReverseStep:
 		result := make([]byte, len(input))
 		for i, b := range input {
@@ -333,11 +339,11 @@ func (s *SDK) executeStep(input []byte, step types.Step) ([]byte, error) {
 		hash := crypto.Keccak256(input)
 		return hash[:], nil
 	case *types.SHA1Step:
-		return nil, fmt.Errorf("SHA1 not supported")
+		return nil, errors.NewSDKError(errors.ErrCodeUnsupported, "SHA1 not supported", nil)
 	case *types.RIPEMD160Step:
-		return nil, fmt.Errorf("RIPEMD160 not supported")
+		return nil, errors.NewSDKError(errors.ErrCodeUnsupported, "RIPEMD160 not supported", nil)
 	default:
-		return nil, fmt.Errorf("unsupported step type: %T", step)
+		return nil, errors.NewSDKError(errors.ErrCodeUnsupported, fmt.Sprintf("unsupported step type: %T", step), nil)
 	}
 }
 
