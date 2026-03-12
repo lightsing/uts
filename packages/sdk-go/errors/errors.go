@@ -30,6 +30,7 @@ const (
 	ErrCodeDecode            ErrorCode = "Decode"
 	ErrCodeEmptyRequests     ErrorCode = "EmptyRequests"
 	ErrCodeGeneric           ErrorCode = "Generic"
+	ErrCodeUnsupported       ErrorCode = "Unsupported"
 )
 
 type SDKError struct {
