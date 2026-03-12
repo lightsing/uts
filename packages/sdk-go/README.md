@@ -37,7 +37,10 @@ func main() {
     data := []byte("Hello, UTS!")
     hash := sha256.Sum256(data)
 
-    header := types.NewDigestHeader(types.DigestSHA256, hash[:])
+    header, err := types.NewDigestHeader(types.DigestSHA256, hash[:])
+    if err != nil {
+        log.Fatal(err)
+    }
     stamps, err := sdk.Stamp(ctx, []*types.DigestHeader{header})
     if err != nil {
         log.Fatal(err)
