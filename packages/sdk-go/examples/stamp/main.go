@@ -61,7 +61,10 @@ func main() {
 		uts.WithTimeout(30*time.Second),
 	)
 
-	header := types.NewDigestHeader(types.DigestKECCAK256, hash[:])
+	header, err := types.NewDigestHeader(types.DigestKECCAK256, hash[:])
+	if err != nil {
+		log.Fatalf("Failed to create digest header: %v", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()

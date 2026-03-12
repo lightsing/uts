@@ -56,22 +56,29 @@ func NewDigestOp(b byte) (DigestOp, bool) {
 }
 
 type DigestHeader struct {
-	Kind   DigestOp
-	Digest [32]byte
+	kind   DigestOp
+	digest []byte
 }
 
-func NewDigestHeader(kind DigestOp, digest []byte) *DigestHeader {
-	h := &DigestHeader{Kind: kind}
-	copy(h.Digest[:], digest)
-	return h
+func NewDigestHeader(kind DigestOp, digest []byte) (*DigestHeader, error) {
+	if len(digest) != kind.OutputSize() {
+		return nil, fmt.Errorf("invalid digest length: expected %d, got %d", kind.OutputSize(), len(digest))
+	}
+	h := &DigestHeader{kind: kind, digest: make([]byte, len(digest))}
+	copy(h.digest, digest)
+	return h, nil
+}
+
+func (h *DigestHeader) Kind() DigestOp {
+	return h.kind
 }
 
 func (h *DigestHeader) DigestBytes() []byte {
-	return h.Digest[:h.Kind.OutputSize()]
+	return h.digest
 }
 
 func (h *DigestHeader) String() string {
-	return fmt.Sprintf("%s %x", h.Kind, h.DigestBytes())
+	return fmt.Sprintf("%s %x", h.kind, h.DigestBytes())
 }
 
 type DetachedTimestamp struct {

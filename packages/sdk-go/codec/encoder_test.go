@@ -105,7 +105,10 @@ func TestEncoderWriteHeader(t *testing.T) {
 		digest[i] = byte(i)
 	}
 
-	header := types.NewDigestHeader(types.DigestSHA256, digest)
+	header, err := types.NewDigestHeader(types.DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	enc := NewEncoder()
 	enc.WriteHeader(header)
 
@@ -121,7 +124,10 @@ func TestEncoderWriteHeaderSHA1(t *testing.T) {
 		digest[i] = byte(i)
 	}
 
-	header := types.NewDigestHeader(types.DigestSHA1, digest)
+	header, err := types.NewDigestHeader(types.DigestSHA1, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	enc := NewEncoder()
 	enc.WriteHeader(header)
 
@@ -407,7 +413,10 @@ func TestEncodeDetachedTimestamp(t *testing.T) {
 	for i := range digest {
 		digest[i] = byte(i)
 	}
-	header := types.NewDigestHeader(types.DigestSHA256, digest)
+	header, err := types.NewDigestHeader(types.DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	ts := types.Timestamp{
 		types.NewAttestationStep(&types.PendingAttestation{URI: "https://example.com"}),
 	}

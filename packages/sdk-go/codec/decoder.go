@@ -171,7 +171,7 @@ func (d *Decoder) ReadHeader() (*types.DigestHeader, error) {
 		return nil, err
 	}
 
-	return types.NewDigestHeader(digestOp, digest), nil
+	return types.NewDigestHeader(digestOp, digest)
 }
 
 func (d *Decoder) readPendingAttestation() (*types.PendingAttestation, error) {

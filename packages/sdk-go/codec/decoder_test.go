@@ -290,8 +290,8 @@ func TestDecoder_ReadHeader(t *testing.T) {
 				return
 			}
 			if !tt.wantErr {
-				if got.Kind != tt.wantKind {
-					t.Errorf("ReadHeader() kind = %v, want %v", got.Kind, tt.wantKind)
+				if got.Kind() != tt.wantKind {
+					t.Errorf("ReadHeader() kind = %v, want %v", got.Kind(), tt.wantKind)
 				}
 				if len(got.DigestBytes()) != tt.wantLen {
 					t.Errorf("ReadHeader() digest len = %v, want %v", len(got.DigestBytes()), tt.wantLen)
@@ -548,7 +548,10 @@ func TestDecodeDetachedTimestamp(t *testing.T) {
 	for i := range digest {
 		digest[i] = byte(i)
 	}
-	header := types.NewDigestHeader(types.DigestSHA256, digest[:])
+	header, err := types.NewDigestHeader(types.DigestSHA256, digest[:])
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	ts := types.Timestamp{
 		types.NewReverseStep(nil),
 		types.NewAttestationStep(&types.BitcoinAttestation{Height: 800000}),
@@ -565,7 +568,7 @@ func TestDecodeDetachedTimestamp(t *testing.T) {
 		t.Fatalf("DecodeDetachedTimestamp() error = %v", err)
 	}
 
-	if decoded.Header.Kind != header.Kind {
+	if decoded.Header.Kind() != header.Kind() {
 		t.Errorf("header kind mismatch")
 	}
 	if len(decoded.Timestamp) != len(ts) {
@@ -576,7 +579,10 @@ func TestDecodeDetachedTimestamp(t *testing.T) {
 func TestRoundTrip(t *testing.T) {
 	t.Run("simple timestamp", func(t *testing.T) {
 		digest := [32]byte{0x01, 0x02, 0x03}
-		header := types.NewDigestHeader(types.DigestSHA256, digest[:])
+		header, err := types.NewDigestHeader(types.DigestSHA256, digest[:])
+		if err != nil {
+			t.Fatalf("NewDigestHeader() error = %v", err)
+		}
 		ts := types.Timestamp{
 			types.NewAppendStep([]byte("hello"), nil),
 			types.NewReverseStep(nil),
@@ -597,7 +603,7 @@ func TestRoundTrip(t *testing.T) {
 			t.Fatalf("decode error: %v", err)
 		}
 
-		if decoded.Header.Kind != original.Header.Kind {
+		if decoded.Header.Kind() != original.Header.Kind() {
 			t.Errorf("header kind mismatch")
 		}
 		if len(decoded.Timestamp) != len(original.Timestamp) {
@@ -607,7 +613,10 @@ func TestRoundTrip(t *testing.T) {
 
 	t.Run("fork timestamp", func(t *testing.T) {
 		digest := [32]byte{0xff}
-		header := types.NewDigestHeader(types.DigestSHA256, digest[:])
+		header, err := types.NewDigestHeader(types.DigestSHA256, digest[:])
+		if err != nil {
+			t.Fatalf("NewDigestHeader() error = %v", err)
+		}
 		ts := types.Timestamp{
 			types.NewForkStep([]types.Timestamp{
 				{types.NewReverseStep(nil), types.NewAttestationStep(&types.BitcoinAttestation{Height: 100})},
@@ -640,7 +649,10 @@ func TestRoundTrip(t *testing.T) {
 
 	t.Run("all attestation types", func(t *testing.T) {
 		digest := [32]byte{0x99}
-		header := types.NewDigestHeader(types.DigestKECCAK256, digest[:])
+		header, err := types.NewDigestHeader(types.DigestKECCAK256, digest[:])
+		if err != nil {
+			t.Fatalf("NewDigestHeader() error = %v", err)
+		}
 		uid := [32]byte{}
 		for i := range uid {
 			uid[i] = byte(i)

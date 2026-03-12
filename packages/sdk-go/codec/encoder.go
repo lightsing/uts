@@ -78,7 +78,7 @@ func (e *Encoder) WriteVersionedMagic(version byte) *Encoder {
 }
 
 func (e *Encoder) WriteHeader(header *types.DigestHeader) *Encoder {
-	e.WriteOp(types.Op(header.Kind))
+	e.WriteOp(types.Op(header.Kind()))
 	e.WriteBytes(header.DigestBytes())
 	return e
 }

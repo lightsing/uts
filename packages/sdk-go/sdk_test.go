@@ -458,9 +458,10 @@ func TestStamp(t *testing.T) {
 				WithCalendars(server.URL),
 				WithTimeout(5 * time.Second),
 			},
-			headers: []*types.DigestHeader{
-				types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
-			},
+			headers: func() []*types.DigestHeader {
+				h, _ := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+				return []*types.DigestHeader{h}
+			}(),
 			wantErr: false,
 			validateFn: func(t *testing.T, results []*types.DetachedTimestamp) {
 				if len(results) != 1 {
@@ -482,11 +483,12 @@ func TestStamp(t *testing.T) {
 				WithCalendars(server.URL),
 				WithTimeout(5 * time.Second),
 			},
-			headers: []*types.DigestHeader{
-				types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
-				types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
-				types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
-			},
+			headers: func() []*types.DigestHeader {
+				h1, _ := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+				h2, _ := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+				h3, _ := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+				return []*types.DigestHeader{h1, h2, h3}
+			}(),
 			wantErr: false,
 			validateFn: func(t *testing.T, results []*types.DetachedTimestamp) {
 				if len(results) != 3 {
@@ -511,9 +513,10 @@ func TestStamp(t *testing.T) {
 				WithTimeout(5 * time.Second),
 				WithHashAlgorithm(HashSHA256),
 			},
-			headers: []*types.DigestHeader{
-				types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
-			},
+			headers: func() []*types.DigestHeader {
+				h, _ := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+				return []*types.DigestHeader{h}
+			}(),
 			wantErr: false,
 			validateFn: func(t *testing.T, results []*types.DetachedTimestamp) {
 				if len(results) != 1 {
@@ -570,18 +573,22 @@ func TestRequestAttestation_MalformedResponse(t *testing.T) {
 		WithTimeout(5*time.Second),
 	)
 
+	header, err := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	headers := []*types.DigestHeader{
-		types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
+		header,
 	}
 
-	_, err := sdk.Stamp(context.Background(), headers)
+	_, err = sdk.Stamp(context.Background(), headers)
 	if err == nil {
 		t.Error("Stamp() expected error for malformed response, got nil")
 	}
 }
 
 func TestUpgradeAttestation_CommitmentCalculation(t *testing.T) {
-	digest := []byte("test digest for upgrade test")
+	digest := make([]byte, 32)
 
 	appendData := []byte{0x01, 0x02, 0x03, 0x04}
 
@@ -596,8 +603,12 @@ func TestUpgradeAttestation_CommitmentCalculation(t *testing.T) {
 
 	pendingAtt.URI = server.URL
 
+	header, err := types.NewDigestHeader(types.DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	stamp := types.NewDetachedTimestamp(
-		types.NewDigestHeader(types.DigestSHA256, digest),
+		header,
 		types.Timestamp{
 			types.NewAppendStep(appendData, nil),
 			types.NewSHA256Step(nil),
@@ -638,8 +649,13 @@ func TestUpgrade_ConcurrentCalendars(t *testing.T) {
 	}))
 	defer server.Close()
 
+	header, err := types.NewDigestHeader(types.DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
+
 	stamp := types.NewDetachedTimestamp(
-		types.NewDigestHeader(types.DigestSHA256, digest),
+		header,
 		types.Timestamp{
 			types.NewAttestationStep(&types.PendingAttestation{URI: server.URL}),
 		},
@@ -677,9 +693,18 @@ func TestStamp_NonceGeneration(t *testing.T) {
 		WithNonceSize(16),
 	)
 
+	header1, err := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
+	header2, err := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
+
 	headers := []*types.DigestHeader{
-		types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
-		types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
+		header1,
+		header2,
 	}
 
 	results, err := sdk.Stamp(context.Background(), headers)
@@ -714,10 +739,15 @@ func extractAppendSteps(ts types.Timestamp) [][]byte {
 }
 
 func TestVerify_WithHexlifyStep(t *testing.T) {
-	digest := []byte{0xde, 0xad, 0xbe, 0xef}
+	digest := make([]byte, 32)
+
+	header, err := types.NewDigestHeader(types.DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 
 	stamp := types.NewDetachedTimestamp(
-		types.NewDigestHeader(types.DigestSHA256, digest),
+		header,
 		types.Timestamp{
 			types.NewHexlifyStep(nil),
 			types.NewAttestationStep(&types.PendingAttestation{URI: "https://example.com"}),
@@ -738,10 +768,15 @@ func TestVerify_WithHexlifyStep(t *testing.T) {
 }
 
 func TestVerify_WithReverseStep(t *testing.T) {
-	digest := []byte("hello")
+	digest := make([]byte, 32)
+
+	header, err := types.NewDigestHeader(types.DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 
 	stamp := types.NewDetachedTimestamp(
-		types.NewDigestHeader(types.DigestSHA256, digest),
+		header,
 		types.Timestamp{
 			types.NewReverseStep(nil),
 			types.NewAttestationStep(&types.PendingAttestation{URI: "https://example.com"}),
@@ -762,8 +797,12 @@ func TestVerify_WithReverseStep(t *testing.T) {
 }
 
 func TestUpgrade_EmptyTimestamp(t *testing.T) {
+	header, err := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	stamp := types.NewDetachedTimestamp(
-		types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
+		header,
 		types.Timestamp{},
 	)
 
@@ -794,8 +833,13 @@ func TestStamp_Keccak256Hash(t *testing.T) {
 		WithHashAlgorithm(HashKeccak256),
 	)
 
+	header, err := types.NewDigestHeader(types.DigestKECCAK256, make([]byte, 32))
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
+
 	headers := []*types.DigestHeader{
-		types.NewDigestHeader(types.DigestKECCAK256, make([]byte, 32)),
+		header,
 	}
 
 	results, err := sdk.Stamp(context.Background(), headers)
@@ -844,11 +888,16 @@ func TestRequestAttestation_HTTPErrorStatus(t *testing.T) {
 				WithTimeout(5*time.Second),
 			)
 
-			headers := []*types.DigestHeader{
-				types.NewDigestHeader(types.DigestSHA256, make([]byte, 32)),
+			header, err := types.NewDigestHeader(types.DigestSHA256, make([]byte, 32))
+			if err != nil {
+				t.Fatalf("NewDigestHeader() error = %v", err)
 			}
 
-			_, err := sdk.Stamp(context.Background(), headers)
+			headers := []*types.DigestHeader{
+				header,
+			}
+
+			_, err = sdk.Stamp(context.Background(), headers)
 			if !tt.wantErr && err != nil {
 				t.Errorf("Stamp() unexpected error = %v", err)
 			}
@@ -893,7 +942,11 @@ func TestStamp_LargeDigestCount(t *testing.T) {
 	for i := range headers {
 		digest := make([]byte, 32)
 		rand.Read(digest)
-		headers[i] = types.NewDigestHeader(types.DigestSHA256, digest)
+		header, err := types.NewDigestHeader(types.DigestSHA256, digest)
+		if err != nil {
+			t.Fatalf("NewDigestHeader() error = %v", err)
+		}
+		headers[i] = header
 	}
 
 	results, err := sdk.Stamp(context.Background(), headers)
@@ -922,8 +975,13 @@ func TestUpgrade_MultiplePendingAttestations(t *testing.T) {
 	}))
 	defer server.Close()
 
+	header, err := types.NewDigestHeader(types.DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
+
 	stamp := types.NewDetachedTimestamp(
-		types.NewDigestHeader(types.DigestSHA256, digest),
+		header,
 		types.Timestamp{
 			types.NewSHA256Step(nil),
 			types.NewAttestationStep(&types.PendingAttestation{URI: server.URL}),

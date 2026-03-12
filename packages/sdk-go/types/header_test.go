@@ -100,13 +100,16 @@ func TestNewDigestHeader(t *testing.T) {
 		digest[i] = byte(i)
 	}
 
-	header := NewDigestHeader(DigestSHA256, digest)
-
-	if header.Kind != DigestSHA256 {
-		t.Errorf("DigestHeader.Kind = %v, want %v", header.Kind, DigestSHA256)
+	header, err := NewDigestHeader(DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
 	}
 
-	if !bytes.Equal(header.Digest[:], digest) {
+	if header.Kind() != DigestSHA256 {
+		t.Errorf("DigestHeader.Kind = %v, want %v", header.Kind(), DigestSHA256)
+	}
+
+	if !bytes.Equal(header.DigestBytes(), digest) {
 		t.Errorf("DigestHeader.Digest not set correctly")
 	}
 }
@@ -131,7 +134,10 @@ func TestDigestHeaderDigestBytes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			header := NewDigestHeader(tt.kind, digest)
+			header, err := NewDigestHeader(tt.kind, digest)
+			if err != nil {
+				t.Fatalf("NewDigestHeader() error = %v", err)
+			}
 			got := header.DigestBytes()
 			if len(got) != tt.wantLen {
 				t.Errorf("DigestBytes() length = %v, want %v", len(got), tt.wantLen)
@@ -149,7 +155,10 @@ func TestDigestHeaderString(t *testing.T) {
 		digest[i] = byte(i)
 	}
 
-	header := NewDigestHeader(DigestSHA256, digest)
+	header, err := NewDigestHeader(DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	str := header.String()
 
 	if str == "" {
@@ -163,7 +172,10 @@ func TestDetachedTimestamp(t *testing.T) {
 		digest[i] = byte(i)
 	}
 
-	header := NewDigestHeader(DigestSHA256, digest)
+	header, err := NewDigestHeader(DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	ts := Timestamp{
 		NewSHA256Step(Timestamp{
 			NewAttestationStep(&BitcoinAttestation{Height: 123}),
@@ -187,7 +199,10 @@ func TestDetachedTimestampString(t *testing.T) {
 		digest[i] = byte(i)
 	}
 
-	header := NewDigestHeader(DigestSHA256, digest)
+	header, err := NewDigestHeader(DigestSHA256, digest)
+	if err != nil {
+		t.Fatalf("NewDigestHeader() error = %v", err)
+	}
 	ts := Timestamp{}
 	dt := NewDetachedTimestamp(header, ts)
 
