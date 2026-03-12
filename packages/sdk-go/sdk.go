@@ -185,13 +185,16 @@ func (s *SDK) requestAttestation(ctx context.Context, calendarURL string, root [
 }
 
 func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*types.DetachedTimestamp, error) {
+	if len(headers) == 0 {
+		return nil, errors.NewSDKError(errors.ErrCodeEmptyRequests, "at least one digest header is required", nil)
+	}
 	nonces := make([][]byte, len(headers))
 	nonceDigests := make([][crypto.HashSize]byte, len(headers))
 
 	for i, header := range headers {
 		nonce := make([]byte, s.nonceSize)
 		if _, err := rand.Read(nonce); err != nil {
-			return nil, fmt.Errorf("failed to generate nonce: %w", err)
+			return nil, errors.NewSDKError(errors.ErrCodeGeneric, "failed to generate nonce", map[string]interface{}{"error": err.Error()})
 		}
 		nonces[i] = nonce
 
@@ -270,7 +273,7 @@ func (s *SDK) Stamp(ctx context.Context, headers []*types.DigestHeader) ([]*type
 
 		proof, err := tree.GetProof(nonceDigests[i])
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate proof for digest %x: %w", header.DigestBytes(), err)
+			return nil, errors.NewSDKError(errors.ErrCodeGeneric, "failed to generate proof for digest", map[string]interface{}{"digest": header.DigestBytes(), "error": err.Error()})
 		}
 
 		for _, step := range proof {

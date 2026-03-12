@@ -28,6 +28,8 @@ const (
 	ErrCodeRpc               ErrorCode = "Rpc"
 	ErrCodeRemote            ErrorCode = "Remote"
 	ErrCodeDecode            ErrorCode = "Decode"
+	ErrCodeEmptyRequests     ErrorCode = "EmptyRequests"
+	ErrCodeGeneric           ErrorCode = "Generic"
 )
 
 type SDKError struct {
