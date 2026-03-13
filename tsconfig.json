@@ -59,6 +59,7 @@
   "references": [
     { "path": "./packages/sdk-ts" },
     { "path": "./packages/sdk-ts/test/" },
-    { "path": "./apps/web" }
+    { "path": "./apps/web" },
+    { "path": "./apps/docs" }
   ]
 }

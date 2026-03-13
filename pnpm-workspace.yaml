@@ -5,3 +5,12 @@ packages:
 onlyBuiltDependencies:
   - esbuild
   - unrs-resolver
+  - better-sqlite3
+  - sharp
+
+ignoredBuiltDependencies:
+  - '@parcel/watcher'
+  - '@tailwindcss/oxide'
+  - esbuild
+  - unrs-resolver
+  - vue-demi
