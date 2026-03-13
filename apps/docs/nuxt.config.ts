@@ -14,11 +14,31 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  site: {
+    url: 'https://docs.timestamps.now',
+    name: 'UTS Documentation',
+    description:
+      'Universal Timestamps - Decentralized timestamping protocol with EAS attestations',
+  },
+
   content: {
     build: {
       markdown: {
         toc: {
-          searchDepth: 1,
+          searchDepth: 2,
+          depth: 3,
+        },
+        highlight: {
+          langs: [
+            'typescript',
+            'javascript',
+            'rust',
+            'bash',
+            'json',
+            'yaml',
+            'toml',
+            'solidity',
+          ],
         },
       },
     },

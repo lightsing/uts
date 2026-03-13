@@ -1,7 +1,7 @@
 export default defineAppConfig({
   ui: {
     colors: {
-      primary: 'green',
+      primary: 'violet',
       neutral: 'slate',
     },
     footer: {
@@ -12,13 +12,13 @@ export default defineAppConfig({
     },
   },
   seo: {
-    siteName: 'Nuxt Docs Template',
+    siteName: 'UTS Documentation',
   },
   header: {
-    title: '',
+    title: 'UTS',
     to: '/',
     logo: {
-      alt: '',
+      alt: 'UTS',
       light: '',
       dark: '',
     },
@@ -27,52 +27,52 @@ export default defineAppConfig({
     links: [
       {
         icon: 'i-simple-icons-github',
-        to: 'https://github.com/nuxt-ui-templates/docs',
+        to: 'https://github.com/lightsing/uts',
         target: '_blank',
         'aria-label': 'GitHub',
       },
     ],
   },
   footer: {
-    credits: `Built with Nuxt UI • © ${new Date().getFullYear()}`,
+    credits: `Universal Timestamps • © ${new Date().getFullYear()}`,
     colorMode: false,
     links: [
       {
         icon: 'i-simple-icons-discord',
-        to: 'https://go.nuxt.com/discord',
+        to: 'https://discord.gg/nuxt',
         target: '_blank',
-        'aria-label': 'Nuxt on Discord',
+        'aria-label': 'Discord',
       },
       {
         icon: 'i-simple-icons-x',
-        to: 'https://go.nuxt.com/x',
+        to: 'https://x.com/nuxt_js',
         target: '_blank',
-        'aria-label': 'Nuxt on X',
+        'aria-label': 'X',
       },
       {
         icon: 'i-simple-icons-github',
-        to: 'https://github.com/nuxt/ui',
+        to: 'https://github.com/lightsing/uts',
         target: '_blank',
-        'aria-label': 'Nuxt UI on GitHub',
+        'aria-label': 'GitHub',
       },
     ],
   },
   toc: {
-    title: 'Table of Contents',
+    title: 'On this page',
     bottom: {
-      title: 'Community',
-      edit: 'https://github.com/nuxt-ui-templates/docs/edit/main/content',
+      title: 'Links',
+      edit: 'https://github.com/lightsing/uts/edit/main/apps/docs/content',
       links: [
         {
           icon: 'i-lucide-star',
           label: 'Star on GitHub',
-          to: 'https://github.com/nuxt/ui',
+          to: 'https://github.com/lightsing/uts',
           target: '_blank',
         },
         {
           icon: 'i-lucide-book-open',
-          label: 'Nuxt UI docs',
-          to: 'https://ui.nuxt.com/docs/getting-started/installation/nuxt',
+          label: 'EAS Documentation',
+          to: 'https://attest.sh/docs/',
           target: '_blank',
         },
       ],

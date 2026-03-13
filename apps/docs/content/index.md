@@ -1,10 +1,10 @@
 ---
 seo:
-  title: Nuxt Docs Template
-  description: Create stunning, fast and SEO-optimized documentation sites with Nuxt UI.
+  title: Universal Timestamps
+  description: Decentralized timestamping protocol with EAS attestations. Create cryptographic, publicly verifiable proofs that data existed at a specific point in time.
 ---
 
-::u-page-hero{class="dark:bg-gradient-to-b from-neutral-900 to-neutral-950"}
+::u-page-hero{class="dark:bg-gradient-to-b from-violet-950 to-neutral-950"}
 ---
 orientation: horizontal
 ---
@@ -12,10 +12,10 @@ orientation: horizontal
 :hero-background
 
 #title
-Ship Beautiful [Documentation]{.text-primary}.
+Decentralized Timestamps, [Verifiable Forever]{.text-primary}.
 
 #description
-Build professional documentation with Nuxt UI's powerful components, enhanced typography, and seamless Nuxt Content integration. The same system trusted by the entire [Nuxt ecosystem](https://nuxt.com).
+UTS extends OpenTimestamps with Ethereum Attestation Service (EAS) integration. Batch Merkle trees, anchor on L2, and secure with L1 finality. The universe's most precise clocks for your data.
 
 #links
   :::u-button
@@ -33,47 +33,43 @@ Build professional documentation with Nuxt UI's powerful components, enhanced ty
   color: neutral
   variant: outline
   size: xl
-  to: https://github.com/nuxt-ui-templates/docs
+  to: https://github.com/lightsing/uts
   target: _blank
   ---
-  Use this template
+  View on GitHub
   :::
 
 #default
   :::prose-pre
   ---
   code: |
-    export default defineNuxtConfig({
-      modules: [
-        '@nuxt/ui',
-        '@nuxt/content',
-        'nuxt-og-image',
-        'nuxt-llms'
-      ],
+    // Install the CLI
+    cargo install uts-cli
 
-      css: ['~/assets/css/main.css']
-    })
-  filename: nuxt.config.ts
+    # Timestamp a file
+    uts stamp document.pdf
+
+    # Verify timestamp
+    uts verify document.pdf.ots
+  filename: Terminal
   ---
 
-  ```ts [nuxt.config.ts]
-  export default defineNuxtConfig({
-    modules: [
-      '@nuxt/ui',
-      '@nuxt/content',
-      'nuxt-og-image',
-      'nuxt-llms'
-    ],
+  ```bash
+  # Install the CLI
+  cargo install uts-cli
 
-    css: ['~/assets/css/main.css']
-  })
+  # Timestamp a file
+  uts stamp document.pdf
+
+  # Verify timestamp
+  uts verify document.pdf
   ```
   :::
 ::
 
 ::u-page-section{class="dark:bg-neutral-950"}
 #title
-Powered by Nuxt UI components
+Why UTS?
 
 #links
   :::u-button
@@ -81,34 +77,23 @@ Powered by Nuxt UI components
   color: neutral
   size: lg
   target: _blank
-  to: https://ui.nuxt.com/docs/getting-started/installation/nuxt
+  to: https://attest.org/
   trailingIcon: i-lucide-arrow-right
   variant: subtle
   ---
-  Explore Nuxt UI
+  Learn about EAS
   :::
 
 #features
   :::u-page-feature
   ---
-  icon: i-lucide-palette
+  icon: i-lucide-shield-check
   ---
   #title
-  100+ UI Components
+  Trustless Verification
 
   #description
-  Access the complete Nuxt UI component library. From badges to modals, everything styled and accessible out of the box.
-  :::
-
-  :::u-page-feature
-  ---
-  icon: i-lucide-type
-  ---
-  #title
-  Beautiful Typography
-
-  #description
-  Pre-styled prose components with perfect visual harmony. No need for @tailwindcss/typography - get precise control over every element.
+  No trusted third parties. Timestamps are anchored on Ethereum via EAS attestations, providing immutable, publicly verifiable proofs.
   :::
 
   :::u-page-feature
@@ -116,84 +101,32 @@ Powered by Nuxt UI components
   icon: i-lucide-layers
   ---
   #title
-  Rich Prose Components
+  Dual-Layer Security
 
   #description
-  Accordions, cards, callouts, tabs, steps, code blocks, and more - all provided by Nuxt UI for interactive documentation.
+  Fast L2 timestamps on Scroll for immediate confirmation. Optional L1 Ethereum anchoring for maximum finality guarantees.
   :::
 
   :::u-page-feature
   ---
-  icon: i-lucide-search
+  icon: i-lucide-git-merge
   ---
   #title
-  Built-in Search
+  Merkle Tree Batching
 
   #description
-  Full-text search with ContentSearch component. No need for Algolia - instant, relevant results with keyboard shortcuts (⌘K).
+  Thousands of digests share a single on-chain transaction. Amortized costs make cryptographic timestamping practical for everyone.
   :::
 
   :::u-page-feature
   ---
-  icon: i-lucide-navigation
+  icon: i-lucide-zap
   ---
   #title
-  Smart Navigation
+  OpenTimestamps Compatible
 
   #description
-  Auto-generated navigation with ContentNavigation and ContentToc components. Sticky table of contents and prev/next links.
-  :::
-
-  :::u-page-feature
-  ---
-  icon: i-lucide-moon
-  ---
-  #title
-  Dark Mode Ready
-
-  #description
-  Automatic theme switching with smooth transitions. Respects system preferences and remembers user choice.
-  :::
-::
-
-::u-page-section{class="dark:bg-neutral-950"}
-#title
-Enhanced with Nuxt Content
-
-#links
-  :::u-button
-  ---
-  color: neutral
-  size: lg
-  target: _blank
-  to: https://content.nuxt.com/docs/getting-started/installation
-  trailingIcon: i-lucide-arrow-right
-  variant: subtle
-  ---
-  Explore Nuxt Content
-  :::
-
-#features
-  :::u-page-feature
-  ---
-  icon: i-simple-icons-markdown
-  ---
-  #title
-  MDC Enhanced Markdown
-
-  #description
-  Write in Markdown while embedding Vue components. Seamlessly integrate interactive elements in your content.
-  :::
-
-  :::u-page-feature
-  ---
-  icon: i-lucide-file-text
-  ---
-  #title
-  File-based Routing
-
-  #description
-  Organize content in folders and files. Your documentation structure automatically becomes your navigation.
+  Builds on the proven OTS binary format. Existing tools and workflows integrate seamlessly with enhanced Ethereum support.
   :::
 
   :::u-page-feature
@@ -201,60 +134,151 @@ Enhanced with Nuxt Content
   icon: i-lucide-code
   ---
   #title
-  Syntax Highlighting
+  Multi-Language SDKs
 
   #description
-  Beautiful code blocks with language detection, line numbers, and copy buttons. Support for 100+ languages.
+  Rust, TypeScript, Python, and Go SDKs. Integrate timestamping into any project with familiar, well-documented libraries.
   :::
 
   :::u-page-feature
   ---
-  icon: i-lucide-database
+  icon: i-lucide-clock
   ---
   #title
-  Content Database
+  Beacon Integration
 
   #description
-  Query your content with a MongoDB-like API. Filter, sort, and search through your documentation programmatically.
-  :::
-
-  :::u-page-feature
-  ---
-  icon: i-lucide-file-code
-  ---
-  #title
-  Frontmatter Support
-
-  #description
-  Add metadata to your content files. Define SEO tags, navigation properties, and custom fields.
-  :::
-
-  :::u-page-feature
-  ---
-  icon: i-lucide-git-branch
-  ---
-  #title
-  Version Control
-
-  #description
-  Content lives in your repository. Branch, review, and deploy documentation alongside your code.
+  Drand randomness injection for continuous, unpredictable timestamps. Perfect for applications requiring public randomness.
   :::
 ::
 
-::u-page-section{class="dark:bg-gradient-to-b from-neutral-950 to-neutral-900"}
+::u-page-section{class="dark:bg-neutral-950"}
+#title
+How It Works
+
+#features
+  :::u-page-feature
+  ---
+  icon: i-lucide-upload
+  ---
+  #title
+  1. Submit Digest
+
+  #description
+  Send your data's SHA256 hash to a calendar server. Your original data never leaves your machine—only the cryptographic fingerprint.
+  :::
+
+  :::u-page-feature
+  ---
+  icon: i-lucide-tree-deciduous
+  ---
+  #title
+  2. Merkle Tree Batching
+
+  #description
+  The calendar aggregates thousands of digests into a Binary Merkle Tree. You receive an OTS file with your Merkle proof path.
+  :::
+
+  :::u-page-feature
+  ---
+  #icon: i-lucide-badge-check
+  ---
+  #title
+  3. EAS Attestation
+
+  #description
+  The Merkle root is timestamped on L2 (Scroll) via Ethereum Attestation Service. Fast confirmation, low cost, immutable record.
+  :::
+
+  :::u-page-feature
+  ---
+  icon: i-lucide-link
+  ---
+  #title
+  4. L1 Anchoring (Optional)
+
+  #description
+  L2 attestation roots are batched and anchored on Ethereum L1. Cross-chain relay ensures finality on the main chain.
+  :::
+
+  :::u-page-feature
+  ---
+  icon: i-lucide-search-check
+  ---
+  #title
+  5. Verify Anytime
+
+  #description
+  Re-hash your data, verify the Merkle proof, and check the on-chain attestation. Trustless verification, forever.
+  :::
+::
+
+::u-page-section{class="dark:bg-neutral-950"}
+#title
+Built with Modern Technology
+
+#links
+  :::u-button
+  ---
+  color: neutral
+  size: lg
+  target: _blank
+  to: https://www.rust-lang.org/
+  trailingIcon: i-lucide-arrow-right
+  variant: subtle
+  ---
+  Explore the Stack
+  :::
+
+#features
+  :::u-page-feature
+  ---
+  icon: i-simple-icons-rust
+  ---
+  #title
+  Rust Backend
+
+  #description
+  High-performance, memory-safe Rust implementation. Tokio async runtime, Axum web framework, RocksDB storage.
+  :::
+
+  :::u-page-feature
+  ---
+  icon: i-simple-icons-ethereum
+  ---
+  #title
+  Ethereum Ecosystem
+
+  #description
+  Deep EAS integration, Foundry smart contracts, Alloy bindings. Native support for L2 (Scroll) and L1 (Ethereum).
+  :::
+
+  :::u-page-feature
+  ---
+  icon: i-simple-icons-typescript
+  ---
+  #title
+  TypeScript SDK
+
+  #description
+  Full-featured TypeScript/JavaScript SDK. Browser and Node.js compatible with complete type safety.
+  :::
+::
+
+::u-page-section{class="dark:bg-gradient-to-b from-neutral-950 to-violet-950"}
   :::u-page-c-t-a
   ---
   links:
-    - label: Start building
+    - label: Get started
       to: '/getting-started'
       trailingIcon: i-lucide-arrow-right
     - label: View on GitHub
-      to: 'https://github.com/nuxt-ui-templates/docs'
+      to: 'https://github.com/lightsing/uts'
       target: _blank
       variant: subtle
       icon: i-simple-icons-github
-  title: Ready to build an amazing documentation?
-  description: Join thousands of developers building with Nuxt and Nuxt UI. Get this template and start shipping today.
+  title: Ready to timestamp your data?
+  description: Join the decentralized timestamping revolution. Start with the CLI or integrate the SDK into your application.
   class: dark:bg-neutral-950
   ---
 
