@@ -8,3 +8,5 @@ lib/*
 target/*
 
 **/.sqlx/*.json
+
+apps/docs/content/**/*.md
