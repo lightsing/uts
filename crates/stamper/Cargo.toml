@@ -20,7 +20,6 @@ workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-provider = { workspace = true }
-bytemuck = { workspace = true }
 digest = { workspace = true }
 eyre = { workspace = true }
 rocksdb = { workspace = true }

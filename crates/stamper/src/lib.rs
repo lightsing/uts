@@ -1,6 +1,3 @@
-#![feature(generic_const_exprs)]
-#![allow(incomplete_features)]
-
 //! Timestamping
 
 #[macro_use]
@@ -8,7 +5,6 @@ extern crate tracing;
 
 use alloy_primitives::B256;
 use alloy_provider::Provider;
-use bytemuck::Pod;
 use digest::{Digest, FixedOutputReset, Output, typenum::Unsigned};
 use eyre::{Context, bail};
 use rocksdb::{DB, WriteBatch};
@@ -87,7 +83,7 @@ impl<D, P> Stamper<D, P>
 where
     D: Digest + FixedOutputReset + 'static,
     P: Provider + Clone + 'static,
-    Output<D>: Pod + Copy,
+    Output<D>: Copy,
 {
     /// Create a new Stamper
     pub fn new(
@@ -182,7 +178,7 @@ where
         }
         debug_assert_eq!(buffer.len(), target_size);
 
-        let merkle_tree = MerkleTree::<D>::new_unhashed(bytemuck::cast_slice(buffer));
+        let merkle_tree = MerkleTree::<D>::new_unhashed(buffer);
 
         let merkle_tree = tokio::task::spawn_blocking(move || {
             let merkle_tree = merkle_tree.finalize(); // CPU intensive
@@ -193,7 +189,7 @@ where
         .await
         .context("failed to create Merkle tree")?;
 
-        let root = B256::new(bytemuck::cast(*merkle_tree.root()));
+        let root = B256::from_slice(merkle_tree.root());
 
         let mut batch = WriteBatch::default();
         // store leaf->root mappings for quick lookup
@@ -201,7 +197,7 @@ where
             batch.put(leaf, root);
         }
         // if it's a single-leaf tree, the root == the leaf, so we write mapping first.
-        batch.put(root, merkle_tree.as_raw_bytes());
+        batch.put(root, merkle_tree.to_raw_bytes());
         self.kv_storage
             .write(batch)
             .context("failed to write to kv db")?;

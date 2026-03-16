@@ -1,5 +1,4 @@
 use crate::client::CLIENT;
-use bytemuck::Pod;
 use clap::{Args, ValueEnum};
 use digest::{Digest, FixedOutputReset, Output};
 use futures::TryFutureExt;
@@ -70,7 +69,7 @@ impl Stamp {
     async fn run_inner<D>(self) -> eyre::Result<()>
     where
         D: Digest + FixedOutputReset + DigestOpExt + Send,
-        Output<D>: Pod + Copy,
+        Output<D>: Copy,
     {
         info!("Hashing files...");
         let digests =

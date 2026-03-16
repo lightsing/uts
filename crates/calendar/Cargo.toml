@@ -28,7 +28,6 @@ axum = { workspace = true, default-features = false, features = [
   "json",
 ] } # http2 only
 bump-scope.workspace = true
-bytemuck = { workspace = true }
 bytes = { workspace = true }
 config = { workspace = true }
 digest = { workspace = true }

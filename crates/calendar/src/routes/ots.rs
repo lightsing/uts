@@ -14,7 +14,7 @@ use axum::{
 };
 use bump_scope::Bump;
 use bytes::BytesMut;
-use digest::Digest;
+use digest::{Digest, Output};
 use sha3::Keccak256;
 use std::{cell::RefCell, sync::Arc};
 use uts_core::codec::{
@@ -80,7 +80,8 @@ pub fn submit_digest_inner(
             hasher.finalize_reset()
         });
 
-        let undeniable_sig = signer.sign_hash_sync(&hash.0.into()).unwrap();
+        let hash = B256::from_slice(&hash);
+        let undeniable_sig = signer.sign_hash_sync(&hash).unwrap();
         undeniable_sig.as_erc2098()
     };
 
@@ -152,8 +153,9 @@ pub async fn get_timestamp(
         .expect("DB error")
         .expect("bug: entry not found");
 
+    let commitment = Output::<Keccak256>::from_slice(commitment.as_slice());
     let proof = trie
-        .get_proof_iter(bytemuck::cast_ref(&*commitment))
+        .get_proof_iter(commitment)
         .expect("bug: proof not found");
 
     let mut builder = Timestamp::builder();

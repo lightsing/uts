@@ -175,7 +175,7 @@ impl<P1: Provider, P2: Provider> Relayer<P1, P2> {
                 .map(|hash| Output::<Keccak256>::from(hash.0))
                 .collect::<Vec<_>>();
         let trie = MerkleTree::<Keccak256>::new(&leaves);
-        let root = B256::new(trie.root().0);
+        let root = B256::from_slice(trie.root());
 
         sql::l1_batch::upsert_l1batch(
             &self.db,
