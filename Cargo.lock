@@ -6757,6 +6757,8 @@ dependencies = [
  "sha2 0.11.0-rc.5",
  "sha3 0.11.0-rc.8",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
  "url",
  "uts-bmt",
  "uts-contracts",

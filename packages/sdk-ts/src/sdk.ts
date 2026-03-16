@@ -87,11 +87,14 @@ export const WELL_KNOWN_CHAINS: Record<
 }
 
 export const DEFAULT_CALENDARS = [
-  // new URL('https://a.pool.opentimestamps.org/'),
-  // new URL('https://b.pool.opentimestamps.org/'),
-  // new URL('https://a.pool.eternitywall.com/'),
-  // new URL('https://ots.btc.catallaxy.com/'),
   new URL('https://lgm1.calendar.test.timestamps.now/'),
+  // Run by Peter Todd
+  new URL('https://a.pool.opentimestamps.org/'),
+  new URL('https://b.pool.opentimestamps.org/'),
+  // Run by Riccardo Casatta
+  new URL('https://a.pool.eternitywall.com/'),
+  // Run by Bull Bitcoin
+  new URL('https://ots.btc.catallaxy.com/'),
 ]
 
 export const DEFAULT_EAS_ADDRESSES: Record<number, Hex> = {

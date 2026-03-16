@@ -10,6 +10,7 @@ use std::{
     path::PathBuf,
     process,
 };
+use tracing::{error, info, warn};
 use uts_contracts::eas::EAS_ADDRESSES;
 use uts_core::{
     codec::{
@@ -69,14 +70,14 @@ impl Verify {
         let expected = hasher.finalize();
 
         if *expected != *digest_header.digest() {
-            eprintln!(
+            error!(
                 "Digest mismatch! Expected: {}, Found: {}",
                 Hexed(&expected),
                 Hexed(digest_header.digest())
             );
             process::exit(1);
         }
-        eprintln!("Digest matches: {}", Hexed(&expected));
+        info!("Digest matches: {}", Hexed(&expected));
 
         timestamp.try_finalize()?;
 
@@ -85,7 +86,7 @@ impl Verify {
                 continue; // skip pending attestations
             }
             if attestation.tag != EASAttestation::TAG && attestation.tag != EASTimestamped::TAG {
-                eprintln!("Unknown attestation type: {}", Hexed(&attestation.tag));
+                warn!("Unknown attestation type: {}", Hexed(&attestation.tag));
             }
 
             let expected = attestation
@@ -125,19 +126,19 @@ impl Verify {
             if attestation.tag == EASAttestation::TAG {
                 let eas_attestation = EASAttestation::from_raw(attestation)?;
                 let result = verifier.verify(&eas_attestation, expected).await?;
-                eprintln!("EAS Onchain Attestation: {}", result.uid);
+                info!("EAS Onchain Attestation: {}", result.uid);
                 time = result.time;
-                eprintln!("\tattester: {}", result.attester);
+                info!("\tattester: {}", result.attester);
             } else {
                 let timestamped = EASTimestamped::from_raw(attestation)?;
                 time = verifier.verify(&timestamped, expected).await?;
-                eprintln!("EAS Timestamped");
+                info!("EAS Timestamped");
             }
 
             let ts = Timestamp::from_second(time.try_into().context("i64 overflow")?)?;
             let zdt = ts.to_zoned(TimeZone::system());
-            eprintln!("\ttime attested: {zdt}");
-            eprintln!("\tmerkle root: {}", Hexed(&expected));
+            info!("\ttime attested: {zdt}");
+            info!("\tmerkle root: {}", Hexed(&expected));
         }
 
         Ok(())
