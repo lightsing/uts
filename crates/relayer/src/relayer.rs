@@ -247,7 +247,7 @@ impl<P1: Provider, P2: Provider> Relayer<P1, P2> {
             .get_balance(self.wallet)
             .block_id(block_number.into())
             .await?;
-        let gas_fee = U256::from(receipt.gas_used as u128 * receipt.effective_gas_price);
+        let gas_fee = U256::from(u128::from(receipt.gas_used) * receipt.effective_gas_price);
         let cross_chain_fee = if prev > current + gas_fee {
             prev - current - gas_fee
         } else {
@@ -303,7 +303,7 @@ impl<P1: Provider, P2: Provider> Relayer<P1, P2> {
             .block_number
             .context("missing block number in log")?;
         info!(%tx_hash, block_number, "Finalize transaction mined");
-        let gas_fee = U256::from(receipt.gas_used as u128 * receipt.effective_gas_price);
+        let gas_fee = U256::from(u128::from(receipt.gas_used) * receipt.effective_gas_price);
 
         let mut db_tx = self.db.begin().await?;
         insert_tx_receipt(&mut *db_tx, self.l2_chain_id, &receipt).await?;

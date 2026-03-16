@@ -116,15 +116,15 @@ impl<A: Allocator + Clone> DetachedTimestamp<A> {
     }
 }
 
-impl Deref for DetachedTimestamp {
-    type Target = Timestamp;
+impl<A: Allocator> Deref for DetachedTimestamp<A> {
+    type Target = Timestamp<A>;
 
     fn deref(&self) -> &Self::Target {
         &self.timestamp
     }
 }
 
-impl DerefMut for DetachedTimestamp {
+impl<A: Allocator> DerefMut for DetachedTimestamp<A> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.timestamp
     }

@@ -4,6 +4,7 @@ use crate::{
     error::{DecodeError, EncodeError},
 };
 use core::fmt;
+use std::ops::{Deref, DerefMut};
 
 /// Version number of the serialization format.
 pub type Version = u32;
@@ -73,5 +74,19 @@ impl<T: Proof<A>, A: Allocator> Encode for VersionedProof<T, A> {
 impl<T: Proof<A> + fmt::Display, A: Allocator> fmt::Display for VersionedProof<T, A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Version {} Proof {}", T::VERSION, self.proof)
+    }
+}
+
+impl<T: Proof<A>, A: Allocator> Deref for VersionedProof<T, A> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.proof
+    }
+}
+
+impl<T: Proof<A>, A: Allocator> DerefMut for VersionedProof<T, A> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.proof
     }
 }

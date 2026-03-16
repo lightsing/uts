@@ -42,9 +42,11 @@ macro_rules! leb128 {
                         let byte = decoder.decode_byte()?;
                         let value = (byte & 0x7f) as $ty;
                         if shift < value.leading_zeros() || shift < value.leading_ones() {
+                            ret |= ((byte & 0x7f) as $ty) << shift;
+                        } else {
                             return Err($crate::error::DecodeError::LEB128Overflow(<$ty>::BITS));
                         }
-                        ret |= ((byte & 0x7f) as $ty) << shift;
+
                         // Top bit is a continue bit
                         if byte & 0x80 == 0 {
                             break;

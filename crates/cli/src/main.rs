@@ -4,7 +4,6 @@ use clap::Parser;
 use tracing::warn;
 use tracing_subscriber::{EnvFilter, filter::LevelFilter};
 
-mod client;
 mod commands;
 
 #[derive(Debug, Parser)]

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "packages/sdk-rs"]
 resolver = "3"
 
 [workspace.package]
@@ -44,6 +44,7 @@ alloy-transport-ws = "1.7"
 auto_impl = "1.3"
 axum = { version = "0.8", default-features = false }
 axum-extra = "0.12"
+backon = "1.6"
 bitcode = "0.6"
 bump-scope = { version = "2.2", features = ["allocator-api2-04"] }
 bytes = "1.11"
@@ -58,6 +59,8 @@ dyn-clone = "1.0"
 eyre = "0.6"
 futures = "0.3"
 hex = "0.4"
+http = "1.4"
+http-body-util = "0.1.3"
 itoa = "1.0"
 jiff = "0.2"
 once_cell = { version = "1.21", default-features = false }
@@ -95,6 +98,7 @@ uts-bmt = { version = "0.1.1", path = "crates/bmt" }
 uts-contracts = { version = "=0.1.0-alpha.0", path = "crates/contracts" }
 uts-core = { version = "=0.1.0-alpha.0", path = "crates/core" }
 uts-journal = { version = "0.1.0", path = "crates/journal" }
+uts-sdk = { version = "=0.1.0-alpha.0", path = "packages/sdk-rs" }
 uts-sql = { version = "=0.1.0-alpha.0", path = "crates/sql" }
 uts-stamper = { version = "=0.1.0-alpha.0", path = "crates/stamper" }
 
