@@ -36,5 +36,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/docs
-          preCommands: npx nuxi generate
-          command: pages deploy ./.output/public --project-name=uts-docs --branch main
+          preCommands: pnpm run build
+          command: pages deploy ./.vitepress/dist --project-name=uts-docs --branch main

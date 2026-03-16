@@ -1,8 +1,8 @@
 {
   "$schema": "./node_modules/@lunariajs/core/config.schema.json",
   "repository": {
-    "name": "vuejs/vitepress",
-    "rootDir": "docs"
+    "name": "lightsing/uts",
+    "rootDir": "apps/docs"
   },
   "files": [
     {
@@ -20,7 +20,12 @@
     "label": "English",
     "lang": "en"
   },
-  "locales": [],
+  "locales": [
+    {
+      "label": "Chinese",
+      "lang": "zh"
+    }
+  ],
   "outDir": ".vitepress/dist/_translations",
   "ignoreKeywords": ["lunaria-ignore"]
 }
