@@ -1,5 +1,4 @@
-use crate::codec::*;
-use alloc::vec::Vec;
+use crate::{alloc::vec::Vec, codec::*};
 
 mod alloy;
 #[cfg(feature = "bytes")]
@@ -12,6 +11,18 @@ mod std_io;
 pub use std_io::{Reader, Writer};
 
 impl<A: Allocator> Encoder for Vec<u8, A> {
+    fn encode_byte(&mut self, byte: u8) -> Result<(), EncodeError> {
+        self.push(byte);
+        Ok(())
+    }
+
+    fn write_all(&mut self, buf: impl AsRef<[u8]>) -> Result<(), EncodeError> {
+        self.extend_from_slice(buf.as_ref());
+        Ok(())
+    }
+}
+
+impl Encoder for std::vec::Vec<u8> {
     fn encode_byte(&mut self, byte: u8) -> Result<(), EncodeError> {
         self.push(byte);
         Ok(())

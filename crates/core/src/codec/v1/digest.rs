@@ -1,4 +1,5 @@
 use crate::{
+    alloc::Allocator,
     codec::{
         DecodeIn, Decoder, Encode, Encoder,
         v1::opcode::{DigestOp, DigestOpExt},
@@ -6,7 +7,6 @@ use crate::{
     error::{DecodeError, EncodeError},
     utils::Hexed,
 };
-use alloc::alloc::Allocator;
 use core::fmt;
 use digest::{Output, typenum::Unsigned};
 

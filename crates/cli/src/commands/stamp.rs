@@ -96,7 +96,7 @@ impl Stamp {
                 Digest::update(&mut hasher, digest.digest());
                 let nonce: [u8; 32] = rand::random();
                 Digest::update(&mut hasher, nonce);
-                builder.append(nonce.to_vec()).digest::<D>();
+                builder.append(nonce.into()).digest::<D>();
                 hasher.finalize()
             })
             .collect::<Vec<_>>();
@@ -135,7 +135,7 @@ impl Stamp {
         .await
         .into_iter()
         .filter_map(|res| res.ok())
-        .collect::<Vec<_>>();
+        .collect::<uts_core::alloc::vec::Vec<_>>();
         if stamps.len() < quorum {
             eyre::bail!(
                 "Only received {} valid responses from calendars, which does not meet the quorum of {quorum}",

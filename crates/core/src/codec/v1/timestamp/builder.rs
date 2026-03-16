@@ -1,6 +1,7 @@
 //! Timestamp Builder
 
 use crate::{
+    alloc::{Allocator, Global, vec, vec::Vec},
     codec::v1::{
         Attestation, Timestamp,
         opcode::{DigestOpExt, OpCode},
@@ -9,7 +10,7 @@ use crate::{
     error::EncodeError,
     utils::OnceLock,
 };
-use alloc::alloc::{Allocator, Global};
+use allocator_api2::SliceExt;
 use uts_bmt::{NodePosition, SiblingIter};
 
 #[derive(Debug, Clone)]
@@ -67,13 +68,14 @@ impl<A: Allocator + Clone> TimestampBuilder<A> {
     pub fn merkle_proof<D: DigestOpExt>(&mut self, proof: SiblingIter<'_, D>) -> &mut Self {
         let alloc = self.allocator().clone();
         for (side, sibling_hash) in proof {
+            let sibling_hash = SliceExt::to_vec_in(sibling_hash.as_slice(), alloc.clone());
             match side {
                 NodePosition::Left => self
-                    .prepend([uts_bmt::INNER_NODE_PREFIX].to_vec_in(alloc.clone()))
-                    .append(sibling_hash.to_vec_in(alloc.clone())),
+                    .prepend(vec![in alloc.clone(); uts_bmt::INNER_NODE_PREFIX])
+                    .append(sibling_hash),
                 NodePosition::Right => self
-                    .prepend(sibling_hash.to_vec_in(alloc.clone()))
-                    .prepend([uts_bmt::INNER_NODE_PREFIX].to_vec_in(alloc.clone())),
+                    .prepend(sibling_hash)
+                    .prepend(vec![in alloc.clone(); uts_bmt::INNER_NODE_PREFIX]),
             }
             .digest::<D>();
         }
@@ -96,7 +98,7 @@ impl<A: Allocator + Clone> TimestampBuilder<A> {
     /// commitment.
     pub fn commitment(&self, input: impl AsRef<[u8]>) -> Vec<u8, A> {
         let alloc = self.allocator().clone();
-        let mut commitment = input.as_ref().to_vec_in(alloc.clone());
+        let mut commitment = SliceExt::to_vec_in(input.as_ref(), alloc.clone());
         for step in &self.steps {
             commitment = step.op.execute_in(&commitment, &step.data, alloc.clone());
         }

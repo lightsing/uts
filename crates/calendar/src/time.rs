@@ -46,7 +46,11 @@ pub fn updater() {
         // Note: This behavior is different from the async version, which skips missed ticks.
         let now_instant = Instant::now();
         if next_tick > now_instant {
-            std::thread::sleep_until(next_tick);
+            let now = Instant::now();
+
+            if let Some(delay) = next_tick.checked_duration_since(now) {
+                std::thread::sleep(delay);
+            }
         } else {
             // If we've fallen behind, resynchronize to avoid accumulating drift.
             next_tick = now_instant;

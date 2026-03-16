@@ -1,14 +1,15 @@
 //! ** The implementation here is subject to change as this is a read-only version. **
 
 use crate::{
+    alloc::{Allocator, Global, vec, vec::Vec},
     codec::v1::{
         Attestation, FinalizationError, MayHaveInput, PendingAttestation,
         attestation::RawAttestation, opcode::OpCode,
     },
     utils::{Hexed, OnceLock},
 };
-use alloc::{alloc::Global, vec::Vec};
-use core::{alloc::Allocator, fmt::Debug};
+use allocator_api2::SliceExt;
+use core::fmt::Debug;
 
 pub(crate) mod builder;
 mod decode;
@@ -186,7 +187,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
     ///
     /// Returns an error if the timestamp is already finalized with different input data.
     pub fn try_finalize(&self, input: &[u8]) -> Result<(), FinalizationError> {
-        let init_fn = || input.to_vec_in(self.allocator().clone());
+        let init_fn = || SliceExt::to_vec_in(input, self.allocator().clone());
         match self {
             Self::Attestation(attestation) => {
                 if let Some(already) = attestation.value.get() {

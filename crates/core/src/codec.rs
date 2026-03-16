@@ -1,7 +1,9 @@
-use crate::error::{DecodeError, EncodeError};
-use alloc::alloc::Global;
+use crate::{
+    alloc::{Allocator, Global},
+    error::{DecodeError, EncodeError},
+};
 use auto_impl::auto_impl;
-use core::{alloc::Allocator, ops::RangeBounds};
+use core::ops::RangeBounds;
 
 mod proof;
 pub use proof::{Proof, Version, VersionedProof};

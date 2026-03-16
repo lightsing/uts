@@ -31,7 +31,7 @@ macro_rules! leb128 {
                 }
             }
 
-            impl<A: core::alloc::Allocator> crate::codec::DecodeIn<A> for $ty {
+            impl<A: $crate::alloc::Allocator> crate::codec::DecodeIn<A> for $ty {
                 #[inline]
                 fn decode_in(decoder: &mut impl crate::codec::Decoder, _alloc: A) -> Result<Self, $crate::error::DecodeError> {
                     let mut ret: $ty = 0;
@@ -40,9 +40,11 @@ macro_rules! leb128 {
                     loop {
                         // Bottom 7 bits are value bits
                         let byte = decoder.decode_byte()?;
-                        ret |= ((byte & 0x7f) as $ty)
-                            .shl_exact(shift)
-                            .ok_or($crate::error::DecodeError::LEB128Overflow(<$ty>::BITS))?;
+                        let value = (byte & 0x7f) as $ty;
+                        if shift < value.leading_zeros() || shift < value.leading_ones() {
+                            return Err($crate::error::DecodeError::LEB128Overflow(<$ty>::BITS));
+                        }
+                        ret |= ((byte & 0x7f) as $ty) << shift;
                         // Top bit is a continue bit
                         if byte & 0x80 == 0 {
                             break;

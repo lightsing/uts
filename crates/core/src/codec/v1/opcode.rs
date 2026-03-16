@@ -3,10 +3,10 @@
 //! It contains opcode information and utilities to work with opcodes.
 
 use crate::{
+    alloc::{Allocator, Global, vec::Vec},
     codec::{Decode, DecodeIn, Decoder, Encode, Encoder},
     error::{DecodeError, EncodeError},
 };
-use alloc::{alloc::Allocator, vec::Vec};
 use alloy_primitives::hex;
 use core::{fmt, hint::unreachable_unchecked};
 use digest::Digest;
@@ -95,7 +95,7 @@ impl OpCode {
     /// Panics if the opcode is a control opcode.
     #[inline]
     pub fn execute(&self, input: impl AsRef<[u8]>, immediate: impl AsRef<[u8]>) -> Vec<u8> {
-        self.execute_in(input, immediate, alloc::alloc::Global)
+        self.execute_in(input, immediate, Global)
     }
 
     /// Executes the opcode on the given input data, with an optional immediate value.
@@ -326,18 +326,18 @@ macro_rules! define_digest_opcodes {
             }
 
             /// Executes the digest operation on the input data.
-            pub fn execute(&self, input: impl AsRef<[u8]>) -> ::alloc::vec::Vec<u8> {
-                self.execute_in(input, ::alloc::alloc::Global)
+            pub fn execute(&self, input: impl AsRef<[u8]>) -> $crate::alloc::vec::Vec<u8> {
+                self.execute_in(input, $crate::alloc::Global)
             }
 
             /// Executes the digest operation on the input data.
-            pub fn execute_in<A: Allocator>(&self, input: impl AsRef<[u8]>, alloc: A) -> ::alloc::vec::Vec<u8, A> {
+            pub fn execute_in<A: $crate::alloc::Allocator>(&self, input: impl AsRef<[u8]>, alloc: A) -> $crate::alloc::vec::Vec<u8, A> {
                 match *self {
                     $( Self::$variant => {
                         paste::paste! {
                             let mut hasher = [<$variant:camel>]::new();
                             hasher.update(input);
-                            hasher.finalize().to_vec_in(alloc)
+                            $crate::alloc::SliceExt::to_vec_in(hasher.finalize().as_slice(), alloc)
                         }
                     }, )*
                     // SAFETY: unreachable as all variants are covered.
@@ -362,7 +362,7 @@ macro_rules! define_digest_opcodes {
 
 macro_rules! impl_simple_step {
     ($variant:ident) => {paste::paste! {
-        impl<A: Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
+        impl<A: $crate::alloc::Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
             #[doc = concat!("Push the `", stringify!($variant), "` opcode.")]
             pub fn [< $variant:lower >](&mut self) -> &mut Self {
                 self.push_step(OpCode::[<$variant>])
@@ -378,9 +378,9 @@ macro_rules! impl_simple_step {
 
 macro_rules! impl_step_with_data {
     ($variant:ident) => {paste::paste! {
-        impl<A: Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
+        impl<A: $crate::alloc::Allocator + Clone> $crate::codec::v1::timestamp::builder::TimestampBuilder<A> {
             #[doc = concat!("Push the `", stringify!($variant), "` opcode.")]
-            pub fn [< $variant:lower >](&mut self, data: ::alloc::vec::Vec<u8, A>) -> &mut Self {
+            pub fn [< $variant:lower >](&mut self, data: $crate::alloc::vec::Vec<u8, A>) -> &mut Self {
                 self.push_immediate_step(OpCode::[<$variant>], data)
             }
         }

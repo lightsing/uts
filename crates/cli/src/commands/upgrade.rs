@@ -95,7 +95,7 @@ async fn upgrade_one(
                 );
 
                 *step = if keep_pending {
-                    Timestamp::merge(vec![attestation, step.clone()])
+                    Timestamp::merge(uts_core::alloc::vec![attestation, step.clone()])
                 } else {
                     attestation
                 };

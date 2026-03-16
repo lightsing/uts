@@ -1,8 +1,10 @@
-use crate::codec::{
-    Decode, DecodeIn, Encode, Encoder, Proof, Version,
-    v1::{DigestHeader, FinalizationError, Timestamp},
+use crate::{
+    alloc::{Allocator, Global},
+    codec::{
+        Decode, DecodeIn, Encode, Encoder, Proof, Version,
+        v1::{DigestHeader, FinalizationError, Timestamp},
+    },
 };
-use alloc::alloc::{Allocator, Global};
 use core::{fmt, fmt::Formatter};
 use std::ops::{Deref, DerefMut};
 

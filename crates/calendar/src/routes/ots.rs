@@ -17,9 +17,12 @@ use bytes::BytesMut;
 use digest::{Digest, Output};
 use sha3::Keccak256;
 use std::{cell::RefCell, sync::Arc};
-use uts_core::codec::{
-    Encode,
-    v1::{EASTimestamped, PendingAttestation, Timestamp},
+use uts_core::{
+    alloc::SliceExt,
+    codec::{
+        Encode,
+        v1::{EASTimestamped, PendingAttestation, Timestamp},
+    },
 };
 use uts_journal::Error;
 use uts_stamper::{kv::DbExt, sql, sql::AttestationResult};
@@ -98,8 +101,8 @@ pub fn submit_digest_inner(
 
         let mut builder = Timestamp::builder_in(&*bump);
         builder
-            .prepend(recv_timestamp.to_vec_in(&bump))
-            .append(undeniable_sig.to_vec_in(&bump))
+            .prepend(SliceExt::to_vec_in(recv_timestamp.as_slice(), &bump))
+            .append(SliceExt::to_vec_in(undeniable_sig.as_slice(), &bump))
             .keccak256();
 
         let mut commitment = [0u8; 32];

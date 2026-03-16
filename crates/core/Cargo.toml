@@ -16,6 +16,7 @@ repository.workspace = true
 version.workspace = true
 
 [dependencies]
+allocator-api2 = { workspace = true }
 alloy-chains = { workspace = true }
 alloy-contract = { workspace = true, optional = true }
 alloy-primitives = { workspace = true }
@@ -43,6 +44,7 @@ bytes = ["dep:bytes"]
 default = ["std"]
 eas-verifier = ["verifier", "dep:alloy-provider", "dep:alloy-contract", "dep:alloy-sol-types", "dep:uts-contracts"]
 io-utils = ["dep:tokio", "tokio/fs"]
+nightly = []
 serde = ["dep:serde", "dep:serde_with", "serde/derive", "serde_with/hex"]
 std = []
 tracing = ["dep:tracing"]

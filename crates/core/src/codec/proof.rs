@@ -1,8 +1,8 @@
 use crate::{
+    alloc::{Allocator, Global},
     codec::{DecodeIn, Decoder, Encode, Encoder},
     error::{DecodeError, EncodeError},
 };
-use alloc::alloc::{Allocator, Global};
 use core::fmt;
 
 /// Version number of the serialization format.
