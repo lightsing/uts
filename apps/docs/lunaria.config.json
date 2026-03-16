@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/@lunariajs/core/config.schema.json",
+  "repository": {
+    "name": "lightsing/uts",
+    "rootDir": "apps/docs"
+  },
+  "files": [
+    {
+      "location": "**/config.ts",
+      "pattern": "@lang/@path",
+      "type": "universal"
+    },
+    {
+      "location": "**/*.md",
+      "pattern": "@lang/@path",
+      "type": "universal"
+    }
+  ],
+  "defaultLocale": {
+    "label": "English",
+    "lang": "en"
+  },
+  "locales": [
+    {
+      "label": "Chinese",
+      "lang": "zh"
+    }
+  ],
+  "outDir": ".vitepress/dist/_translations",
+  "ignoreKeywords": ["lunaria-ignore"]
+}
