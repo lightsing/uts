@@ -64,6 +64,4 @@ The command checks the file with the upgraded proof and confirms if the timestam
 
 ## Next Steps
 
-- [CLI Usage](/guide/cli-usage) — Common workflows
-- [Installation](/guide/installation) — SDK setup
 - [Architecture](/developer/overview) — How it works
