@@ -126,13 +126,13 @@ impl Verify {
             if attestation.tag == EASAttestation::TAG {
                 let eas_attestation = EASAttestation::from_raw(attestation)?;
                 let result = verifier.verify(&eas_attestation, expected).await?;
-                info!("EAS Onchain Attestation: {}", result.uid);
+                info!("EAS On Chain {chain} Attestation: {}", result.uid);
                 time = result.time;
                 info!("\tattester: {}", result.attester);
             } else {
                 let timestamped = EASTimestamped::from_raw(attestation)?;
                 time = verifier.verify(&timestamped, expected).await?;
-                info!("EAS Timestamped");
+                info!("EAS Timestamped On Chain {chain}");
             }
 
             let ts = Timestamp::from_second(time.try_into().context("i64 overflow")?)?;
