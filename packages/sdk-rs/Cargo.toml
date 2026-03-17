@@ -39,8 +39,6 @@ full = [
   "bitcoin-verifier",
 ]
 
-tracing = ["uts-core/tracing"]
-
 bitcoin-verifier = ["uts-core/bitcoin-verifier"]
 eas-verifier = [
   "dep:alloy-provider",

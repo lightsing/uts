@@ -2,8 +2,6 @@
 
 extern crate core;
 
-mod tracing;
-
 #[cfg(test)]
 pub mod fixtures;
 

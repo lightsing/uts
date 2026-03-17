@@ -8,6 +8,7 @@ use http_body_util::LengthLimitError;
 use reqwest::Client;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::json;
+use tracing::instrument;
 use url::Url;
 
 const RESPONSE_SIZE_LIMIT: usize = 10 * 1024; // 10 KiB
@@ -105,7 +106,7 @@ impl BitcoinVerifier {
         Ok(header)
     }
 
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self), level = trace, err = "warn"))]
+    #[instrument(skip(self, params), level = "trace", err(level = "warn"))]
     async fn req<P: Serialize, T: DeserializeOwned>(
         &self,
         method: &str,
