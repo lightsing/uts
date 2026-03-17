@@ -5996,14 +5996,11 @@ dependencies = [
 name = "uts-cli"
 version = "0.1.0-alpha.0"
 dependencies = [
- "alloy-primitives",
- "alloy-provider",
  "clap",
  "color-eyre",
  "digest 0.10.7",
  "eyre",
  "futures",
- "jiff",
  "ripemd",
  "sha1",
  "sha2",
@@ -6012,7 +6009,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
- "uts-contracts",
  "uts-core",
  "uts-sdk",
 ]
