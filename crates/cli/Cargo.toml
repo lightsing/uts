@@ -39,7 +39,4 @@ performance = ["tracing/max_level_info"]
 
 reqwest-default-tls = ["uts-sdk/reqwest-default-tls"]
 reqwest-native-tls = ["uts-sdk/reqwest-native-tls"]
-reqwest-native-tls-no-alpn = ["uts-sdk/reqwest-native-tls-no-alpn"]
-reqwest-native-tls-vendored = ["uts-sdk/reqwest-native-tls-vendored"]
-reqwest-native-tls-vendored-no-alpn = ["uts-sdk/reqwest-native-tls-vendored-no-alpn"]
 reqwest-rustls = ["uts-sdk/reqwest-rustls"]

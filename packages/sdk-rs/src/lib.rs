@@ -1,18 +1,14 @@
 //! Rust SDK for the Universal Timestamps protocol.
 
-use alloy_primitives::ChainId;
-use alloy_provider::DynProvider;
 use backon::{ExponentialBuilder, Retryable};
 use bytes::Bytes;
 use http::StatusCode;
 use reqwest::{Client, RequestBuilder};
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tracing::trace;
 use url::Url;
+#[cfg(feature = "eas-verifier")]
+use {alloy_primitives::ChainId, alloy_provider::DynProvider, std::collections::BTreeMap};
 
 mod builder;
 mod error;
@@ -49,7 +45,9 @@ struct SdkInner {
     keep_pending: bool,
 
     // Verify
+    #[cfg(feature = "eas-verifier")]
     eth_providers: BTreeMap<ChainId, DynProvider>,
+    #[cfg(feature = "bitcoin-verifier")]
     bitcoin_rpc: Url,
 }
 

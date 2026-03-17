@@ -1,15 +1,19 @@
 use crate::{Sdk, SdkInner};
-use alloy_primitives::ChainId;
-use alloy_provider::{Provider, ProviderBuilder};
 use backon::ExponentialBuilder;
 use reqwest::Client;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     sync::{Arc, LazyLock},
     time::Duration,
 };
 use url::Url;
-use uts_contracts::provider_helper::{RetryBackoffArgs, ThrottleArgs};
+#[cfg(feature = "eas-verifier")]
+use {
+    alloy_primitives::ChainId,
+    alloy_provider::{Provider, ProviderBuilder},
+    std::collections::BTreeMap,
+    uts_contracts::provider_helper::{RetryBackoffArgs, ThrottleArgs},
+};
 
 /// Default public calendars to use.
 static DEFAULT_CALENDARS: LazyLock<HashSet<Url>> = LazyLock::new(|| {
@@ -25,6 +29,7 @@ static DEFAULT_CALENDARS: LazyLock<HashSet<Url>> = LazyLock::new(|| {
     ])
 });
 
+#[cfg(feature = "eas-verifier")]
 static DEFAULT_PROVIDERS: LazyLock<BTreeMap<ChainId, Url>> = LazyLock::new(|| {
     BTreeMap::from([
         (1, Url::parse("https://0xrpc.io/eth").unwrap()),
@@ -60,10 +65,14 @@ pub struct SdkBuilder {
 
     keep_pending: bool,
 
+    #[cfg(feature = "eas-verifier")]
     eth_providers: BTreeMap<ChainId, Url>,
+    #[cfg(feature = "eas-verifier")]
     eth_compute_units_per_second: u64,
+    #[cfg(feature = "eas-verifier")]
     eth_requests_per_second: u32,
 
+    #[cfg(feature = "bitcoin-verifier")]
     bitcoin_rpc: Url,
 }
 
@@ -89,10 +98,14 @@ impl SdkBuilder {
 
             keep_pending: false,
 
+            #[cfg(feature = "eas-verifier")]
             eth_providers: BTreeMap::new(),
+            #[cfg(feature = "eas-verifier")]
             eth_compute_units_per_second: 20,
+            #[cfg(feature = "eas-verifier")]
             eth_requests_per_second: 25,
 
+            #[cfg(feature = "bitcoin-verifier")]
             bitcoin_rpc: Url::parse("https://bitcoin-rpc.publicnode.com").unwrap(),
         }
     }
@@ -107,6 +120,7 @@ impl SdkBuilder {
         let this = Self {
             calendars,
 
+            #[cfg(feature = "eas-verifier")]
             eth_providers: DEFAULT_PROVIDERS.clone(),
             ..Self::empty()
         };
@@ -197,18 +211,21 @@ impl SdkBuilder {
     }
 
     /// Add an Ethereum provider for a given chain ID. The URL should point to an Ethereum node that supports the JSON-RPC API.
+    #[cfg(feature = "eas-verifier")]
     pub fn add_eth_provider(mut self, chain_id: ChainId, url: Url) -> Self {
         self.eth_providers.insert(chain_id, url);
         self
     }
 
     /// Set the compute units per second for Ethereum provider requests. This is used to rate limit requests to avoid overwhelming the provider.
+    #[cfg(feature = "eas-verifier")]
     pub fn with_eth_compute_units_per_second(mut self, compute_units_per_second: u64) -> Self {
         self.eth_compute_units_per_second = compute_units_per_second;
         self
     }
 
     /// Set the requests per second for Ethereum provider requests. This is used to rate limit requests to avoid overwhelming the provider.
+    #[cfg(feature = "eas-verifier")]
     pub fn with_eth_requests_per_second(mut self, requests_per_second: u32) -> Self {
         self.eth_requests_per_second = requests_per_second;
         self
@@ -235,26 +252,28 @@ impl SdkBuilder {
                 .expect("default HTTP client should be valid")
         };
 
-        let eth_retry = RetryBackoffArgs {
-            compute_units_per_second: self.eth_compute_units_per_second,
-            ..Default::default()
+        #[cfg(feature = "eas-verifier")]
+        let eth_providers = {
+            let eth_retry = RetryBackoffArgs {
+                compute_units_per_second: self.eth_compute_units_per_second,
+                ..Default::default()
+            };
+            let eth_throttle = ThrottleArgs {
+                requests_per_second: self.eth_requests_per_second,
+            };
+            self.eth_providers
+                .into_iter()
+                .map(|(chain_id, url)| {
+                    let provider = ProviderBuilder::new().connect_client(
+                        alloy_rpc_client::ClientBuilder::default()
+                            .layer(eth_retry.layer())
+                            .layer(eth_throttle.layer())
+                            .http(url),
+                    );
+                    (chain_id, provider.erased())
+                })
+                .collect()
         };
-        let eth_throttle = ThrottleArgs {
-            requests_per_second: self.eth_requests_per_second,
-        };
-        let eth_providers = self
-            .eth_providers
-            .into_iter()
-            .map(|(chain_id, url)| {
-                let provider = ProviderBuilder::new().connect_client(
-                    alloy_rpc_client::ClientBuilder::default()
-                        .layer(eth_retry.layer())
-                        .layer(eth_throttle.layer())
-                        .http(url),
-                );
-                (chain_id, provider.erased())
-            })
-            .collect();
 
         Ok(Sdk {
             inner: Arc::new(SdkInner {
@@ -269,7 +288,9 @@ impl SdkBuilder {
 
                 keep_pending: self.keep_pending,
 
+                #[cfg(feature = "eas-verifier")]
                 eth_providers,
+                #[cfg(feature = "bitcoin-verifier")]
                 bitcoin_rpc: self.bitcoin_rpc,
             }),
         })

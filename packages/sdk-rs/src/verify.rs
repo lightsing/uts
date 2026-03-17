@@ -1,5 +1,5 @@
 use crate::{Error, Result, Sdk};
-use alloy_provider::DynProvider;
+#[cfg(any(feature = "eas-verifier", feature = "bitcoin-verifier"))]
 use backon::RetryableWithContext;
 use digest::Digest;
 use jiff::Timestamp;
@@ -8,17 +8,23 @@ use tokio::{
     fs::File,
     io::{AsyncReadExt, BufReader},
 };
-use uts_contracts::eas::EAS_ADDRESSES;
 use uts_core::{
     alloc,
     alloc::Allocator,
     codec::v1::{
-        Attestation, BitcoinAttestation, DetachedTimestamp, EASAttestation, EASTimestamped,
-        PendingAttestation, RawAttestation,
+        Attestation, DetachedTimestamp, PendingAttestation, RawAttestation,
         opcode::{KECCAK256, RIPEMD160, SHA1, SHA256},
     },
-    verifier::{BitcoinVerifier, EASVerifier},
 };
+#[cfg(feature = "eas-verifier")]
+use {
+    alloy_provider::DynProvider,
+    uts_contracts::eas::EAS_ADDRESSES,
+    uts_core::codec::v1::{EASAttestation, EASTimestamped},
+    uts_core::verifier::EASVerifier,
+};
+#[cfg(feature = "bitcoin-verifier")]
+use {uts_core::codec::v1::BitcoinAttestation, uts_core::verifier::BitcoinVerifier};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AttestationStatusKind {
@@ -197,25 +203,29 @@ impl Sdk {
         &self,
         attestation: &RawAttestation<A>,
     ) -> Result<AttestationStatusKind, Error> {
-        let expected = attestation
+        let _expected = attestation
             .value()
             .expect("Attestation value should be finalized");
 
-        let status = if attestation.tag == EASAttestation::TAG {
+        #[cfg(feature = "eas-verifier")]
+        if attestation.tag == EASAttestation::TAG {
             let attestation = EASAttestation::from_raw(attestation)?;
-            self.verify_eas_attestation(expected, attestation).await?
+            return self.verify_eas_attestation(_expected, attestation).await;
         } else if attestation.tag == EASTimestamped::TAG {
             let attestation = EASTimestamped::from_raw(attestation)?;
-            self.verify_eas_timestamped(expected, attestation).await?
-        } else if attestation.tag == BitcoinAttestation::TAG {
+            return self.verify_eas_timestamped(_expected, attestation).await;
+        }
+
+        #[cfg(feature = "bitcoin-verifier")]
+        if attestation.tag == BitcoinAttestation::TAG {
             let attestation = BitcoinAttestation::from_raw(attestation)?;
-            self.verify_bitcoin(expected, attestation).await?
-        } else {
-            AttestationStatusKind::Unknown
-        };
-        Ok(status)
+            return self.verify_bitcoin(_expected, attestation).await;
+        }
+
+        Ok(AttestationStatusKind::Unknown)
     }
 
+    #[cfg(feature = "eas-verifier")]
     async fn verify_eas_attestation(
         &self,
         expected: &[u8],
@@ -252,6 +262,7 @@ impl Sdk {
         }
     }
 
+    #[cfg(feature = "eas-verifier")]
     async fn verify_eas_timestamped(
         &self,
         expected: &[u8],
@@ -288,6 +299,7 @@ impl Sdk {
         }
     }
 
+    #[cfg(feature = "bitcoin-verifier")]
     async fn verify_bitcoin(
         &self,
         expected: &[u8],

@@ -54,20 +54,36 @@ std = []
 serde = ["dep:serde", "dep:serde_with", "serde/derive", "serde_with/hex"]
 tracing = ["dep:tracing"]
 
-bitcoin-verifier = ["verifier", "dep:reqwest", "dep:url", "dep:backon", "dep:http", "dep:http-body-util", "dep:serde", "dep:serde_json", "reqwest/json", "serde/derive"]
-eas-verifier = ["verifier", "dep:alloy-provider", "dep:alloy-contract", "dep:alloy-sol-types", "dep:uts-contracts"]
+bitcoin-verifier = [
+  "dep:reqwest",
+  "dep:url",
+  "dep:backon",
+  "dep:http",
+  "dep:http-body-util",
+  "dep:serde",
+  "dep:serde_json",
+
+  "verifier",
+  "reqwest/json",
+  "serde/derive",
+]
+eas-verifier = [
+  "dep:alloy-provider",
+  "dep:alloy-contract",
+  "dep:alloy-sol-types",
+  "dep:uts-contracts",
+
+  "verifier",
+]
 verifier = []
 
 io-utils = ["dep:tokio", "tokio/fs"]
 
 nightly = []
 
-reqwest-default-tls = ["reqwest/default-tls", "alloy-provider/reqwest-default-tls"]
-reqwest-native-tls = ["reqwest/native-tls", "alloy-provider/reqwest-native-tls"]
-reqwest-native-tls-no-alpn = ["reqwest/native-tls-no-alpn"]
-reqwest-native-tls-vendored = ["reqwest/native-tls-vendored"]
-reqwest-native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn"]
-reqwest-rustls = ["reqwest/rustls", "alloy-provider/reqwest-rustls-tls"]
+reqwest-default-tls = ["reqwest/default-tls", "alloy-provider?/reqwest-default-tls"]
+reqwest-native-tls = ["reqwest/native-tls", "alloy-provider?/reqwest-native-tls"]
+reqwest-rustls = ["reqwest/rustls", "alloy-provider?/reqwest-rustls-tls"]
 
 [dev-dependencies]
 serde_json.workspace = true
