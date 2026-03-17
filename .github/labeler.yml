@@ -1,0 +1,51 @@
+rust:
+  - changed-files:
+      - any-glob-to-any-file:
+          - crates/**
+          - packages/sdk-rs/**
+          - Cargo.toml
+          - Cargo.lock
+          - rust-toolchain.toml
+          - rustfmt.toml
+
+typescript:
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/sdk-ts/**
+          - packages/contract-types/**
+          - apps/**
+          - package.json
+          - pnpm-lock.yaml
+          - pnpm-workspace.yaml
+          - tsconfig.json
+          - eslint.config.js
+          - .prettierrc.toml
+
+contracts:
+  - changed-files:
+      - any-glob-to-any-file:
+          - contracts/**
+          - contract-tests/**
+          - foundry.toml
+          - remappings.txt
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - apps/docs/**
+          - book/**
+          - "*.md"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - Cargo.lock
+          - pnpm-lock.yaml
+          - package.json
+          - "**/Cargo.toml"
+          - "**/package.json"
