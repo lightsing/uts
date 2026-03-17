@@ -23,12 +23,17 @@ alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true, optional = true }
 alloy-sol-types = { workspace = true, optional = true }
 auto_impl.workspace = true
+backon = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
-digest.workspace = true
+digest = { workspace = true }
+http = { workspace = true, optional = true }
+http-body-util = { workspace = true, optional = true }
 once_cell = { workspace = true, features = ["alloc"] }
 paste.workspace = true
+reqwest = { workspace = true, optional = true, default-features = false }
 ripemd.workspace = true
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 sha1.workspace = true
 sha2.workspace = true
@@ -36,19 +41,34 @@ sha3.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
 uts-bmt = { workspace = true }
 uts-contracts = { workspace = true, optional = true }
 
 [features]
 bytes = ["dep:bytes"]
 default = ["std"]
-eas-verifier = ["verifier", "dep:alloy-provider", "dep:alloy-contract", "dep:alloy-sol-types", "dep:uts-contracts"]
-io-utils = ["dep:tokio", "tokio/fs"]
-nightly = []
-serde = ["dep:serde", "dep:serde_with", "serde/derive", "serde_with/hex"]
+
 std = []
+
+serde = ["dep:serde", "dep:serde_with", "serde/derive", "serde_with/hex"]
 tracing = ["dep:tracing"]
+
+bitcoin-verifier = ["verifier", "dep:reqwest", "dep:url", "dep:backon", "dep:http", "dep:http-body-util", "dep:serde", "dep:serde_json", "reqwest/json", "serde/derive"]
+eas-verifier = ["verifier", "dep:alloy-provider", "dep:alloy-contract", "dep:alloy-sol-types", "dep:uts-contracts"]
 verifier = []
+
+io-utils = ["dep:tokio", "tokio/fs"]
+
+nightly = []
+
+reqwest-default-tls = ["reqwest/default-tls", "alloy-provider/reqwest-default-tls"]
+reqwest-native-tls = ["reqwest/native-tls", "alloy-provider/reqwest-native-tls"]
+reqwest-native-tls-no-alpn = ["reqwest/native-tls-no-alpn"]
+reqwest-native-tls-vendored = ["reqwest/native-tls-vendored"]
+reqwest-native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn"]
+reqwest-rustls = ["reqwest/rustls", "alloy-provider/reqwest-rustls-tls"]
 
 [dev-dependencies]
 serde_json.workspace = true
+tokio = { workspace = true, features = ["full"] }

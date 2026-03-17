@@ -11,6 +11,7 @@ version.workspace = true
 [dependencies]
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true, default-features = false, features = ["reqwest"] }
+alloy-rpc-client = { workspace = true }
 backon = { workspace = true }
 bytes = { workspace = true }
 digest = { workspace = true }
@@ -27,21 +28,28 @@ sha3 = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 url = { workspace = true }
 uts-bmt = { workspace = true }
-uts-contracts = { workspace = true }
-uts-core = { workspace = true, features = ["std", "eas-verifier", "io-utils"] }
+uts-contracts = { workspace = true, optional = true }
+uts-core = { workspace = true, features = ["std", "io-utils"] }
 
 [features]
-full = []
+full = [
+  "eas-verifier",
+  "bitcoin-verifier",
+]
 
-reqwest-default-tls = ["reqwest/default-tls", "alloy-provider/reqwest-default-tls"]
-reqwest-native-tls = ["reqwest/native-tls", "alloy-provider/reqwest-native-tls"]
-reqwest-native-tls-no-alpn = ["reqwest/native-tls-no-alpn"]
-reqwest-native-tls-vendored = ["reqwest/native-tls-vendored"]
-reqwest-native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn"]
-reqwest-rustls = ["reqwest/rustls", "alloy-provider/reqwest-rustls-tls"]
+tracing = ["uts-core/tracing"]
+
+bitcoin-verifier = ["uts-core/bitcoin-verifier"]
+eas-verifier = ["dep:uts-contracts", "uts-core/eas-verifier", "uts-contracts/provider-helper"]
+
+reqwest-default-tls = ["reqwest/default-tls", "alloy-provider/reqwest-default-tls", "uts-core/reqwest-default-tls"]
+reqwest-native-tls = ["reqwest/native-tls", "alloy-provider/reqwest-native-tls", "uts-core/reqwest-native-tls"]
+reqwest-native-tls-no-alpn = ["reqwest/native-tls-no-alpn", "uts-core/reqwest-native-tls-no-alpn"]
+reqwest-native-tls-vendored = ["reqwest/native-tls-vendored", "uts-core/reqwest-native-tls-vendored"]
+reqwest-native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn", "uts-core/reqwest-native-tls-vendored-no-alpn"]
+reqwest-rustls = ["reqwest/rustls", "alloy-provider/reqwest-rustls-tls", "uts-core/reqwest-rustls"]
 
 [lints]
 workspace = true

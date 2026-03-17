@@ -1,10 +1,16 @@
 //! Rust SDK for the Universal Timestamps protocol.
 
+use alloy_primitives::ChainId;
+use alloy_provider::DynProvider;
 use backon::{ExponentialBuilder, Retryable};
 use bytes::Bytes;
 use http::StatusCode;
 use reqwest::{Client, RequestBuilder};
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 use tracing::trace;
 use url::Url;
 
@@ -12,6 +18,7 @@ mod builder;
 mod error;
 mod stamp;
 mod upgrade;
+mod verify;
 
 pub use error::Error;
 pub use upgrade::UpgradeResult;
@@ -29,7 +36,7 @@ pub struct Sdk {
 struct SdkInner {
     http_client: Client,
 
-    // Stamp behaviors
+    // Stamp
     calendars: HashSet<Url>,
     quorum: usize,
     timeout_seconds: u64,
@@ -38,8 +45,12 @@ struct SdkInner {
     // Privacy
     nonce_size: usize,
 
-    // Upgrade behaviors
+    // Upgrade
     keep_pending: bool,
+
+    // Verify
+    eth_providers: BTreeMap<ChainId, DynProvider>,
+    bitcoin_rpc: Url,
 }
 
 impl Default for Sdk {

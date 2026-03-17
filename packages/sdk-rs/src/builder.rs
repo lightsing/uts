@@ -1,12 +1,15 @@
 use crate::{Sdk, SdkInner};
+use alloy_primitives::ChainId;
+use alloy_provider::{Provider, ProviderBuilder};
 use backon::ExponentialBuilder;
 use reqwest::Client;
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, HashSet},
     sync::{Arc, LazyLock},
     time::Duration,
 };
 use url::Url;
+use uts_contracts::provider_helper::{RetryBackoffArgs, ThrottleArgs};
 
 /// Default public calendars to use.
 static DEFAULT_CALENDARS: LazyLock<HashSet<Url>> = LazyLock::new(|| {
@@ -19,6 +22,15 @@ static DEFAULT_CALENDARS: LazyLock<HashSet<Url>> = LazyLock::new(|| {
         Url::parse("https://a.pool.eternitywall.com/").unwrap(),
         // Run by Bull Bitcoin
         Url::parse("https://ots.btc.catallaxy.com/").unwrap(),
+    ])
+});
+
+static DEFAULT_PROVIDERS: LazyLock<BTreeMap<ChainId, Url>> = LazyLock::new(|| {
+    BTreeMap::from([
+        (1, Url::parse("https://0xrpc.io/eth").unwrap()),
+        (11155111, Url::parse("https://0xrpc.io/sep").unwrap()),
+        (534352, Url::parse("https://rpc.scroll.io").unwrap()),
+        (534351, Url::parse("https://sepolia-rpc.scroll.io").unwrap()),
     ])
 });
 
@@ -47,6 +59,12 @@ pub struct SdkBuilder {
     nonce_size: usize,
 
     keep_pending: bool,
+
+    eth_providers: BTreeMap<ChainId, Url>,
+    eth_compute_units_per_second: u64,
+    eth_requests_per_second: u32,
+
+    bitcoin_rpc: Url,
 }
 
 impl Default for SdkBuilder {
@@ -70,6 +88,12 @@ impl SdkBuilder {
             nonce_size: 32,
 
             keep_pending: false,
+
+            eth_providers: BTreeMap::new(),
+            eth_compute_units_per_second: 20,
+            eth_requests_per_second: 25,
+
+            bitcoin_rpc: Url::parse("https://bitcoin-rpc.publicnode.com").unwrap(),
         }
     }
 
@@ -82,6 +106,8 @@ impl SdkBuilder {
 
         let this = Self {
             calendars,
+
+            eth_providers: DEFAULT_PROVIDERS.clone(),
             ..Self::empty()
         };
 
@@ -170,6 +196,24 @@ impl SdkBuilder {
         self
     }
 
+    /// Add an Ethereum provider for a given chain ID. The URL should point to an Ethereum node that supports the JSON-RPC API.
+    pub fn add_eth_provider(mut self, chain_id: ChainId, url: Url) -> Self {
+        self.eth_providers.insert(chain_id, url);
+        self
+    }
+
+    /// Set the compute units per second for Ethereum provider requests. This is used to rate limit requests to avoid overwhelming the provider.
+    pub fn with_eth_compute_units_per_second(mut self, compute_units_per_second: u64) -> Self {
+        self.eth_compute_units_per_second = compute_units_per_second;
+        self
+    }
+
+    /// Set the requests per second for Ethereum provider requests. This is used to rate limit requests to avoid overwhelming the provider.
+    pub fn with_eth_requests_per_second(mut self, requests_per_second: u32) -> Self {
+        self.eth_requests_per_second = requests_per_second;
+        self
+    }
+
     /// Build the SDK from the builder, validating the configuration. Returns an error if the configuration is invalid.
     pub fn build(self) -> Result<Sdk> {
         if self.calendars.is_empty() {
@@ -191,6 +235,27 @@ impl SdkBuilder {
                 .expect("default HTTP client should be valid")
         };
 
+        let eth_retry = RetryBackoffArgs {
+            compute_units_per_second: self.eth_compute_units_per_second,
+            ..Default::default()
+        };
+        let eth_throttle = ThrottleArgs {
+            requests_per_second: self.eth_requests_per_second,
+        };
+        let eth_providers = self
+            .eth_providers
+            .into_iter()
+            .map(|(chain_id, url)| {
+                let provider = ProviderBuilder::new().connect_client(
+                    alloy_rpc_client::ClientBuilder::default()
+                        .layer(eth_retry.layer())
+                        .layer(eth_throttle.layer())
+                        .http(url),
+                );
+                (chain_id, provider.erased())
+            })
+            .collect();
+
         Ok(Sdk {
             inner: Arc::new(SdkInner {
                 http_client,
@@ -203,6 +268,9 @@ impl SdkBuilder {
                 nonce_size: self.nonce_size,
 
                 keep_pending: self.keep_pending,
+
+                eth_providers,
+                bitcoin_rpc: self.bitcoin_rpc,
             }),
         })
     }

@@ -64,7 +64,7 @@ impl<P: Provider> AttestationVerifier<EASTimestamped> for EASVerifier<P> {
 }
 
 impl<P: Provider> EASVerifier<P> {
-    async fn verify_attestation(
+    pub async fn verify_attestation(
         &self,
         attestation: &EASAttestation,
         value: &[u8],
@@ -92,7 +92,7 @@ impl<P: Provider> EASVerifier<P> {
         Ok(attestation)
     }
 
-    async fn verify_timestamped(
+    pub async fn verify_timestamped(
         &self,
         _attestation: &EASTimestamped,
         value: &[u8],

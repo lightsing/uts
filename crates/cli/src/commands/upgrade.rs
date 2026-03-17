@@ -48,15 +48,21 @@ impl Upgrade {
 }
 
 async fn upgrade_one(sdk: Sdk, path: PathBuf) -> eyre::Result<()> {
+    info!("[{}] upgrading attestation...", path.display());
     let file = tokio::fs::read(&path).await?;
     let mut proof = VersionedProof::<DetachedTimestamp>::decode(&mut &*file)?;
     let results = sdk.upgrade(&mut proof).await?;
+
+    let mut changed = false;
     for (calendar_server, result) in results {
         match result {
-            UpgradeResult::Upgraded => info!(
-                "[{}] attestation from {calendar_server} upgraded successfully",
-                path.display()
-            ),
+            UpgradeResult::Upgraded => {
+                info!(
+                    "[{}] attestation from {calendar_server} upgraded successfully",
+                    path.display()
+                );
+                changed = true;
+            }
             UpgradeResult::Pending => info!(
                 "[{}] attestation from {calendar_server} is still pending, skipping",
                 path.display()
@@ -67,8 +73,11 @@ async fn upgrade_one(sdk: Sdk, path: PathBuf) -> eyre::Result<()> {
             ),
         }
     }
-    let mut buf = Vec::new();
-    proof.encode(&mut buf)?;
-    tokio::fs::write(path, buf).await?;
+
+    if changed {
+        let mut buf = Vec::new();
+        proof.encode(&mut buf)?;
+        tokio::fs::write(path, buf).await?;
+    }
     Ok(())
 }

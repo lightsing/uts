@@ -3,10 +3,15 @@ use crate::{
     error::DecodeError,
 };
 
+#[cfg(feature = "bitcoin-verifier")]
+mod bitcoin;
 #[cfg(feature = "eas-verifier")]
 mod eas;
+
+#[cfg(feature = "bitcoin-verifier")]
+pub use bitcoin::{BitcoinVerifier, BitcoinVerifierError};
 #[cfg(feature = "eas-verifier")]
-pub use eas::EASVerifier;
+pub use eas::{EASVerifier, EASVerifierError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerifyError {
@@ -26,7 +31,11 @@ pub enum VerifyError {
     /// An error occurred while verifying the eas attestation.
     #[cfg(feature = "eas-verifier")]
     #[error("error verifying eas attestation: {0}")]
-    EAS(#[from] eas::EASVerifierError),
+    EAS(#[from] EASVerifierError),
+    /// An error occurred while verifying the bitcoin attestation.
+    #[cfg(feature = "bitcoin-verifier")]
+    #[error("error verifying bitcoin attestation: {0}")]
+    Bitcoin(#[from] BitcoinVerifierError),
 }
 
 pub trait AttestationVerifier<P>
