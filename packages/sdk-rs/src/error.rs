@@ -28,6 +28,9 @@ pub enum Error {
     #[error(transparent)]
     Finalization(#[from] uts_core::codec::v1::FinalizationError),
 
+    #[error("Input cannot be empty")]
+    EmptyInput,
+
     /// Error indicating that a quorum of responses was not reached from the calendars.
     #[error("Quorum of {required} not reached, only {received} responses received")]
     QuorumNotReached {

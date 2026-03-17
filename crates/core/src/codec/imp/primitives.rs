@@ -41,8 +41,29 @@ macro_rules! leb128 {
                         // Bottom 7 bits are value bits
                         let byte = decoder.decode_byte()?;
                         let value = (byte & 0x7f) as $ty;
+
+                        // This is a stable port of `shl_exact`
+                        // FIXME: This should be replaced with `shl_exact` once it is stabilized.
+                        // ```
+                        // ret |= ((byte & 0x7f) as $ty)
+                        //     .shl_exact(shift)
+                        //     .ok_or($crate::error::DecodeError::LEB128Overflow(<$ty>::BITS))?;
+                        // ```
+                        // #[unstable(feature = "exact_bitshifts", issue = "144336")]
+                        // #[must_use = "this returns the result of the operation, \
+                        //               without modifying the original"]
+                        // #[inline]
+                        // pub const fn shl_exact(self, rhs: u32) -> Option<$SelfT> {
+                        //     if rhs < self.leading_zeros() || rhs < self.leading_ones() {
+                        //         // SAFETY: rhs is checked above
+                        //         Some(unsafe { self.unchecked_shl(rhs) })
+                        //     } else {
+                        //         None
+                        //     }
+                        // }
                         if shift < value.leading_zeros() || shift < value.leading_ones() {
-                            ret |= ((byte & 0x7f) as $ty) << shift;
+                            // SAFETY: shift is checked above
+                            ret |= unsafe { ((byte & 0x7f) as $ty).unchecked_shl(shift) };
                         } else {
                             return Err($crate::error::DecodeError::LEB128Overflow(<$ty>::BITS));
                         }

@@ -79,6 +79,7 @@ impl Sdk {
 
     async fn http_request_with_retry<Builder>(
         &self,
+        method: http::Method,
         url: Url,
         response_size_limit: usize,
         builder_fn: Builder,
@@ -93,7 +94,7 @@ impl Sdk {
                 let client = client.clone();
                 let url = url.clone();
                 let req = client
-                    .get(url)
+                    .request(method, url)
                     .timeout(Duration::from_secs(timeout_seconds));
                 let req = builder_fn(req);
 

@@ -1,5 +1,5 @@
 use crate::{Result, Sdk, error::Error};
-use http::StatusCode;
+use http::{Method, StatusCode};
 use std::collections::BTreeMap;
 use tracing::{debug, warn};
 use url::Url;
@@ -48,6 +48,7 @@ impl Sdk {
 
             let result = self
                 .http_request_with_retry(
+                    Method::GET,
                     retrieve_uri,
                     10 * 1024 * 1024, // 10 MiB response size limit
                     |req| req.header("Accept", "application/vnd.opentimestamps.v1"),

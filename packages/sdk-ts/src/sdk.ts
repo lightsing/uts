@@ -815,6 +815,7 @@ export default class SDK {
    *  - If there are also INVALID or UNKNOWN attestations, the overall status is PARTIAL_VALID
    *  - Otherwise, the overall status is VALID
    * - If there are no VALID attestations, but at least one PENDING attestation, the overall status is PENDING
+   * - If there are no VALID attestations, but at least one UNKNOWN attestation, the overall status is UNKNOWN
    * - If there are no VALID or PENDING attestations, the overall status is INVALID
    * @param attestations
    */
@@ -842,6 +843,8 @@ export default class SDK {
       }
     } else if (counts[AttestationStatusKind.PENDING] > 0) {
       status = VerifyStatus.PENDING
+    } else if (counts[AttestationStatusKind.UNKNOWN] > 0) {
+      status = VerifyStatus.UNKNOWN
     }
     return status
   }

@@ -1,5 +1,6 @@
 use crate::{Result, Sdk, error::Error};
 use digest::{Digest, FixedOutputReset, Output};
+use http::Method;
 use std::path::PathBuf;
 use tokio::fs;
 use tracing::{debug, instrument};
@@ -53,6 +54,10 @@ impl Sdk {
         D: Digest + FixedOutputReset + DigestOpExt + Send,
         Output<D>: Copy,
     {
+        if files.is_empty() {
+            return Err(Error::EmptyInput);
+        }
+
         let digests = futures::future::join_all(files.iter().map(|f| hash_file::<D>(f.clone())))
             .await
             .into_iter()
@@ -76,8 +81,11 @@ impl Sdk {
         D: Digest + FixedOutputReset + DigestOpExt + Send,
         Output<D>: Copy,
     {
-        let mut builders: alloc::vec::Vec<TimestampBuilder<A>, A> =
-            alloc::vec![in allocator.clone(); Timestamp::builder_in(allocator.clone()) ];
+        if digests.is_empty() {
+            return Err(Error::EmptyInput);
+        }
+
+        let mut builders: alloc::vec::Vec<TimestampBuilder<A>, A> = alloc::vec![in allocator.clone(); Timestamp::builder_in(allocator.clone()); digests.len() ];
 
         let mut nonced_digest = alloc::vec::Vec::with_capacity_in(digests.len(), allocator.clone());
 
@@ -166,6 +174,7 @@ impl Sdk {
         let root = root.to_vec();
         let (_, body) = self
             .http_request_with_retry(
+                Method::POST,
                 url,
                 10 * 1024, // 10 KB
                 move |req| {

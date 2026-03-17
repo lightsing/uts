@@ -50,6 +50,8 @@ pub enum VerifyStatus {
     Valid(Timestamp),
     /// The timestamp is partially valid, at least one attestation is not valid.
     PartiallyValid(Timestamp),
+    /// The timestamp is invalid, all attestations are invalid.
+    Invalid,
     /// All attestations are pending.
     Pending,
     /// All attestations are unknown.
@@ -166,6 +168,7 @@ impl Sdk {
     ///  - If there are also INVALID or UNKNOWN attestations, the overall status is PARTIAL_VALID
     ///  - Otherwise, the overall status is VALID
     /// - If there are no VALID attestations, but at least one PENDING attestation, the overall status is PENDING
+    /// - If there are no VALID attestations, but at least one UNKNOWN attestation, the overall status is UNKNOWN
     /// - If there are no VALID or PENDING attestations, the overall status is INVALID
     pub fn aggregate_verify_results(&self, results: &[AttestationStatus]) -> VerifyStatus {
         let mut valid_ts = None;
@@ -186,16 +189,18 @@ impl Sdk {
             }
         }
 
-        if let Some(valid_ts) = valid_ts {
+        if let Some(ts) = valid_ts {
             if has_invalid || has_unknown {
-                VerifyStatus::PartiallyValid(valid_ts)
+                VerifyStatus::PartiallyValid(ts)
             } else {
-                VerifyStatus::Valid(valid_ts)
+                VerifyStatus::Valid(ts)
             }
         } else if has_pending {
             VerifyStatus::Pending
-        } else {
+        } else if has_unknown {
             VerifyStatus::Unknown
+        } else {
+            VerifyStatus::Invalid
         }
     }
 
