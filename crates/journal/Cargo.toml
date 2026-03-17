@@ -1,17 +1,19 @@
 [package]
 authors.workspace = true
+categories = ["data-structures", "database"]
 description = "RocksDB-backed append-only journal for UTS"
 edition.workspace = true
 homepage.workspace = true
 include = [
   "src/**/*",
   "Cargo.toml",
+  "LICENSE",
 ]
-keywords.workspace = true
-license.workspace = true
+keywords = ["uts", "journal", "rocksdb"]
+license = "AGPL-3.0-or-later"
 name = "uts-journal"
 repository.workspace = true
-version = "0.1.0"
+version = "0.1.1"
 
 [dependencies]
 rocksdb = { workspace = true }

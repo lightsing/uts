@@ -6,10 +6,9 @@ homepage.workspace = true
 include = [
   "src/**/*",
   "Cargo.toml",
-  "migrations/**/*",
+  "LICENSE",
 ]
-keywords.workspace = true
-license.workspace = true
+license = "AGPL-3.0-or-later"
 name = "uts-calendar"
 repository.workspace = true
 version.workspace = true

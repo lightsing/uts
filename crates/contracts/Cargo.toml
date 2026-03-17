@@ -1,14 +1,16 @@
 [package]
 authors.workspace = true
+categories = ["api-bindings"]
 description = "Ethereum Smart Contracts Interfaces for Universal Timestamps Project"
 edition.workspace = true
 homepage.workspace = true
 include = [
   "src/**/*",
   "Cargo.toml",
+  "LICENSE-*",
 ]
-keywords.workspace = true
-license.workspace = true
+keywords = ["contracts", "solidity", "uts", "ethereum"]
+license = "MIT OR Apache-2.0"
 name = "uts-contracts"
 repository.workspace = true
 version.workspace = true

@@ -9,8 +9,8 @@ include = [
   "LICENSE*",
   "README*",
 ]
-keywords.workspace = true
-license.workspace = true
+keywords = ["uts", "timestamping"]
+license = "MIT OR Apache-2.0"
 name = "uts-core"
 repository.workspace = true
 version.workspace = true

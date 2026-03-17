@@ -1,0 +1,10 @@
+# These are supported funding model platforms
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# You can support the UTS project by sending ETH directly to the operator
+# address displayed on the calendar or relayer home page:
+#   Calendar: https://lgm1.calendar.test.timestamps.now/
+#   Relayer:  https://lich.relayer.test.timestamps.now/
+custom:
+  - https://lgm1.calendar.test.timestamps.now/
+  - https://lich.relayer.test.timestamps.now/

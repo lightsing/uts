@@ -2,10 +2,16 @@
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-keywords.workspace = true
-license.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "migrations/*.sql",
+  ".sqlx/*.json",
+  "LICENSE",
+]
+keywords = ["uts", "ethereum"]
+license = "AGPL-3.0-or-later"
 name = "uts-relayer"
-publish = false
 repository.workspace = true
 version.workspace = true
 
