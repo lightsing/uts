@@ -3,8 +3,6 @@ name: Deploy Book to Cloudflare Pages
 on:
   push:
     branches: [master]
-  pull_request:
-    branches: [master]
   workflow_dispatch:
 
 jobs:
@@ -27,12 +25,11 @@ jobs:
           curl -OL https://github.com/badboy/mdbook-mermaid/releases/download/v0.17.0/mdbook-mermaid-v0.17.0-x86_64-unknown-linux-gnu.tar.gz
           tar -xzf mdbook-mermaid-v0.17.0-x86_64-unknown-linux-gnu.tar.gz -C /usr/local/bin
 
-      - name: Build documentation
-        run: mdbook build
-
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: book
-          command: pages deploy ./build --project-name=uts-book
+          preCommands: mdbook build
+          command: pages deploy ./build --project-name=uts-book --branch main

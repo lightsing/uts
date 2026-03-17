@@ -18,6 +18,8 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - name: Install node
         uses: actions/setup-node@v6
@@ -35,4 +37,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/docs
           preCommands: pnpm run build
-          command: pages deploy ./output/public --project-name=uts-docs --branch main
+          command: pages deploy ./.vitepress/dist --project-name=uts-docs --branch main

@@ -1,0 +1,52 @@
+name: Python CI
+
+on:
+  pull_request:
+    paths:
+      - packages/sdk-py/**
+      - .github/workflows/ci-python.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, Format & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/sdk-py
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install poetry
+        run: pipx install poetry
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: poetry
+
+      - name: Install dependencies
+        working-directory: packages/sdk-py
+        run: poetry install
+
+      - name: Check formatting
+        working-directory: packages/sdk-py
+        run: poetry run black --check .
+
+      - name: Lint
+        working-directory: packages/sdk-py
+        run: poetry run ruff check .
+
+      - name: Type check
+        working-directory: packages/sdk-py
+        run: poetry run mypy src
+
+      - name: Test
+        working-directory: packages/sdk-py
+        run: poetry run pytest
