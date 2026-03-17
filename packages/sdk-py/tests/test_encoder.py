@@ -201,7 +201,7 @@ class TestEncoderFork:
 class TestEncoderPendingAttestationErrors:
     def test_invalid_url_format(self) -> None:
         encoder = Encoder()
-        att = PendingAttestation(url="not-a-url")
+        att = PendingAttestation(url="http://example.com?query=1&foo=bar")
         with pytest.raises(EncodeError, match="Invalid URL format"):
             encoder.write_pending_attestation(att)
 

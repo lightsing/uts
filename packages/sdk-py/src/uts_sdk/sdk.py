@@ -70,7 +70,7 @@ DEFAULT_EAS_ADDRESSES: dict[int, Address] = {
         Web3.to_bytes(hexstr=HexStr("0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587"))
     ),
     11155111: Address(
-        Web3.to_bytes(hexstr=HexStr("0xC2679fBD37d54388Ce493F1DB75320D236e1815e"))
+        Web3.to_bytes(hexstr=HexStr("0xC47300428b6AD2c7D03BB76D05A176058b47E6B0"))
     ),
     534352: Address(
         Web3.to_bytes(hexstr=HexStr("0xC47300428b6AD2c7D03BB76D05A176058b47E6B0"))

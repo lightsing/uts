@@ -34,7 +34,7 @@ if TYPE_CHECKING:
         Timestamp,
     )
 
-_SAFE_URL_RE = re.compile(r"^https?://[^\s]+$")
+_SAFE_URL_RE = re.compile(r"^[a-zA-Z0-9.\-_/:]+$")
 
 
 class Encoder:

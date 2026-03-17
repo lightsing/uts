@@ -22,7 +22,7 @@ import (
 )
 
 var DefaultCalendars = []string{
-	"https://lgm1.calendar.test.timestamps.now",
+	"https://lgm1.calendar.test.timestamps.now/",
 	// Run by Peter Todd
 	"https://a.pool.opentimestamps.org/",
 	"https://b.pool.opentimestamps.org/",
