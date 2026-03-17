@@ -1,4 +1,5 @@
 use crate::{
+    alloc::Allocator,
     codec::{
         DecodeIn, Decoder, Encode, Encoder,
         v1::opcode::{DigestOp, DigestOpExt},
@@ -6,7 +7,6 @@ use crate::{
     error::{DecodeError, EncodeError},
     utils::Hexed,
 };
-use alloc::alloc::Allocator;
 use core::fmt;
 use digest::{Output, typenum::Unsigned};
 
@@ -61,7 +61,7 @@ impl DigestHeader {
 }
 
 impl Encode for DigestHeader {
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(writer), err))]
+    #[tracing::instrument(skip_all, err)]
     #[inline]
     fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
         encoder.encode(self.kind)?;
@@ -71,7 +71,7 @@ impl Encode for DigestHeader {
 }
 
 impl<A: Allocator> DecodeIn<A> for DigestHeader {
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(reader), ret, err))]
+    #[tracing::instrument(skip_all, ret(level = trace), err)]
     #[inline]
     fn decode_in(decoder: &mut impl Decoder, _alloc: A) -> Result<DigestHeader, DecodeError> {
         let kind = decoder.decode()?;

@@ -1,5 +1,4 @@
 use alloy_primitives::B256;
-use bytemuck::Pod;
 use digest::{Digest, FixedOutputReset, Output};
 use rocksdb::DB;
 use uts_bmt::MerkleTree;
@@ -15,7 +14,7 @@ pub trait DbExt<D: Digest> {
 
 impl<D: Digest + FixedOutputReset> DbExt<D> for DB
 where
-    Output<D>: Pod + Copy,
+    Output<D>: Copy,
 {
     fn load_trie(&self, root: B256) -> Result<Option<MerkleTree<D>>, rocksdb::Error> {
         let Some(data) = self.get(root)? else {

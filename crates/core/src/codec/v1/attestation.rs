@@ -4,18 +4,15 @@
 //! comes from some server or from a blockchain.
 
 use crate::{
+    alloc::{Allocator, Global, vec::Vec},
     codec::{Decode, DecodeIn, Decoder, Encode, Encoder, v1::MayHaveInput},
     error::{DecodeError, EncodeError},
-    utils::{Hexed, OnceLock},
-};
-use alloc::{
-    alloc::{Allocator, Global},
-    borrow::Cow,
-    vec::Vec,
+    utils::Hexed,
 };
 use alloy_chains::Chain;
 use alloy_primitives::{B256, FixedBytes, fixed_bytes as tag};
 use core::fmt;
+use std::{borrow::Cow, sync::OnceLock};
 
 /// Size in bytes of the tag identifying the attestation type.
 const TAG_SIZE: usize = 8;

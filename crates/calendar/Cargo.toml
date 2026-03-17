@@ -28,7 +28,6 @@ axum = { workspace = true, default-features = false, features = [
   "json",
 ] } # http2 only
 bump-scope.workspace = true
-bytemuck = { workspace = true }
 bytes = { workspace = true }
 config = { workspace = true }
 digest = { workspace = true }
@@ -47,9 +46,6 @@ uts-contracts = { workspace = true, features = ["provider-helper-serde"] }
 uts-core = { workspace = true, features = ["bytes"] }
 uts-journal = { workspace = true }
 uts-stamper = { workspace = true }
-
-hashbrown_15 = { package = "hashbrown", version = "0.15", features = ["nightly"] } # why?
-hashbrown_16 = { package = "hashbrown", version = "0.16", features = ["nightly"] } # why?
 
 [dev-dependencies]
 criterion.workspace = true

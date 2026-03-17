@@ -17,32 +17,26 @@ name = "uts"
 path = "src/main.rs"
 
 [dependencies]
-alloy-primitives = { workspace = true }
-alloy-provider = { workspace = true, default-features = false, features = ["reqwest"] }
-bytemuck = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 color-eyre = { workspace = true }
 digest = { workspace = true }
 eyre = { workspace = true }
 futures = { workspace = true }
-jiff = { workspace = true }
-rand = { workspace = true }
-reqwest = { workspace = true, default-features = false, features = ["http2"] }
 ripemd = { workspace = true }
 sha1 = { workspace = true }
 sha2 = { workspace = true }
 sha3 = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 url = { workspace = true }
-uts-bmt = { workspace = true }
-uts-contracts = { workspace = true }
-uts-core = { workspace = true, features = ["std", "eas-verifier", "io-utils"] }
+uts-core = { workspace = true }
+uts-sdk = { workspace = true, features = ["full"] }
 
 [features]
 default = ["reqwest-rustls"]
-reqwest-default-tls = ["reqwest/default-tls", "alloy-provider/reqwest-default-tls"]
-reqwest-native-tls = ["reqwest/native-tls", "alloy-provider/reqwest-native-tls"]
-reqwest-native-tls-no-alpn = ["reqwest/native-tls-no-alpn"]
-reqwest-native-tls-vendored = ["reqwest/native-tls-vendored"]
-reqwest-native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn"]
-reqwest-rustls = ["reqwest/rustls", "alloy-provider/reqwest-rustls-tls"]
+performance = ["tracing/max_level_info"]
+
+reqwest-default-tls = ["uts-sdk/reqwest-default-tls"]
+reqwest-native-tls = ["uts-sdk/reqwest-native-tls"]
+reqwest-rustls = ["uts-sdk/reqwest-rustls"]

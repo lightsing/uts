@@ -87,11 +87,14 @@ export const WELL_KNOWN_CHAINS: Record<
 }
 
 export const DEFAULT_CALENDARS = [
-  // new URL('https://a.pool.opentimestamps.org/'),
-  // new URL('https://b.pool.opentimestamps.org/'),
-  // new URL('https://a.pool.eternitywall.com/'),
-  // new URL('https://ots.btc.catallaxy.com/'),
   new URL('https://lgm1.calendar.test.timestamps.now/'),
+  // Run by Peter Todd
+  new URL('https://a.pool.opentimestamps.org/'),
+  new URL('https://b.pool.opentimestamps.org/'),
+  // Run by Riccardo Casatta
+  new URL('https://a.pool.eternitywall.com/'),
+  // Run by Bull Bitcoin
+  new URL('https://ots.btc.catallaxy.com/'),
 ]
 
 export const DEFAULT_EAS_ADDRESSES: Record<number, Hex> = {
@@ -812,6 +815,7 @@ export default class SDK {
    *  - If there are also INVALID or UNKNOWN attestations, the overall status is PARTIAL_VALID
    *  - Otherwise, the overall status is VALID
    * - If there are no VALID attestations, but at least one PENDING attestation, the overall status is PENDING
+   * - If there are no VALID attestations, but at least one UNKNOWN attestation, the overall status is UNKNOWN
    * - If there are no VALID or PENDING attestations, the overall status is INVALID
    * @param attestations
    */
@@ -839,6 +843,8 @@ export default class SDK {
       }
     } else if (counts[AttestationStatusKind.PENDING] > 0) {
       status = VerifyStatus.PENDING
+    } else if (counts[AttestationStatusKind.UNKNOWN] > 0) {
+      status = VerifyStatus.UNKNOWN
     }
     return status
   }

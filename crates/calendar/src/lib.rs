@@ -1,6 +1,3 @@
-#![feature(thread_sleep_until)]
-#![feature(allocator_api)]
-
 //! Calendar server library.
 
 #[macro_use]

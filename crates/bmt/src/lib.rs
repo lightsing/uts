@@ -1,10 +1,6 @@
-#![feature(maybe_uninit_fill)]
-#![feature(likely_unlikely)]
 //! High performance binary Merkle tree implementation in Rust.
 
-use bytemuck::Pod;
-use digest::{Digest, FixedOutputReset, Output};
-use std::hint::unlikely;
+use digest::{Digest, FixedOutputReset, Output, typenum::Unsigned};
 
 /// Prefix byte to distinguish internal nodes from leaves when hashing.
 pub const INNER_NODE_PREFIX: u8 = 0x01;
@@ -28,7 +24,7 @@ pub struct UnhashedMerkleTree<D: Digest> {
 
 impl<D: Digest + FixedOutputReset> MerkleTree<D>
 where
-    Output<D>: Pod + Copy,
+    Output<D>: Copy,
 {
     /// Constructs a new Merkle tree from the given hash leaves.
     pub fn new(data: &[Output<D>]) -> Self {
@@ -62,9 +58,9 @@ where
             std::ptr::copy_nonoverlapping(src, dst, raw_len);
 
             // SAFETY: capacity + len is within the allocated size of `tree`
-            maybe_uninit
-                .get_unchecked_mut(len + raw_len..)
-                .write_filled(Output::<D>::default());
+            for e in maybe_uninit.get_unchecked_mut(len + raw_len..) {
+                e.write(Output::<D>::default());
+            }
         }
 
         UnhashedMerkleTree { buffer: nodes, len }
@@ -100,8 +96,12 @@ where
 
     /// Returns the raw bytes of the Merkle tree nodes
     #[inline]
-    pub fn as_raw_bytes(&self) -> &[u8] {
-        bytemuck::cast_slice(&self.nodes)
+    pub fn to_raw_bytes(&self) -> Vec<u8> {
+        self.nodes
+            .iter()
+            .flat_map(|node| node.as_slice())
+            .copied()
+            .collect()
     }
 
     /// From raw bytes, reconstruct the Merkle tree
@@ -113,8 +113,17 @@ where
     ///   Merkle tree structure.
     #[inline]
     pub fn from_raw_bytes(bytes: &[u8]) -> Self {
-        let nodes: &[Output<D>] = bytemuck::cast_slice(bytes);
-        assert!(nodes.len().is_multiple_of(2));
+        assert!(
+            bytes.len().is_multiple_of(D::OutputSize::USIZE),
+            "Invalid raw bytes length"
+        );
+        let len = bytes.len() / D::OutputSize::USIZE;
+        assert!(len.is_multiple_of(2));
+        let mut nodes: Vec<Output<D>> = Vec::with_capacity(len);
+        for chunk in bytes.chunks_exact(D::OutputSize::USIZE) {
+            let node = Output::<D>::from_slice(chunk);
+            nodes.push(*node);
+        }
         assert_eq!(nodes[0], Output::<D>::default());
         let len = nodes.len() / 2;
         Self {
@@ -126,7 +135,7 @@ where
 
 impl<D: Digest + FixedOutputReset> UnhashedMerkleTree<D>
 where
-    Output<D>: Pod + Copy,
+    Output<D>: Copy,
 {
     /// Finalizes the Merkle tree by hashing internal nodes
     pub fn finalize(self) -> MerkleTree<D> {
@@ -181,7 +190,7 @@ impl<'a, D: Digest> Iterator for SiblingIter<'a, D> {
     type Item = (NodePosition, &'a Output<D>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if unlikely(self.current <= 1) {
+        if self.current <= 1 {
             return None;
         }
         let side = if (self.current & 1) == 0 {
@@ -229,7 +238,7 @@ mod tests {
 
     fn test_merkle_tree<D: Digest + FixedOutputReset>()
     where
-        Output<D>: Pod + Copy,
+        Output<D>: Copy,
     {
         let leaves = vec![
             D::digest(b"leaf1"),
@@ -262,7 +271,7 @@ mod tests {
 
     fn test_proof<D: Digest + FixedOutputReset>()
     where
-        Output<D>: Pod + Copy,
+        Output<D>: Copy,
     {
         let leaves = vec![
             D::digest(b"apple"),
@@ -313,7 +322,7 @@ mod tests {
 
         for i in 0..=10u32 {
             let tree = MerkleTree::<Keccak256>::new(&leaves[..2usize.pow(i)]);
-            let root = B256::new(tree.root().0);
+            let root = B256::from_slice(tree.root());
             println!("bytes32({root}),");
         }
     }

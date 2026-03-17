@@ -1,0 +1,67 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "uts-sdk"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true, default-features = false, optional = true, features = ["reqwest"] }
+alloy-rpc-client = { workspace = true }
+backon = { workspace = true }
+bytes = { workspace = true }
+digest = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+jiff = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true, default-features = false, features = ["http2"] }
+ripemd = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+url = { workspace = true }
+uts-bmt = { workspace = true }
+uts-contracts = { workspace = true, optional = true }
+uts-core = { workspace = true, features = ["io-utils"] }
+
+[features]
+full = [
+  "eas-verifier",
+  "bitcoin-verifier",
+]
+
+bitcoin-verifier = ["uts-core/bitcoin-verifier"]
+eas-verifier = [
+  "dep:alloy-provider",
+  "dep:uts-contracts",
+  "uts-core/eas-verifier",
+  "uts-contracts/provider-helper",
+]
+
+reqwest-default-tls = [
+  "reqwest/default-tls",
+  "alloy-provider?/reqwest-default-tls",
+  "uts-core/reqwest-default-tls",
+]
+reqwest-native-tls = [
+  "reqwest/native-tls",
+  "alloy-provider?/reqwest-native-tls",
+  "uts-core/reqwest-native-tls",
+]
+reqwest-rustls = [
+  "reqwest/rustls",
+  "alloy-provider?/reqwest-rustls-tls",
+  "uts-core/reqwest-rustls",
+]
+
+[lints]
+workspace = true

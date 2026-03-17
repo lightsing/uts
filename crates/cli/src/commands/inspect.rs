@@ -1,5 +1,6 @@
 use clap::Args;
 use std::{fs, io, io::Seek, path::PathBuf};
+use tracing::{error, info};
 use uts_core::codec::{
     Decode, Reader, VersionedProof,
     v1::{DetachedTimestamp, Timestamp},
@@ -17,18 +18,18 @@ impl Inspect {
 
         match VersionedProof::<DetachedTimestamp>::decode(&mut Reader(&mut fh)) {
             Ok(ots) => {
-                eprintln!("OTS Detached Timestamp found:\n{ots}");
+                info!("OTS Detached Timestamp found:\n{ots}");
                 return Ok(());
             }
             Err(e) => {
-                eprintln!("Not a valid Detached Timestamp OTS file (trying raw timestamp): {e}\n");
+                error!("Not a valid Detached Timestamp OTS file (trying raw timestamp): {e}\n");
             }
         };
 
         fh.seek(io::SeekFrom::Start(0))?;
 
         let raw = Timestamp::decode(&mut Reader(&mut fh))?;
-        eprintln!("Raw Timestamp found:\n{raw}");
+        info!("Raw Timestamp found:\n{raw}");
         Ok(())
     }
 }

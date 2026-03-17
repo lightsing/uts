@@ -126,4 +126,5 @@ export enum VerifyStatus {
   PARTIAL_VALID = 'PARTIAL_VALID',
   INVALID = 'INVALID',
   PENDING = 'PENDING',
+  UNKNOWN = 'UNKNOWN',
 }

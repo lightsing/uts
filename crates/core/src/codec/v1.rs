@@ -24,7 +24,6 @@ impl core::fmt::Display for FinalizationError {
     }
 }
 
-#[cfg(feature = "std")]
 impl std::error::Error for FinalizationError {}
 
 /// Trait for objects that may have input data.
