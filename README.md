@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
 [![CI (Rust)](https://github.com/lightsing/uts/actions/workflows/ci-rust.yml/badge.svg)](https://github.com/lightsing/uts/actions/workflows/ci-rust.yml)
-[![CI (TypeScript)](https://github.com/lightsing/uts/actions/workflows/ci-typescript.yml/badge.svg)](https://github.com/lightsing/uts/actions/workflows/ci-typescript.yml)
+![NPM Version](https://img.shields.io/npm/v/%40universal-timestamps%2Fsdk)
 
 Universal Timestamps is a super set of [opentimestamps](https://opentimestamps.org/).
 

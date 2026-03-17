@@ -1,5 +1,6 @@
 [package]
 authors.workspace = true
+description = "Universal Timestamping SDK in Rust"
 edition.workspace = true
 homepage.workspace = true
 keywords = ["uts", "timestamping", "sdk"]

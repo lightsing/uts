@@ -5918,7 +5918,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uts-beacon-injector"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
@@ -5940,7 +5940,7 @@ dependencies = [
 
 [[package]]
 name = "uts-bmt"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -5951,7 +5951,7 @@ dependencies = [
 
 [[package]]
 name = "uts-calendar"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -5984,7 +5984,7 @@ dependencies = [
 
 [[package]]
 name = "uts-cli"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "clap",
  "color-eyre",
@@ -6005,7 +6005,7 @@ dependencies = [
 
 [[package]]
 name = "uts-contracts"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "alloy-contract",
  "alloy-primitives",
@@ -6018,7 +6018,7 @@ dependencies = [
 
 [[package]]
 name = "uts-core"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "allocator-api2 0.4.0",
  "alloy-chains",
@@ -6063,7 +6063,7 @@ dependencies = [
 
 [[package]]
 name = "uts-relayer"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "alloy-contract",
  "alloy-primitives",
@@ -6093,7 +6093,7 @@ dependencies = [
 
 [[package]]
 name = "uts-sdk"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
@@ -6122,7 +6122,7 @@ dependencies = [
 
 [[package]]
 name = "uts-sql"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "alloy-primitives",
  "sqlx",
@@ -6130,7 +6130,7 @@ dependencies = [
 
 [[package]]
 name = "uts-stamper"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "alloy-primitives",
  "alloy-provider",

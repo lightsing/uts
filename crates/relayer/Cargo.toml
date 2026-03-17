@@ -1,5 +1,6 @@
 [package]
 authors.workspace = true
+description = "UTS L2->L1->L2 Relayer Server"
 edition.workspace = true
 homepage.workspace = true
 include = [
