@@ -2,7 +2,7 @@
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-keywords.workspace = true
+keywords = ["beacon", "injector", "uts", "timestamping", "draud"]
 license = "AGPL-3.0-or-later"
 name = "uts-beacon-injector"
 publish = false

@@ -9,7 +9,7 @@ include = [
   ".sqlx/*.json",
   "LICENSE",
 ]
-keywords.workspace = true
+keywords = ["uts", "ethereum"]
 license = "AGPL-3.0-or-later"
 name = "uts-relayer"
 repository.workspace = true

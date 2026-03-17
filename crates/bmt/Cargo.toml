@@ -1,5 +1,9 @@
 [package]
 authors.workspace = true
+categories = [
+  "data-structures",
+  "cryptography",
+]
 description = "Binary Merkle Tree implementation for Universal Timestamps in Rust"
 edition.workspace = true
 homepage.workspace = true
@@ -8,7 +12,7 @@ include = [
   "Cargo.toml",
   "LICENSE-*",
 ]
-keywords.workspace = true
+keywords = ["bmt", "merkle", "trie", "uts"]
 license = "MIT OR Apache-2.0"
 name = "uts-bmt"
 repository.workspace = true

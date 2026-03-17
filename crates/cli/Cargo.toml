@@ -1,5 +1,6 @@
 [package]
 authors.workspace = true
+categories = ["command-line-utilities"]
 description = "Universal Timestamps Command Line Interface."
 edition.workspace = true
 homepage.workspace = true
@@ -9,7 +10,7 @@ include = [
   "LICENSE-*",
   "README.md",
 ]
-keywords.workspace = true
+keywords = ["cli", "command-line", "uts", "timestamping"]
 license = "MIT OR Apache-2.0"
 name = "uts-cli"
 repository.workspace = true

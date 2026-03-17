@@ -1,9 +1,10 @@
 [package]
 authors.workspace = true
+categories = ["database"]
 description = "SQLite database helpers for Universal Timestamps Project"
 edition.workspace = true
 homepage.workspace = true
-keywords.workspace = true
+keywords = ["sql", "sqlx", "uts"]
 license = "AGPL-3.0-or-later"
 name = "uts-sql"
 repository.workspace = true

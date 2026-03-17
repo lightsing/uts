@@ -13,7 +13,7 @@ timestamps without relying on a single trusted calendar server.
 ## Quick Start
 
 ```bash
-cargo install uts-cli --version 0.1.0-alpha.0 --locked
+cargo install uts-cli --version 0.1.0-alpha.1 --locked
 ```
 
 ## Links
@@ -26,8 +26,7 @@ cargo install uts-cli --version 0.1.0-alpha.0 --locked
 
 ### Pre-requisites
 
-- Rust >= 1.94.0-nightly (e7d44143a 2025-12-24)
-- Cargo >= 1.94.0-nightly (3861f60f6 2025-12-19)
+- Rust Toolchain == 1.94.0
 - pnpm >= 10.26.2
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup and guidelines.
@@ -59,9 +58,10 @@ Allocation Tracker: https://github.com/lightsing/uts/issues/46
 
 This project uses a split licensing model:
 
-- **Most code** is dual-licensed under [MIT](LICENSE-MIT) or
+- **Core Libraries** are dual-licensed under [MIT](LICENSE-MIT) or
   [Apache-2.0](LICENSE-APACHE), at your option.
-- **Server components** (`uts-calendar` and `uts-relayer`) are licensed under
-  [AGPL-3.0](LICENSE-AGPL).
+- **All SDKs** are dual-licensed under [MIT](LICENSE-MIT) or
+  [Apache-2.0](LICENSE-APACHE), at your option.
+- **Server components** are licensed under [AGPL-3.0](LICENSE-AGPL).
 
-See the individual `Cargo.toml` files for per-crate license declarations.
+See the individual directory for per-package license declarations.

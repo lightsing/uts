@@ -2,7 +2,7 @@
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
-keywords.workspace = true
+keywords = ["uts", "timestamping", "sdk"]
 license = "MIT OR Apache-2.0"
 name = "uts-sdk"
 repository.workspace = true
