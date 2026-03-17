@@ -1,0 +1,7 @@
+TODO: Add GNU Affero General Public License v3.0 full text here.
+
+This license applies to the following server components:
+- crates/calendar (uts-calendar)
+- crates/relayer (uts-relayer)
+
+See https://www.gnu.org/licenses/agpl-3.0.en.html for the full license text.

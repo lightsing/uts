@@ -1,5 +1,9 @@
 # Universal Timestamps (UTS)
 
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
+[![CI (Rust)](https://github.com/lightsing/uts/actions/workflows/ci-rust.yml/badge.svg)](https://github.com/lightsing/uts/actions/workflows/ci-rust.yml)
+[![CI (TypeScript)](https://github.com/lightsing/uts/actions/workflows/ci-typescript.yml/badge.svg)](https://github.com/lightsing/uts/actions/workflows/ci-typescript.yml)
+
 Universal Timestamps is a super set of [opentimestamps](https://opentimestamps.org/).
 
 UTS batches user-submitted digests into Merkle trees and anchors the roots on-chain
@@ -26,6 +30,14 @@ cargo install uts-cli --version 0.1.0-alpha.0 --locked
 - Cargo >= 1.94.0-nightly (3861f60f6 2025-12-19)
 - pnpm >= 10.26.2
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup and guidelines.
+
+## Supporting the Project
+
+You can support the UTS project by sending ETH directly to the operator address
+displayed on the [calendar](https://lgm1.calendar.test.timestamps.now/) or
+[relayer](https://lich.relayer.test.timestamps.now/) home page.
+
 ## About Our Codenames: The Universe's Natural Clocks
 
 When choosing a codename theme, pulsars serve as the perfect physical metaphor.
@@ -42,3 +54,14 @@ aspiration: an architecture that runs as eternally and precisely as the stars
 themselves.
 
 Allocation Tracker: https://github.com/lightsing/uts/issues/46
+
+## License
+
+This project uses a split licensing model:
+
+- **Most code** is dual-licensed under [MIT](LICENSE-MIT) or
+  [Apache-2.0](LICENSE-APACHE), at your option.
+- **Server components** (`uts-calendar` and `uts-relayer`) are licensed under
+  [AGPL-3.0](LICENSE-AGPL).
+
+See the individual `Cargo.toml` files for per-crate license declarations.
