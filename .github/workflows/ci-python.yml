@@ -29,18 +29,23 @@ jobs:
           cache: pip
 
       - name: Install dependencies
+        working-directory: packages/sdk-py
         run: |
           pip install poetry
           poetry install --with dev
 
       - name: Check formatting
+        working-directory: packages/sdk-py
         run: poetry run black --check .
 
       - name: Lint
+        working-directory: packages/sdk-py
         run: poetry run ruff check .
 
       - name: Type check
+        working-directory: packages/sdk-py
         run: poetry run mypy src
 
       - name: Test
+        working-directory: packages/sdk-py
         run: poetry run pytest
