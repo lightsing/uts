@@ -8,9 +8,9 @@ use crate::{
         timestamp::Step,
     },
     error::EncodeError,
-    utils::OnceLock,
 };
 use allocator_api2::SliceExt;
+use std::sync::OnceLock;
 use uts_bmt::{NodePosition, SiblingIter};
 
 #[derive(Debug, Clone)]

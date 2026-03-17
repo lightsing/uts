@@ -1,4 +1,3 @@
-#![cfg_attr(not(feature = "std"), no_std)]
 //! # Universal Timestamps Core Library
 
 extern crate core;

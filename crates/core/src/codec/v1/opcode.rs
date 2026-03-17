@@ -285,7 +285,6 @@ macro_rules! define_opcodes {
             }
         }
 
-        #[cfg(feature = "std")]
         impl std::error::Error for OpCodeFromStrError {}
 
         impl core::str::FromStr for OpCode {

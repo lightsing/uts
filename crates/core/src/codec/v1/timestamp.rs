@@ -6,10 +6,11 @@ use crate::{
         Attestation, FinalizationError, MayHaveInput, PendingAttestation,
         attestation::RawAttestation, opcode::OpCode,
     },
-    utils::{Hexed, OnceLock},
+    utils::Hexed,
 };
 use allocator_api2::SliceExt;
 use core::fmt::Debug;
+use std::sync::OnceLock;
 
 pub(crate) mod builder;
 mod decode;

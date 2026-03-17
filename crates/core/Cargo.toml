@@ -28,7 +28,6 @@ bytes = { workspace = true, optional = true }
 digest = { workspace = true }
 http = { workspace = true, optional = true }
 http-body-util = { workspace = true, optional = true }
-once_cell = { workspace = true, features = ["alloc"] }
 paste.workspace = true
 reqwest = { workspace = true, optional = true, default-features = false }
 ripemd.workspace = true
@@ -46,11 +45,9 @@ uts-bmt = { workspace = true }
 uts-contracts = { workspace = true, optional = true }
 
 [features]
+default = []
+
 bytes = ["dep:bytes"]
-default = ["std"]
-
-std = []
-
 serde = ["dep:serde", "dep:serde_with", "serde/derive", "serde_with/hex"]
 tracing = ["dep:tracing"]
 

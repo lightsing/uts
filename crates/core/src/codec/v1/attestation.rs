@@ -7,12 +7,12 @@ use crate::{
     alloc::{Allocator, Global, vec::Vec},
     codec::{Decode, DecodeIn, Decoder, Encode, Encoder, v1::MayHaveInput},
     error::{DecodeError, EncodeError},
-    utils::{Hexed, OnceLock},
+    utils::Hexed,
 };
 use alloy_chains::Chain;
 use alloy_primitives::{B256, FixedBytes, fixed_bytes as tag};
 use core::fmt;
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::OnceLock};
 
 /// Size in bytes of the tag identifying the attestation type.
 const TAG_SIZE: usize = 8;

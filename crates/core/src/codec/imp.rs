@@ -4,10 +4,8 @@ mod alloy;
 #[cfg(feature = "bytes")]
 mod bytes;
 mod primitives;
-#[cfg(feature = "std")]
 mod std_io;
 
-#[cfg(feature = "std")]
 pub use std_io::{Reader, Writer};
 
 impl<A: Allocator> Encoder for Vec<u8, A> {

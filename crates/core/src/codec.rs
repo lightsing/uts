@@ -9,7 +9,6 @@ mod proof;
 pub use proof::{Proof, Version, VersionedProof};
 
 mod imp;
-#[cfg(feature = "std")]
 pub use imp::{Reader, Writer};
 
 /// Types and helpers for the version 1 serialization format.
