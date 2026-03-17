@@ -21,6 +21,11 @@ typescript:
           - eslint.config.js
           - .prettierrc.toml
 
+python:
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/sdk-py/**
+
 contracts:
   - changed-files:
       - any-glob-to-any-file:

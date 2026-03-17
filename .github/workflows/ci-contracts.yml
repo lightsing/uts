@@ -28,6 +28,9 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Check Solidity formatting
+        run: forge fmt --check
+
       - name: Build
         run: forge build
 

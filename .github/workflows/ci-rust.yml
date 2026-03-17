@@ -34,7 +34,16 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt
 
-      - run: cargo fmt --all --check
+      - name: Install taplo
+        uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli
+
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+
+      - name: Check TOML formatting
+        run: taplo fmt --check
 
   clippy:
     name: Clippy
