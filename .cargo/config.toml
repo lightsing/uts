@@ -2,9 +2,4 @@
 rustflags = ["-C", "target-cpu=native"]
 
 [target.x86_64-unknown-linux-gnu]
-rustflags = [
-  "-C",
-  "target-cpu=native",
-  # (Nightly) Make the current crate share its generic instantiations
-  "-Zshare-generics=y",
-]
+rustflags = ["-C", "target-cpu=native"]
