@@ -71,7 +71,7 @@ impl Encode for DigestHeader {
 }
 
 impl<A: Allocator> DecodeIn<A> for DigestHeader {
-    #[tracing::instrument(skip_all, ret(level = trace), err)]
+    #[tracing::instrument(skip_all, ret(level = "trace"), err)]
     #[inline]
     fn decode_in(decoder: &mut impl Decoder, _alloc: A) -> Result<DigestHeader, DecodeError> {
         let kind = decoder.decode()?;

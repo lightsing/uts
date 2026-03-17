@@ -92,6 +92,7 @@ impl Sdk {
         let res = {
             move || {
                 let client = client.clone();
+                let method = method.clone();
                 let url = url.clone();
                 let req = client
                     .request(method, url)
