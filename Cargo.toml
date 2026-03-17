@@ -7,7 +7,6 @@ authors = ["Akase Haruka <light.tsing@gmail.com>", "Rohit Narurkar <rohit.narurk
 edition = "2024"
 homepage = "https://github.com/lightsing/uts/"
 keywords = [] # TODO: add keywords
-license = "MIT OR Apache-2.0"
 repository = "https://github.com/lightsing/uts.git"
 version = "0.1.0-alpha.0"
 

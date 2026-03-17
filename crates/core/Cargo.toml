@@ -10,7 +10,7 @@ include = [
   "README*",
 ]
 keywords.workspace = true
-license.workspace = true
+license = "MIT OR Apache-2.0"
 name = "uts-core"
 repository.workspace = true
 version.workspace = true

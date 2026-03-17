@@ -6,9 +6,10 @@ homepage.workspace = true
 include = [
   "src/**/*",
   "Cargo.toml",
+  "LICENSE-*",
 ]
 keywords.workspace = true
-license.workspace = true
+license = "MIT OR Apache-2.0"
 name = "uts-contracts"
 repository.workspace = true
 version.workspace = true

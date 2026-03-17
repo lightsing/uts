@@ -7,9 +7,10 @@ include = [
   ".sqlx/**/*",
   "src/**/*",
   "Cargo.toml",
+  "LICENSE",
 ]
 keywords.workspace = true
-license.workspace = true
+license = "AGPL-3.0-or-later"
 name = "uts-stamper"
 repository.workspace = true
 version.workspace = true
