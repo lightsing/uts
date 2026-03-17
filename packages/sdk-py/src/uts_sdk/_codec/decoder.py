@@ -44,7 +44,7 @@ from .constants import (
 if TYPE_CHECKING:
     pass
 
-_SAFE_URL_RE = re.compile(r"^https?://[^\s]+$")
+_SAFE_URL_RE = re.compile(r"^[a-zA-Z0-9.\-_/:]+$")
 
 
 def _op_from_code(code: int) -> OpCode | None:

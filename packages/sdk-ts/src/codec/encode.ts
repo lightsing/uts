@@ -219,7 +219,7 @@ export default class Encoder {
   }
 
   writeEAS(attestation: EASAttestation | EASTimestamped): this {
-    this.writeU32(attestation.chain)
+    this.writeBigUint(BigInt(attestation.chain))
     if ('uid' in attestation) {
       this.writeBytes(getBytes(attestation.uid))
     }

@@ -46,4 +46,4 @@ export const EAS_TIMESTAMPED_TAG = new Uint8Array([
 ])
 
 export const MAX_URI_LEN = 1000
-export const SAFE_URL_REGEX = /^http(s)?:\/\/[\s\w./:-]+$/
+export const SAFE_URL_REGEX = /^[a-zA-Z0-9.\-_/:]+$/
