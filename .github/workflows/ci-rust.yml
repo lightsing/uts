@@ -11,12 +11,16 @@ on:
       - rustfmt.toml
       - .github/workflows/ci-rust.yml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.94.0"
 
 jobs:
   fmt:
@@ -27,7 +31,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.94.0"
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt
 
       - run: cargo fmt --all --check
@@ -40,7 +44,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.94.0"
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: clippy
 
       - uses: Swatinem/rust-cache@v2
@@ -58,7 +62,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.94.0"
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - uses: Swatinem/rust-cache@v2
 

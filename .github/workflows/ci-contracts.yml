@@ -10,6 +10,9 @@ on:
       - remappings.txt
       - .github/workflows/ci-contracts.yml
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
