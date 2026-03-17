@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   check:
-    name: Lint, Typecheck & Test
+    name: TypeScript Lint, Typecheck & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

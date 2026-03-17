@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   check:
-    name: Build & Test
+    name: Solidity Build & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
