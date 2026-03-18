@@ -574,6 +574,83 @@ export default class SDK {
   }
 
   /**
+   * List all pending attestation URLs in the given detached timestamp.
+   * @param stamp The detached timestamp to inspect.
+   * @returns An array of pending attestation URLs found in the timestamp.
+   */
+  listPending(stamp: DetachedTimestamp): URL[] {
+    return SDK.collectPendingAttestations(stamp.timestamp)
+  }
+
+  private static collectPendingAttestations(timestamp: Timestamp): URL[] {
+    const pending: URL[] = []
+    for (const step of timestamp) {
+      if (step.op === 'ATTESTATION' && step.attestation.kind === 'pending') {
+        pending.push(step.attestation.url)
+      } else if (step.op === 'FORK') {
+        for (const branch of step.steps) {
+          pending.push(...SDK.collectPendingAttestations(branch))
+        }
+      }
+    }
+    return pending
+  }
+
+  /**
+   * Purge all pending attestations from the given detached timestamp, modifying it in place.
+   *
+   * This removes all pending attestation branches from the timestamp tree. FORK nodes
+   * that are left with a single branch after purging are collapsed. If all attestations
+   * in the timestamp are pending, the timestamp will be left empty.
+   *
+   * @param stamp The detached timestamp to purge pending attestations from.
+   * @returns An object containing the purged URLs and whether any non-pending attestations remain.
+   */
+  purgePending(stamp: DetachedTimestamp): {
+    purged: URL[]
+    hasRemaining: boolean
+  } {
+    const purged = this.listPending(stamp)
+    if (purged.length === 0) {
+      return { purged: [], hasRemaining: true }
+    }
+    const hasRemaining = SDK.purgeTimestamp(stamp.timestamp)
+    return { purged, hasRemaining }
+  }
+
+  /**
+   * Recursively remove pending attestation branches from a timestamp.
+   * Modifies the timestamp array in place.
+   * @returns true if the timestamp still has non-pending content, false if it should be removed entirely.
+   */
+  private static purgeTimestamp(timestamp: Timestamp): boolean {
+    for (let i = timestamp.length - 1; i >= 0; i--) {
+      const step = timestamp[i]
+      if (step.op === 'ATTESTATION') {
+        if (step.attestation.kind === 'pending') {
+          timestamp.splice(i, 1)
+        }
+      } else if (step.op === 'FORK') {
+        // Recursively purge each branch, remove empty branches
+        for (let j = step.steps.length - 1; j >= 0; j--) {
+          if (!SDK.purgeTimestamp(step.steps[j])) {
+            step.steps.splice(j, 1)
+          }
+        }
+        if (step.steps.length === 0) {
+          // All branches removed, remove the FORK step
+          timestamp.splice(i, 1)
+        } else if (step.steps.length === 1) {
+          // Collapse: replace FORK with its single remaining branch
+          timestamp.splice(i, 1, ...step.steps[0])
+        }
+      }
+    }
+    // Return true if there's still content in the timestamp
+    return timestamp.length > 0
+  }
+
+  /**
    * Verify the provided detached timestamp by replaying the timestamp steps and validating the attestations.
    *
    * @param stamp Detached timestamp to verify, which includes the original digest header and the associated timestamp steps.

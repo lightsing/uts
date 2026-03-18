@@ -76,3 +76,11 @@ class UpgradeResult:
     original: PendingAttestation
     upgraded: Timestamp | None = None
     error: Exception | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PurgeResult:
+    """Result of purging pending attestations from a timestamp."""
+
+    purged: list[str]
+    has_remaining: bool

@@ -711,3 +711,95 @@ func (s *SDK) Upgrade(ctx context.Context, stamp *types.DetachedTimestamp, keepP
 	s.logger.Debug(ctx, "Upgrade: complete", "results", len(results))
 	return results, nil
 }
+
+// ListPending returns all pending attestation URIs in the given detached timestamp.
+func (s *SDK) ListPending(stamp *types.DetachedTimestamp) []string {
+	return collectPendingAttestations(stamp.Timestamp)
+}
+
+func collectPendingAttestations(ts types.Timestamp) []string {
+	var uris []string
+	for _, step := range ts {
+		switch st := step.(type) {
+		case *types.AttestationStep:
+			if pending, ok := st.Attestation.(*types.PendingAttestation); ok {
+				uris = append(uris, pending.URI)
+			}
+		case *types.ForkStep:
+			for _, branch := range st.Branches {
+				uris = append(uris, collectPendingAttestations(branch)...)
+			}
+		}
+	}
+	return uris
+}
+
+// PurgeResult contains the result of a purge operation.
+type PurgeResult struct {
+	// Purged contains the URIs of the pending attestations that were removed.
+	Purged []string
+	// HasRemaining is true if the timestamp still has non-pending attestations.
+	HasRemaining bool
+}
+
+// PurgePending removes all pending attestations from the given detached timestamp.
+// It returns a PurgeResult with the purged URIs and whether any attestations remain.
+func (s *SDK) PurgePending(stamp *types.DetachedTimestamp) *PurgeResult {
+	pending := s.ListPending(stamp)
+	if len(pending) == 0 {
+		return &PurgeResult{Purged: nil, HasRemaining: true}
+	}
+
+	hasRemaining := purgeTimestamp(&stamp.Timestamp)
+	return &PurgeResult{
+		Purged:       pending,
+		HasRemaining: hasRemaining,
+	}
+}
+
+// purgeTimestamp recursively removes all pending attestation branches from a timestamp.
+// It modifies the timestamp slice in place.
+// Returns true if the timestamp still has non-pending content, false if it should be removed.
+func purgeTimestamp(ts *types.Timestamp) bool {
+	i := 0
+	for i < len(*ts) {
+		step := (*ts)[i]
+		switch st := step.(type) {
+		case *types.AttestationStep:
+			if _, ok := st.Attestation.(*types.PendingAttestation); ok {
+				// Remove pending attestation
+				*ts = append((*ts)[:i], (*ts)[i+1:]...)
+				continue
+			}
+			i++
+		case *types.ForkStep:
+			// Recursively purge each branch, remove empty ones
+			j := 0
+			for j < len(st.Branches) {
+				if !purgeTimestamp(&st.Branches[j]) {
+					st.Branches = append(st.Branches[:j], st.Branches[j+1:]...)
+				} else {
+					j++
+				}
+			}
+			if len(st.Branches) == 0 {
+				// All branches removed, remove the FORK step
+				*ts = append((*ts)[:i], (*ts)[i+1:]...)
+				continue
+			} else if len(st.Branches) == 1 {
+				// Collapse: replace FORK with its single remaining branch
+				remaining := st.Branches[0]
+				newTs := make(types.Timestamp, 0, len(*ts)-1+len(remaining))
+				newTs = append(newTs, (*ts)[:i]...)
+				newTs = append(newTs, remaining...)
+				newTs = append(newTs, (*ts)[i+1:]...)
+				*ts = newTs
+				continue
+			}
+			i++
+		default:
+			i++
+		}
+	}
+	return len(*ts) > 0
+}

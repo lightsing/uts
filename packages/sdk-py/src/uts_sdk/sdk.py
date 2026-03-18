@@ -41,6 +41,7 @@ from uts_sdk._types import (
     NodePosition,
     PendingAttestation,
     PrependStep,
+    PurgeResult,
     RIPEMD160Step,
     SHA1Step,
     SHA256Step,
@@ -359,6 +360,68 @@ class SDK:
         return await self._upgrade_timestamp(
             stamp.header.digest, stamp.timestamp, keep_pending
         )
+
+    def list_pending(self, stamp: DetachedTimestamp) -> list[str]:
+        """List all pending attestation URLs in the given detached timestamp."""
+        return self._collect_pending_attestations(stamp.timestamp)
+
+    @staticmethod
+    def _collect_pending_attestations(timestamp: Timestamp) -> list[str]:
+        """Collect all pending attestation URIs from a timestamp."""
+        uris: list[str] = []
+        for step in timestamp:
+            match step:
+                case AttestationStep(attestation=att):
+                    if isinstance(att, PendingAttestation):
+                        uris.append(att.url)
+                case ForkStep(steps=branches):
+                    for branch in branches:
+                        uris.extend(SDK._collect_pending_attestations(branch))
+        return uris
+
+    def purge_pending(self, stamp: DetachedTimestamp) -> PurgeResult:
+        """Purge all pending attestations from the given detached timestamp.
+
+        This removes all pending attestation branches from the timestamp tree in place.
+        FORK nodes that are left with a single branch after purging are collapsed.
+
+        Returns a PurgeResult with purged URIs and whether any non-pending attestations
+        remain. If all attestations were pending, the timestamp will be empty.
+        """
+        pending = self.list_pending(stamp)
+        if not pending:
+            return PurgeResult(purged=[], has_remaining=True)
+
+        has_remaining = self._purge_timestamp(stamp.timestamp)
+        return PurgeResult(purged=pending, has_remaining=has_remaining)
+
+    @staticmethod
+    def _purge_timestamp(timestamp: Timestamp) -> bool:
+        """Recursively remove pending attestation branches from a timestamp.
+
+        Modifies the timestamp list in place.
+        Returns True if the timestamp still has non-pending content.
+        """
+        i = len(timestamp) - 1
+        while i >= 0:
+            step = timestamp[i]
+            match step:
+                case AttestationStep(attestation=att):
+                    if isinstance(att, PendingAttestation):
+                        del timestamp[i]
+                case ForkStep(steps=branches):
+                    j = len(branches) - 1
+                    while j >= 0:
+                        if not SDK._purge_timestamp(branches[j]):
+                            del branches[j]
+                        j -= 1
+                    if len(branches) == 0:
+                        del timestamp[i]
+                    elif len(branches) == 1:
+                        # Collapse: replace FORK with its single remaining branch
+                        timestamp[i : i + 1] = branches[0]
+            i -= 1
+        return len(timestamp) > 0
 
     async def _upgrade_timestamp(
         self,
