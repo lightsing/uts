@@ -1,4 +1,5 @@
 use clap::Args;
+use std::collections::HashSet;
 use std::path::PathBuf;
 use tracing::{error, info, warn};
 use uts_core::codec::{Decode, Encode, VersionedProof, v1::DetachedTimestamp};
@@ -9,7 +10,7 @@ pub struct Purge {
     /// Files to purge pending attestations from. May be specified multiple times.
     #[arg(value_name = "FILE", num_args = 1..)]
     files: Vec<PathBuf>,
-    /// Skip the interactive confirmation prompt and purge immediately.
+    /// Skip the interactive confirmation prompt and purge all pending attestations.
     #[arg(short = 'y', long = "yes", default_value_t = false)]
     yes: bool,
 }
@@ -39,33 +40,62 @@ impl Purge {
             path.display(),
             pending.len()
         );
-        for uri in &pending {
-            info!("  - {uri}");
+        for (i, uri) in pending.iter().enumerate() {
+            info!("  [{}] {uri}", i + 1);
         }
 
-        if !self.yes {
+        let uris_to_purge = if self.yes {
+            // Purge all when --yes flag is used
+            None
+        } else {
+            // Interactive selection
             eprint!(
-                "Purge {} pending attestation(s) from {}? [y/N] ",
-                pending.len(),
-                path.display()
+                "Enter numbers to purge (comma-separated), 'all', or 'none' to skip: "
             );
             let mut input = String::new();
             std::io::stdin().read_line(&mut input)?;
-            if !input.trim().eq_ignore_ascii_case("y") {
+            let input = input.trim();
+
+            if input.eq_ignore_ascii_case("none") || input.is_empty() {
                 info!("[{}] skipped", path.display());
                 return Ok(());
             }
-        }
 
-        let result = Sdk::purge_pending(&mut proof);
+            if input.eq_ignore_ascii_case("all") {
+                None
+            } else {
+                let mut selected = HashSet::new();
+                for part in input.split(',') {
+                    let part = part.trim();
+                    match part.parse::<usize>() {
+                        Ok(n) if n >= 1 && n <= pending.len() => {
+                            selected.insert(pending[n - 1].clone());
+                        }
+                        _ => {
+                            warn!("ignoring invalid selection: {part}");
+                        }
+                    }
+                }
+                if selected.is_empty() {
+                    info!("[{}] no valid selections, skipping", path.display());
+                    return Ok(());
+                }
+                Some(selected)
+            }
+        };
+
+        let result = Sdk::purge_pending_by_uris(&mut proof, uris_to_purge.as_ref());
+
+        if result.purged.is_empty() {
+            info!("[{}] nothing to purge", path.display());
+            return Ok(());
+        }
 
         if !result.has_remaining {
             warn!(
-                "[{}] all attestations were pending — the file is now empty and should be removed",
+                "[{}] purging would leave no attestations in the file, skipping",
                 path.display()
             );
-            tokio::fs::remove_file(path).await?;
-            info!("[{}] removed empty file", path.display());
             return Ok(());
         }
 

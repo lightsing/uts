@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use tracing::info;
 use uts_core::{
     alloc::Allocator,
@@ -37,14 +38,28 @@ impl Sdk {
     ///
     /// If all attestations were pending, the timestamp becomes invalid and
     /// `has_remaining` will be `false` — callers should handle this case
-    /// (e.g., by deleting the file).
+    /// (e.g., by not writing the file).
     pub fn purge_pending<A: Allocator>(
         stamp: &mut DetachedTimestamp<A>,
     ) -> PurgeResult {
-        let pending_uris = Self::list_pending(stamp);
-        let count = pending_uris.len();
+        Self::purge_pending_by_uris(stamp, None)
+    }
 
-        if count == 0 {
+    /// Purges selected pending attestations from the given detached timestamp.
+    ///
+    /// If `uris_to_purge` is `None`, all pending attestations are purged.
+    /// If `uris_to_purge` is `Some(set)`, only pending attestations whose URI
+    /// is in the set are purged.
+    ///
+    /// Returns a [`PurgeResult`] containing the URIs of purged attestations
+    /// and whether the timestamp still has remaining (non-pending) attestations.
+    pub fn purge_pending_by_uris<A: Allocator>(
+        stamp: &mut DetachedTimestamp<A>,
+        uris_to_purge: Option<&HashSet<String>>,
+    ) -> PurgeResult {
+        let pending_uris = Self::list_pending(stamp);
+
+        if pending_uris.is_empty() {
             info!("no pending attestations found");
             return PurgeResult {
                 purged: Vec::new(),
@@ -52,19 +67,36 @@ impl Sdk {
             };
         }
 
-        let result = stamp.purge_pending();
+        let purged_uris: Vec<String> = match &uris_to_purge {
+            Some(set) => pending_uris.iter().filter(|u| set.contains(*u)).cloned().collect(),
+            None => pending_uris,
+        };
+
+        if purged_uris.is_empty() {
+            info!("no matching pending attestations to purge");
+            return PurgeResult {
+                purged: Vec::new(),
+                has_remaining: true,
+            };
+        }
+
+        let result = match &uris_to_purge {
+            Some(set) => stamp.purge_pending_if(&|uri| set.contains(uri)),
+            None => stamp.purge_pending(),
+        };
+
         match result {
             Some(purged) => {
                 info!("purged {purged} pending attestation(s)");
                 PurgeResult {
-                    purged: pending_uris,
+                    purged: purged_uris,
                     has_remaining: true,
                 }
             }
             None => {
                 info!("all attestations were pending, timestamp is now empty");
                 PurgeResult {
-                    purged: pending_uris,
+                    purged: purged_uris,
                     has_remaining: false,
                 }
             }

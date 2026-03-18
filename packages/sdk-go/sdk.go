@@ -745,28 +745,57 @@ type PurgeResult struct {
 // PurgePending removes all pending attestations from the given detached timestamp.
 // It returns a PurgeResult with the purged URIs and whether any attestations remain.
 func (s *SDK) PurgePending(stamp *types.DetachedTimestamp) *PurgeResult {
-	pending := s.ListPending(stamp)
-	if len(pending) == 0 {
+	return s.PurgePendingByURIs(stamp, nil)
+}
+
+// PurgePendingByURIs removes selected pending attestations from the given detached timestamp.
+// If urisToPurge is nil, all pending attestations are removed.
+// If urisToPurge is non-nil, only pending attestations whose URI is in the set are removed.
+func (s *SDK) PurgePendingByURIs(stamp *types.DetachedTimestamp, urisToPurge map[string]bool) *PurgeResult {
+	allPending := s.ListPending(stamp)
+	if len(allPending) == 0 {
 		return &PurgeResult{Purged: nil, HasRemaining: true}
 	}
 
-	hasRemaining := purgeTimestamp(&stamp.Timestamp)
+	var purgedURIs []string
+	if urisToPurge != nil {
+		for _, uri := range allPending {
+			if urisToPurge[uri] {
+				purgedURIs = append(purgedURIs, uri)
+			}
+		}
+	} else {
+		purgedURIs = allPending
+	}
+
+	if len(purgedURIs) == 0 {
+		return &PurgeResult{Purged: nil, HasRemaining: true}
+	}
+
+	shouldPurge := func(uri string) bool {
+		if urisToPurge == nil {
+			return true
+		}
+		return urisToPurge[uri]
+	}
+
+	hasRemaining := purgeTimestamp(&stamp.Timestamp, shouldPurge)
 	return &PurgeResult{
-		Purged:       pending,
+		Purged:       purgedURIs,
 		HasRemaining: hasRemaining,
 	}
 }
 
-// purgeTimestamp recursively removes all pending attestation branches from a timestamp.
+// purgeTimestamp recursively removes pending attestation branches matching the predicate from a timestamp.
 // It modifies the timestamp slice in place.
 // Returns true if the timestamp still has non-pending content, false if it should be removed.
-func purgeTimestamp(ts *types.Timestamp) bool {
+func purgeTimestamp(ts *types.Timestamp, shouldPurge func(string) bool) bool {
 	i := 0
 	for i < len(*ts) {
 		step := (*ts)[i]
 		switch st := step.(type) {
 		case *types.AttestationStep:
-			if _, ok := st.Attestation.(*types.PendingAttestation); ok {
+			if pending, ok := st.Attestation.(*types.PendingAttestation); ok && shouldPurge(pending.URI) {
 				// Remove pending attestation
 				*ts = append((*ts)[:i], (*ts)[i+1:]...)
 				continue
@@ -776,7 +805,7 @@ func purgeTimestamp(ts *types.Timestamp) bool {
 			// Recursively purge each branch, remove empty ones
 			j := 0
 			for j < len(st.Branches) {
-				if !purgeTimestamp(&st.Branches[j]) {
+				if !purgeTimestamp(&st.Branches[j], shouldPurge) {
 					st.Branches = append(st.Branches[:j], st.Branches[j+1:]...)
 				} else {
 					j++

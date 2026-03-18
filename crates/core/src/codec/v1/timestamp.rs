@@ -176,18 +176,35 @@ impl<A: Allocator> Timestamp<A> {
     /// it is collapsed into that branch to maintain the invariant that FORKs
     /// have at least two children.
     pub fn purge_pending(&mut self) -> Option<usize> {
+        self.purge_pending_if(&|_| true)
+    }
+
+    /// Purges pending attestations matching the given predicate from this timestamp tree.
+    ///
+    /// The predicate receives the URI of each pending attestation and should return
+    /// `true` if the attestation should be purged.
+    ///
+    /// Returns `Some(count)` where `count` is the number of pending attestations removed,
+    /// or `None` if the entire timestamp would be empty after purging.
+    ///
+    /// When a FORK node is left with only one remaining branch after purging,
+    /// it is collapsed into that branch to maintain the invariant that FORKs
+    /// have at least two children.
+    pub fn purge_pending_if(&mut self, should_purge: &dyn Fn(&str) -> bool) -> Option<usize> {
         // Phase 1: recursively purge children and compute result
         let (purge_count, should_collapse) = match self {
             Timestamp::Attestation(attestation) => {
-                return if attestation.tag == PendingAttestation::TAG {
-                    None
-                } else {
-                    Some(0)
-                };
+                if attestation.tag == PendingAttestation::TAG {
+                    let uri = PendingAttestation::from_raw(&*attestation)
+                        .map(|p| p.uri.to_string())
+                        .unwrap_or_default();
+                    return if should_purge(&uri) { None } else { Some(0) };
+                }
+                return Some(0);
             }
             Timestamp::Step(step) if step.op == OpCode::FORK => {
                 let mut purged = 0usize;
-                step.next.retain_mut(|child| match child.purge_pending() {
+                step.next.retain_mut(|child| match child.purge_pending_if(should_purge) {
                     None => {
                         purged += 1;
                         false
@@ -206,7 +223,7 @@ impl<A: Allocator> Timestamp<A> {
             }
             Timestamp::Step(step) => {
                 debug_assert!(step.next.len() == 1, "non-FORK must have exactly one child");
-                return step.next[0].purge_pending();
+                return step.next[0].purge_pending_if(should_purge);
             }
         };
 
@@ -494,6 +511,34 @@ mod tests {
         let result = ts.purge_pending();
         assert_eq!(result, Some(1));
         // Outer FORK remains (2 branches), inner FORK collapsed
+        assert!(matches!(ts, Timestamp::Step(ref s) if s.op == OpCode::FORK));
+    }
+
+    #[test]
+    fn purge_pending_if_selective() {
+        // FORK with two different pending attestations
+        let p1 = make_pending("https://a.example.com");
+        let p2 = make_pending("https://b.example.com");
+        let confirmed = make_bitcoin(100);
+        let mut ts = Timestamp::merge(alloc_vec![p1, p2, confirmed]);
+
+        // Only purge the first one
+        let result = ts.purge_pending_if(&|uri| uri == "https://a.example.com");
+        assert_eq!(result, Some(1));
+        // FORK should remain since 2 branches are still present (p2 + confirmed)
+        assert!(matches!(ts, Timestamp::Step(ref s) if s.op == OpCode::FORK));
+    }
+
+    #[test]
+    fn purge_pending_if_none_match() {
+        let p1 = make_pending("https://a.example.com");
+        let confirmed = make_bitcoin(100);
+        let mut ts = Timestamp::merge(alloc_vec![p1, confirmed]);
+
+        // Predicate matches nothing
+        let result = ts.purge_pending_if(&|_| false);
+        assert_eq!(result, Some(0));
+        // FORK should remain unchanged
         assert!(matches!(ts, Timestamp::Step(ref s) if s.op == OpCode::FORK));
     }
 }

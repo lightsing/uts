@@ -379,24 +379,52 @@ class SDK:
                         uris.extend(SDK._collect_pending_attestations(branch))
         return uris
 
-    def purge_pending(self, stamp: DetachedTimestamp) -> PurgeResult:
-        """Purge all pending attestations from the given detached timestamp.
+    def purge_pending(
+        self,
+        stamp: DetachedTimestamp,
+        *,
+        uris_to_purge: set[str] | None = None,
+    ) -> PurgeResult:
+        """Purge pending attestations from the given detached timestamp.
 
-        This removes all pending attestation branches from the timestamp tree in place.
+        This removes pending attestation branches from the timestamp tree in place.
         FORK nodes that are left with a single branch after purging are collapsed.
+
+        Args:
+            stamp: The detached timestamp to purge.
+            uris_to_purge: Optional set of URIs to selectively purge. If None,
+                all pending attestations are purged.
 
         Returns a PurgeResult with purged URIs and whether any non-pending attestations
         remain. If all attestations were pending, the timestamp will be empty.
         """
-        pending = self.list_pending(stamp)
-        if not pending:
+        all_pending = self.list_pending(stamp)
+        if not all_pending:
             return PurgeResult(purged=[], has_remaining=True)
 
-        has_remaining = self._purge_timestamp(stamp.timestamp)
-        return PurgeResult(purged=pending, has_remaining=has_remaining)
+        purged_uris = (
+            [u for u in all_pending if u in uris_to_purge]
+            if uris_to_purge is not None
+            else all_pending
+        )
+
+        if not purged_uris:
+            return PurgeResult(purged=[], has_remaining=True)
+
+        should_purge = (
+            (lambda uri: uri in uris_to_purge)
+            if uris_to_purge is not None
+            else (lambda _: True)
+        )
+
+        has_remaining = self._purge_timestamp(stamp.timestamp, should_purge)
+        return PurgeResult(purged=purged_uris, has_remaining=has_remaining)
 
     @staticmethod
-    def _purge_timestamp(timestamp: Timestamp) -> bool:
+    def _purge_timestamp(
+        timestamp: Timestamp,
+        should_purge: Callable[[str], bool],
+    ) -> bool:
         """Recursively remove pending attestation branches from a timestamp.
 
         Modifies the timestamp list in place.
@@ -407,12 +435,12 @@ class SDK:
             step = timestamp[i]
             match step:
                 case AttestationStep(attestation=att):
-                    if isinstance(att, PendingAttestation):
+                    if isinstance(att, PendingAttestation) and should_purge(att.url):
                         del timestamp[i]
                 case ForkStep(steps=branches):
                     j = len(branches) - 1
                     while j >= 0:
-                        if not SDK._purge_timestamp(branches[j]):
+                        if not SDK._purge_timestamp(branches[j], should_purge):
                             del branches[j]
                         j -= 1
                     if len(branches) == 0:

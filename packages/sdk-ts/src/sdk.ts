@@ -604,36 +604,56 @@ export default class SDK {
    * in the timestamp are pending, the timestamp will be left empty.
    *
    * @param stamp The detached timestamp to purge pending attestations from.
+   * @param urlsToPurge Optional set of URLs to selectively purge. If not provided, all pending attestations are purged.
    * @returns An object containing the purged URLs and whether any non-pending attestations remain.
    */
-  purgePending(stamp: DetachedTimestamp): {
+  purgePending(
+    stamp: DetachedTimestamp,
+    urlsToPurge?: Set<string>,
+  ): {
     purged: URL[]
     hasRemaining: boolean
   } {
-    const purged = this.listPending(stamp)
+    const allPending = this.listPending(stamp)
+    if (allPending.length === 0) {
+      return { purged: [], hasRemaining: true }
+    }
+    const purged = urlsToPurge
+      ? allPending.filter((u) => urlsToPurge.has(u.toString()))
+      : allPending
     if (purged.length === 0) {
       return { purged: [], hasRemaining: true }
     }
-    const hasRemaining = SDK.purgeTimestamp(stamp.timestamp)
+    const shouldPurge = urlsToPurge
+      ? (url: string) => urlsToPurge.has(url)
+      : () => true
+    const hasRemaining = SDK.purgeTimestamp(stamp.timestamp, shouldPurge)
     return { purged, hasRemaining }
   }
 
   /**
    * Recursively remove pending attestation branches from a timestamp.
    * Modifies the timestamp array in place.
+   * @param shouldPurge Predicate that receives a pending attestation URL and returns true if it should be purged.
    * @returns true if the timestamp still has non-pending content, false if it should be removed entirely.
    */
-  private static purgeTimestamp(timestamp: Timestamp): boolean {
+  private static purgeTimestamp(
+    timestamp: Timestamp,
+    shouldPurge: (url: string) => boolean,
+  ): boolean {
     for (let i = timestamp.length - 1; i >= 0; i--) {
       const step = timestamp[i]
       if (step.op === 'ATTESTATION') {
-        if (step.attestation.kind === 'pending') {
+        if (
+          step.attestation.kind === 'pending' &&
+          shouldPurge(step.attestation.url.toString())
+        ) {
           timestamp.splice(i, 1)
         }
       } else if (step.op === 'FORK') {
         // Recursively purge each branch, remove empty branches
         for (let j = step.steps.length - 1; j >= 0; j--) {
-          if (!SDK.purgeTimestamp(step.steps[j])) {
+          if (!SDK.purgeTimestamp(step.steps[j], shouldPurge)) {
             step.steps.splice(j, 1)
           }
         }
