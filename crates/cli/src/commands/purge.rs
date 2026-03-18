@@ -49,9 +49,11 @@ impl Purge {
             None
         } else {
             // Interactive selection
-            eprint!(
+            print!(
                 "Enter numbers to purge (comma-separated), 'all', or 'none' to skip: "
             );
+            use std::io::Write;
+            std::io::stdout().flush()?;
             let mut input = String::new();
             std::io::stdin().read_line(&mut input)?;
             let input = input.trim();
