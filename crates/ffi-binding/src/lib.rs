@@ -278,7 +278,7 @@ impl DetachedTimestamp {
             .inner
             .write()
             .map_err(|e| UtsError::InvalidOperation(format!("lock poisoned: {e}")))?;
-        let result = guard.proof.purge_pending();
+        let result = guard.purge_pending();
         Ok(result.map(|n| n as u32))
     }
 }
@@ -341,6 +341,7 @@ pub fn uts_magic_bytes() -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::Digest as _;
 
     /// Embedded copy of the small detached timestamp fixture from uts-core.
     const SMALL_OTS: &[u8] = b"\
@@ -510,8 +511,6 @@ mod tests {
         assert_eq!(magic.len(), 31);
         assert_eq!(&magic[1..15], b"OpenTimestamps");
     }
-
-    use sha2::Digest as _;
 
     #[test]
     fn build_and_round_trip() {
