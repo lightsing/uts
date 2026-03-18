@@ -82,7 +82,7 @@ impl Sdk {
             };
         }
 
-        let result = stamp.retain_attestations(&|att| {
+        let result = stamp.retain_attestations(|att| {
             if att.tag != PendingAttestation::TAG {
                 return true; // keep non-pending attestations
             }
