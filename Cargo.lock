@@ -6177,6 +6177,8 @@ dependencies = [
 name = "uts-ffi-binding"
 version = "0.1.0-alpha.1"
 dependencies = [
+ "sha2",
+ "thiserror 2.0.18",
  "uniffi",
  "uts-core",
 ]

@@ -1,5 +1,6 @@
 [package]
 authors.workspace = true
+description = "UniFFI-based foreign function interface for uts-core"
 edition.workspace = true
 homepage.workspace = true
 name = "uts-ffi-binding"
@@ -7,11 +8,15 @@ repository.workspace = true
 version.workspace = true
 
 [lib]
-crate-type = ["cdylib", "staticlib"]
+crate-type = ["cdylib", "staticlib", "lib"]
 
 [dependencies]
+thiserror = { workspace = true }
 uniffi = { workspace = true }
 uts-core = { workspace = true }
+
+[dev-dependencies]
+sha2 = { workspace = true }
 
 [lints]
 workspace = true
