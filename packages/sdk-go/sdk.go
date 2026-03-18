@@ -742,7 +742,17 @@ type PurgeResult struct {
 	HasRemaining bool
 }
 
+// RetainAttestations retains only the attestations for which the predicate returns true,
+// removing all others from the timestamp tree. This is analogous to Go's slices.DeleteFunc
+// but operates on the attestation leaves of the timestamp tree.
+// FORK nodes left with a single branch after filtering are collapsed.
+// Returns true if the timestamp still has attestations, false if all were removed.
+func (s *SDK) RetainAttestations(stamp *types.DetachedTimestamp, shouldRetain func(types.Attestation) bool) bool {
+	return retainAttestations(&stamp.Timestamp, shouldRetain)
+}
+
 // PurgePending removes all pending attestations from the given detached timestamp.
+// This is a convenience wrapper around RetainAttestations.
 // It returns a PurgeResult with the purged URIs and whether any attestations remain.
 func (s *SDK) PurgePending(stamp *types.DetachedTimestamp) *PurgeResult {
 	return s.PurgePendingByURIs(stamp, nil)
@@ -751,6 +761,7 @@ func (s *SDK) PurgePending(stamp *types.DetachedTimestamp) *PurgeResult {
 // PurgePendingByURIs removes selected pending attestations from the given detached timestamp.
 // If urisToPurge is nil, all pending attestations are removed.
 // If urisToPurge is non-nil, only pending attestations whose URI is in the set are removed.
+// This is a convenience wrapper around RetainAttestations.
 func (s *SDK) PurgePendingByURIs(stamp *types.DetachedTimestamp, urisToPurge map[string]bool) *PurgeResult {
 	allPending := s.ListPending(stamp)
 	if len(allPending) == 0 {
@@ -772,51 +783,50 @@ func (s *SDK) PurgePendingByURIs(stamp *types.DetachedTimestamp, urisToPurge map
 		return &PurgeResult{Purged: nil, HasRemaining: true}
 	}
 
-	shouldPurge := func(uri string) bool {
-		if urisToPurge == nil {
-			return true
+	hasRemaining := s.RetainAttestations(stamp, func(att types.Attestation) bool {
+		pending, ok := att.(*types.PendingAttestation)
+		if !ok {
+			return true // keep non-pending
 		}
-		return urisToPurge[uri]
-	}
+		if urisToPurge == nil {
+			return false // purge all pending
+		}
+		return !urisToPurge[pending.URI] // keep if NOT in purge set
+	})
 
-	hasRemaining := purgeTimestamp(&stamp.Timestamp, shouldPurge)
 	return &PurgeResult{
 		Purged:       purgedURIs,
 		HasRemaining: hasRemaining,
 	}
 }
 
-// purgeTimestamp recursively removes pending attestation branches matching the predicate from a timestamp.
+// retainAttestations recursively retains only attestations matching the predicate.
 // It modifies the timestamp slice in place.
-// Returns true if the timestamp still has non-pending content, false if it should be removed.
-func purgeTimestamp(ts *types.Timestamp, shouldPurge func(string) bool) bool {
+// Returns true if the timestamp still has content, false if it should be removed.
+func retainAttestations(ts *types.Timestamp, shouldRetain func(types.Attestation) bool) bool {
 	i := 0
 	for i < len(*ts) {
 		step := (*ts)[i]
 		switch st := step.(type) {
 		case *types.AttestationStep:
-			if pending, ok := st.Attestation.(*types.PendingAttestation); ok && shouldPurge(pending.URI) {
-				// Remove pending attestation
+			if !shouldRetain(st.Attestation) {
 				*ts = append((*ts)[:i], (*ts)[i+1:]...)
 				continue
 			}
 			i++
 		case *types.ForkStep:
-			// Recursively purge each branch, remove empty ones
 			j := 0
 			for j < len(st.Branches) {
-				if !purgeTimestamp(&st.Branches[j], shouldPurge) {
+				if !retainAttestations(&st.Branches[j], shouldRetain) {
 					st.Branches = append(st.Branches[:j], st.Branches[j+1:]...)
 				} else {
 					j++
 				}
 			}
 			if len(st.Branches) == 0 {
-				// All branches removed, remove the FORK step
 				*ts = append((*ts)[:i], (*ts)[i+1:]...)
 				continue
 			} else if len(st.Branches) == 1 {
-				// Collapse: replace FORK with its single remaining branch
 				remaining := st.Branches[0]
 				newTs := make(types.Timestamp, 0, len(*ts)-1+len(remaining))
 				newTs = append(newTs, (*ts)[:i]...)

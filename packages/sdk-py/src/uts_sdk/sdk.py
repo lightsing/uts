@@ -379,6 +379,60 @@ class SDK:
                         uris.extend(SDK._collect_pending_attestations(branch))
         return uris
 
+    def retain_attestations(
+        self,
+        stamp: DetachedTimestamp,
+        should_retain: Callable[[Attestation], bool],
+    ) -> bool:
+        """Retain only attestations matching the predicate, removing all others.
+
+        This is analogous to Python's ``filter`` but operates on the attestation
+        leaves of the timestamp tree. FORK nodes left with a single branch after
+        filtering are collapsed.
+
+        Args:
+            stamp: The detached timestamp to filter.
+            should_retain: Predicate receiving each attestation; return True to keep.
+
+        Returns True if the timestamp still has attestations, False if all were removed.
+        """
+        return self._retain_attestations_in_timestamp(
+            stamp.timestamp, should_retain
+        )
+
+    @staticmethod
+    def _retain_attestations_in_timestamp(
+        timestamp: Timestamp,
+        should_retain: Callable[[Attestation], bool],
+    ) -> bool:
+        """Recursively retain attestations matching the predicate.
+
+        Modifies the timestamp list in place.
+        Returns True if the timestamp still has content.
+        """
+        i = len(timestamp) - 1
+        while i >= 0:
+            step = timestamp[i]
+            match step:
+                case AttestationStep(attestation=att):
+                    if not should_retain(att):
+                        del timestamp[i]
+                case ForkStep(steps=branches):
+                    j = len(branches) - 1
+                    while j >= 0:
+                        if not SDK._retain_attestations_in_timestamp(
+                            branches[j], should_retain
+                        ):
+                            del branches[j]
+                        j -= 1
+                    if len(branches) == 0:
+                        del timestamp[i]
+                    elif len(branches) == 1:
+                        # Collapse: expand the single remaining branch in place
+                        timestamp[i : i + 1] = branches[0]
+            i -= 1
+        return len(timestamp) > 0
+
     def purge_pending(
         self,
         stamp: DetachedTimestamp,
@@ -387,8 +441,8 @@ class SDK:
     ) -> PurgeResult:
         """Purge pending attestations from the given detached timestamp.
 
-        This removes pending attestation branches from the timestamp tree in place.
-        FORK nodes that are left with a single branch after purging are collapsed.
+        This is a convenience wrapper around :meth:`retain_attestations` that
+        removes pending attestation branches from the timestamp tree in place.
 
         Args:
             stamp: The detached timestamp to purge.
@@ -411,45 +465,15 @@ class SDK:
         if not purged_uris:
             return PurgeResult(purged=[], has_remaining=True)
 
-        should_purge = (
-            (lambda uri: uri in uris_to_purge)
-            if uris_to_purge is not None
-            else (lambda _: True)
-        )
+        def should_retain(att: Attestation) -> bool:
+            if not isinstance(att, PendingAttestation):
+                return True
+            if uris_to_purge is None:
+                return False
+            return att.url not in uris_to_purge
 
-        has_remaining = self._purge_timestamp(stamp.timestamp, should_purge)
+        has_remaining = self.retain_attestations(stamp, should_retain)
         return PurgeResult(purged=purged_uris, has_remaining=has_remaining)
-
-    @staticmethod
-    def _purge_timestamp(
-        timestamp: Timestamp,
-        should_purge: Callable[[str], bool],
-    ) -> bool:
-        """Recursively remove pending attestation branches from a timestamp.
-
-        Modifies the timestamp list in place.
-        Returns True if the timestamp still has non-pending content.
-        """
-        i = len(timestamp) - 1
-        while i >= 0:
-            step = timestamp[i]
-            match step:
-                case AttestationStep(attestation=att):
-                    if isinstance(att, PendingAttestation) and should_purge(att.url):
-                        del timestamp[i]
-                case ForkStep(steps=branches):
-                    j = len(branches) - 1
-                    while j >= 0:
-                        if not SDK._purge_timestamp(branches[j], should_purge):
-                            del branches[j]
-                        j -= 1
-                    if len(branches) == 0:
-                        del timestamp[i]
-                    elif len(branches) == 1:
-                        # Collapse: replace FORK with its single remaining branch
-                        timestamp[i : i + 1] = branches[0]
-            i -= 1
-        return len(timestamp) > 0
 
     async def _upgrade_timestamp(
         self,

@@ -51,6 +51,8 @@ impl Sdk {
     /// If `uris_to_purge` is `Some(set)`, only pending attestations whose URI
     /// is in the set are purged.
     ///
+    /// This is implemented using [`Timestamp::retain_attestations`] under the hood.
+    ///
     /// Returns a [`PurgeResult`] containing the URIs of purged attestations
     /// and whether the timestamp still has remaining (non-pending) attestations.
     pub fn purge_pending_by_uris<A: Allocator>(
@@ -80,10 +82,20 @@ impl Sdk {
             };
         }
 
-        let result = match &uris_to_purge {
-            Some(set) => stamp.purge_pending_if(&|uri| set.contains(uri)),
-            None => stamp.purge_pending(),
-        };
+        let result = stamp.retain_attestations(&|att| {
+            if att.tag != PendingAttestation::TAG {
+                return true; // keep non-pending attestations
+            }
+            match &uris_to_purge {
+                None => false, // purge all pending
+                Some(set) => {
+                    let uri = PendingAttestation::from_raw(att)
+                        .map(|p| p.uri.to_string())
+                        .unwrap_or_default();
+                    !set.contains(&uri) // keep if NOT in the purge set
+                }
+            }
+        });
 
         match result {
             Some(purged) => {

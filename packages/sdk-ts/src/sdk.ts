@@ -597,14 +597,56 @@ export default class SDK {
   }
 
   /**
-   * Purge all pending attestations from the given detached timestamp, modifying it in place.
+   * Retain only attestations matching the predicate, removing all others from the timestamp tree.
+   * This is analogous to `Array.filter` but operates on the attestation leaves of the timestamp tree.
+   * FORK nodes left with a single branch after filtering are collapsed.
    *
-   * This removes all pending attestation branches from the timestamp tree. FORK nodes
-   * that are left with a single branch after purging are collapsed. If all attestations
-   * in the timestamp are pending, the timestamp will be left empty.
+   * @param stamp The detached timestamp to filter.
+   * @param shouldRetain Predicate that receives each attestation and returns true to keep it.
+   * @returns true if the timestamp still has attestations, false if all were removed.
+   */
+  retainAttestations(
+    stamp: DetachedTimestamp,
+    shouldRetain: (attestation: Attestation) => boolean,
+  ): boolean {
+    return SDK.retainAttestationsInTimestamp(stamp.timestamp, shouldRetain)
+  }
+
+  private static retainAttestationsInTimestamp(
+    timestamp: Timestamp,
+    shouldRetain: (attestation: Attestation) => boolean,
+  ): boolean {
+    for (let i = timestamp.length - 1; i >= 0; i--) {
+      const step = timestamp[i]
+      if (step.op === 'ATTESTATION') {
+        if (!shouldRetain(step.attestation)) {
+          timestamp.splice(i, 1)
+        }
+      } else if (step.op === 'FORK') {
+        for (let j = step.steps.length - 1; j >= 0; j--) {
+          if (
+            !SDK.retainAttestationsInTimestamp(step.steps[j], shouldRetain)
+          ) {
+            step.steps.splice(j, 1)
+          }
+        }
+        if (step.steps.length === 0) {
+          timestamp.splice(i, 1)
+        } else if (step.steps.length === 1) {
+          timestamp.splice(i, 1, ...step.steps[0])
+        }
+      }
+    }
+    return timestamp.length > 0
+  }
+
+  /**
+   * Purge pending attestations from the given detached timestamp, modifying it in place.
+   * This is a convenience wrapper around {@link retainAttestations} that removes
+   * pending attestations.
    *
    * @param stamp The detached timestamp to purge pending attestations from.
-   * @param urlsToPurge Optional set of URLs to selectively purge. If not provided, all pending attestations are purged.
+   * @param urlsToPurge Optional set of URL strings to selectively purge. If not provided, all pending attestations are purged.
    * @returns An object containing the purged URLs and whether any non-pending attestations remain.
    */
   purgePending(
@@ -624,50 +666,12 @@ export default class SDK {
     if (purged.length === 0) {
       return { purged: [], hasRemaining: true }
     }
-    const shouldPurge = urlsToPurge
-      ? (url: string) => urlsToPurge.has(url)
-      : () => true
-    const hasRemaining = SDK.purgeTimestamp(stamp.timestamp, shouldPurge)
+    const hasRemaining = this.retainAttestations(stamp, (attestation) => {
+      if (attestation.kind !== 'pending') return true
+      if (!urlsToPurge) return false
+      return !urlsToPurge.has(attestation.url.toString())
+    })
     return { purged, hasRemaining }
-  }
-
-  /**
-   * Recursively remove pending attestation branches from a timestamp.
-   * Modifies the timestamp array in place.
-   * @param shouldPurge Predicate that receives a pending attestation URL and returns true if it should be purged.
-   * @returns true if the timestamp still has non-pending content, false if it should be removed entirely.
-   */
-  private static purgeTimestamp(
-    timestamp: Timestamp,
-    shouldPurge: (url: string) => boolean,
-  ): boolean {
-    for (let i = timestamp.length - 1; i >= 0; i--) {
-      const step = timestamp[i]
-      if (step.op === 'ATTESTATION') {
-        if (
-          step.attestation.kind === 'pending' &&
-          shouldPurge(step.attestation.url.toString())
-        ) {
-          timestamp.splice(i, 1)
-        }
-      } else if (step.op === 'FORK') {
-        // Recursively purge each branch, remove empty branches
-        for (let j = step.steps.length - 1; j >= 0; j--) {
-          if (!SDK.purgeTimestamp(step.steps[j], shouldPurge)) {
-            step.steps.splice(j, 1)
-          }
-        }
-        if (step.steps.length === 0) {
-          // All branches removed, remove the FORK step
-          timestamp.splice(i, 1)
-        } else if (step.steps.length === 1) {
-          // Collapse: replace FORK with its single remaining branch
-          timestamp.splice(i, 1, ...step.steps[0])
-        }
-      }
-    }
-    // Return true if there's still content in the timestamp
-    return timestamp.length > 0
   }
 
   /**
