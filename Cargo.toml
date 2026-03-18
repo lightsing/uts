@@ -83,6 +83,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5"
 
+uniffi = { version = "0.31", default-features = false }
 
 crypto-common = "0.1"
 digest = "0.10"
