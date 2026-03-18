@@ -1,0 +1,17 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+name = "uts-ffi-binding"
+repository.workspace = true
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+uniffi = { workspace = true }
+uts-core = { workspace = true }
+
+[lints]
+workspace = true

@@ -6168,7 +6168,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
- "uniffi",
  "url",
  "uts-bmt",
  "uts-contracts",
@@ -6178,6 +6177,7 @@ dependencies = [
 name = "uts-ffi-binding"
 version = "0.1.0-alpha.1"
 dependencies = [
+ "uniffi",
  "uts-core",
 ]
 
