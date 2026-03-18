@@ -224,11 +224,9 @@ impl<A: Allocator> Timestamp<A> {
         };
 
         // Phase 2: collapse single-branch FORK
-        if should_collapse {
-            if let Timestamp::Step(step) = self {
-                let remaining = step.next.pop().unwrap();
-                *self = remaining;
-            }
+        if should_collapse && let Timestamp::Step(step) = self {
+            let remaining = step.next.pop().unwrap();
+            *self = remaining;
         }
 
         Some(removed_count)
@@ -288,11 +286,9 @@ impl<A: Allocator> Timestamp<A> {
             }
         };
 
-        if should_collapse {
-            if let Timestamp::Step(step) = self {
-                let remaining = step.next.pop().unwrap();
-                *self = remaining;
-            }
+        if should_collapse && let Timestamp::Step(step) = self {
+            let remaining = step.next.pop().unwrap();
+            *self = remaining;
         }
 
         Some(removed_count)

@@ -97,20 +97,17 @@ impl Sdk {
             }
         });
 
-        match result {
-            Some(purged) => {
-                info!("purged {purged} pending attestation(s)");
-                PurgeResult {
-                    purged: purged_uris,
-                    has_remaining: true,
-                }
+        if let Some(purged) = result {
+            info!("purged {purged} pending attestation(s)");
+            PurgeResult {
+                purged: purged_uris,
+                has_remaining: true,
             }
-            None => {
-                info!("all attestations were pending, timestamp is now empty");
-                PurgeResult {
-                    purged: purged_uris,
-                    has_remaining: false,
-                }
+        } else {
+            info!("all attestations were pending, timestamp is now empty");
+            PurgeResult {
+                purged: purged_uris,
+                has_remaining: false,
             }
         }
     }
