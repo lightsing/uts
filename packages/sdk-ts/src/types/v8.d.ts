@@ -1,3 +1,3 @@
 interface ErrorConstructor {
-  captureStackTrace?(targetObject: object, constructorOpt?: Function): void
+  captureStackTrace?(object: object, constructor?: () => void): void
 }

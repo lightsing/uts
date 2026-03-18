@@ -396,9 +396,7 @@ class SDK:
 
         Returns True if the timestamp still has attestations, False if all were removed.
         """
-        return self._retain_attestations_in_timestamp(
-            stamp.timestamp, should_retain
-        )
+        return self._retain_attestations_in_timestamp(stamp.timestamp, should_retain)
 
     @staticmethod
     def _retain_attestations_in_timestamp(

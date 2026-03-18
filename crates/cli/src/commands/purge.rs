@@ -1,6 +1,5 @@
 use clap::Args;
-use std::collections::HashSet;
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 use tracing::{error, info, warn};
 use uts_core::codec::{Decode, Encode, VersionedProof, v1::DetachedTimestamp};
 use uts_sdk::Sdk;
@@ -31,7 +30,10 @@ impl Purge {
 
         let pending = Sdk::list_pending(&proof);
         if pending.is_empty() {
-            info!("[{}] no pending attestations found, skipping", path.display());
+            info!(
+                "[{}] no pending attestations found, skipping",
+                path.display()
+            );
             return Ok(());
         }
 
@@ -49,9 +51,7 @@ impl Purge {
             None
         } else {
             // Interactive selection
-            print!(
-                "Enter numbers to purge (comma-separated), 'all', or 'none' to skip: "
-            );
+            print!("Enter numbers to purge (comma-separated), 'all', or 'none' to skip: ");
             use std::io::Write;
             std::io::stdout().flush()?;
             let mut input = String::new();

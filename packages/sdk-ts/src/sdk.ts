@@ -624,9 +624,7 @@ export default class SDK {
         }
       } else if (step.op === 'FORK') {
         for (let j = step.steps.length - 1; j >= 0; j--) {
-          if (
-            !SDK.retainAttestationsInTimestamp(step.steps[j], shouldRetain)
-          ) {
+          if (!SDK.retainAttestationsInTimestamp(step.steps[j], shouldRetain)) {
             step.steps.splice(j, 1)
           }
         }
@@ -884,10 +882,10 @@ export default class SDK {
         `Decoded EAS attestation data for UID ${hexlify(attestation.uid)}:`,
         contentHash,
       )
-    } catch (e) {
+    } catch (error) {
       console.debug(
         `Failed to decode EAS attestation data for UID ${hexlify(attestation.uid)}:`,
-        e,
+        error,
       )
       return {
         attestation,

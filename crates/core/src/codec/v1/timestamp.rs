@@ -503,9 +503,11 @@ impl<'a, A: Allocator> Iterator for PendingAttestationIterMut<'a, A> {
 
 #[cfg(test)]
 mod tests {
-    use crate::alloc::vec as alloc_vec;
-    use crate::codec::v1::{BitcoinAttestation, PendingAttestation};
     use super::*;
+    use crate::{
+        alloc::vec as alloc_vec,
+        codec::v1::{BitcoinAttestation, PendingAttestation},
+    };
     use std::borrow::Cow;
 
     fn make_pending(uri: &str) -> Timestamp {
@@ -525,7 +527,10 @@ mod tests {
     #[test]
     fn purge_pending_single_pending() {
         let mut ts = make_pending("https://example.com");
-        assert!(ts.purge_pending().is_none(), "all-pending should return None");
+        assert!(
+            ts.purge_pending().is_none(),
+            "all-pending should return None"
+        );
     }
 
     #[test]

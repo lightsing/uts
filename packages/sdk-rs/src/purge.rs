@@ -18,9 +18,7 @@ pub struct PurgeResult {
 
 impl Sdk {
     /// Lists all pending attestation URIs in the given detached timestamp.
-    pub fn list_pending<A: Allocator>(
-        stamp: &DetachedTimestamp<A>,
-    ) -> Vec<String> {
+    pub fn list_pending<A: Allocator>(stamp: &DetachedTimestamp<A>) -> Vec<String> {
         stamp
             .attestations()
             .filter_map(|att| {
@@ -39,9 +37,7 @@ impl Sdk {
     /// If all attestations were pending, the timestamp becomes invalid and
     /// `has_remaining` will be `false` — callers should handle this case
     /// (e.g., by not writing the file).
-    pub fn purge_pending<A: Allocator>(
-        stamp: &mut DetachedTimestamp<A>,
-    ) -> PurgeResult {
+    pub fn purge_pending<A: Allocator>(stamp: &mut DetachedTimestamp<A>) -> PurgeResult {
         Self::purge_pending_by_uris(stamp, None)
     }
 
@@ -70,7 +66,11 @@ impl Sdk {
         }
 
         let purged_uris: Vec<String> = match &uris_to_purge {
-            Some(set) => pending_uris.iter().filter(|u| set.contains(*u)).cloned().collect(),
+            Some(set) => pending_uris
+                .iter()
+                .filter(|u| set.contains(*u))
+                .cloned()
+                .collect(),
             None => pending_uris,
         };
 
