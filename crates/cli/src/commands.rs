@@ -1,6 +1,7 @@
 use clap::Subcommand;
 
 mod inspect;
+mod purge;
 mod stamp;
 mod upgrade;
 mod verify;
@@ -15,6 +16,8 @@ pub enum Commands {
     Stamp(stamp::Stamp),
     /// Upgrade timestamp
     Upgrade(upgrade::Upgrade),
+    /// Purge stale pending attestations
+    Purge(purge::Purge),
 }
 
 impl Commands {
@@ -24,6 +27,7 @@ impl Commands {
             Commands::Verify(cmd) => cmd.run().await,
             Commands::Stamp(cmd) => cmd.run().await,
             Commands::Upgrade(cmd) => cmd.run().await,
+            Commands::Purge(cmd) => cmd.run().await,
         }
     }
 }
