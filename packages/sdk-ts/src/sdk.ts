@@ -574,6 +574,105 @@ export default class SDK {
   }
 
   /**
+   * List all pending attestation URLs in the given detached timestamp.
+   * @param stamp The detached timestamp to inspect.
+   * @returns An array of pending attestation URLs found in the timestamp.
+   */
+  listPending(stamp: DetachedTimestamp): URL[] {
+    return SDK.collectPendingAttestations(stamp.timestamp)
+  }
+
+  private static collectPendingAttestations(timestamp: Timestamp): URL[] {
+    const pending: URL[] = []
+    for (const step of timestamp) {
+      if (step.op === 'ATTESTATION' && step.attestation.kind === 'pending') {
+        pending.push(step.attestation.url)
+      } else if (step.op === 'FORK') {
+        for (const branch of step.steps) {
+          pending.push(...SDK.collectPendingAttestations(branch))
+        }
+      }
+    }
+    return pending
+  }
+
+  /**
+   * Retain only attestations matching the predicate, removing all others from the timestamp tree.
+   * This is analogous to `Array.filter` but operates on the attestation leaves of the timestamp tree.
+   * FORK nodes left with a single branch after filtering are collapsed.
+   *
+   * @param stamp The detached timestamp to filter.
+   * @param shouldRetain Predicate that receives each attestation and returns true to keep it.
+   * @returns true if the timestamp still has attestations, false if all were removed.
+   */
+  retainAttestations(
+    stamp: DetachedTimestamp,
+    shouldRetain: (attestation: Attestation) => boolean,
+  ): boolean {
+    return SDK.retainAttestationsInTimestamp(stamp.timestamp, shouldRetain)
+  }
+
+  private static retainAttestationsInTimestamp(
+    timestamp: Timestamp,
+    shouldRetain: (attestation: Attestation) => boolean,
+  ): boolean {
+    for (let i = timestamp.length - 1; i >= 0; i--) {
+      const step = timestamp[i]
+      if (step.op === 'ATTESTATION') {
+        if (!shouldRetain(step.attestation)) {
+          timestamp.splice(i, 1)
+        }
+      } else if (step.op === 'FORK') {
+        for (let j = step.steps.length - 1; j >= 0; j--) {
+          if (!SDK.retainAttestationsInTimestamp(step.steps[j], shouldRetain)) {
+            step.steps.splice(j, 1)
+          }
+        }
+        if (step.steps.length === 0) {
+          timestamp.splice(i, 1)
+        } else if (step.steps.length === 1) {
+          timestamp.splice(i, 1, ...step.steps[0])
+        }
+      }
+    }
+    return timestamp.length > 0
+  }
+
+  /**
+   * Purge pending attestations from the given detached timestamp, modifying it in place.
+   * This is a convenience wrapper around {@link retainAttestations} that removes
+   * pending attestations.
+   *
+   * @param stamp The detached timestamp to purge pending attestations from.
+   * @param urlsToPurge Optional set of URL strings to selectively purge. If not provided, all pending attestations are purged.
+   * @returns An object containing the purged URLs and whether any non-pending attestations remain.
+   */
+  purgePending(
+    stamp: DetachedTimestamp,
+    urlsToPurge?: Set<string>,
+  ): {
+    purged: URL[]
+    hasRemaining: boolean
+  } {
+    const allPending = this.listPending(stamp)
+    if (allPending.length === 0) {
+      return { purged: [], hasRemaining: true }
+    }
+    const purged = urlsToPurge
+      ? allPending.filter((u) => urlsToPurge.has(u.toString()))
+      : allPending
+    if (purged.length === 0) {
+      return { purged: [], hasRemaining: true }
+    }
+    const hasRemaining = this.retainAttestations(stamp, (attestation) => {
+      if (attestation.kind !== 'pending') return true
+      if (!urlsToPurge) return false
+      return !urlsToPurge.has(attestation.url.toString())
+    })
+    return { purged, hasRemaining }
+  }
+
+  /**
    * Verify the provided detached timestamp by replaying the timestamp steps and validating the attestations.
    *
    * @param stamp Detached timestamp to verify, which includes the original digest header and the associated timestamp steps.
@@ -783,10 +882,10 @@ export default class SDK {
         `Decoded EAS attestation data for UID ${hexlify(attestation.uid)}:`,
         contentHash,
       )
-    } catch (e) {
+    } catch (error) {
       console.debug(
         `Failed to decode EAS attestation data for UID ${hexlify(attestation.uid)}:`,
-        e,
+        error,
       )
       return {
         attestation,

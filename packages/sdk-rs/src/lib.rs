@@ -50,11 +50,13 @@ use {alloy_primitives::ChainId, alloy_provider::DynProvider, std::collections::B
 
 mod builder;
 mod error;
+mod purge;
 mod stamp;
 mod upgrade;
 mod verify;
 
 pub use error::Error;
+pub use purge::PurgeResult;
 pub use upgrade::UpgradeResult;
 
 /// Alias `Result` to use the crate's error type by default.

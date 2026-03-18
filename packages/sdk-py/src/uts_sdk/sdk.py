@@ -41,6 +41,7 @@ from uts_sdk._types import (
     NodePosition,
     PendingAttestation,
     PrependStep,
+    PurgeResult,
     RIPEMD160Step,
     SHA1Step,
     SHA256Step,
@@ -359,6 +360,118 @@ class SDK:
         return await self._upgrade_timestamp(
             stamp.header.digest, stamp.timestamp, keep_pending
         )
+
+    def list_pending(self, stamp: DetachedTimestamp) -> list[str]:
+        """List all pending attestation URLs in the given detached timestamp."""
+        return self._collect_pending_attestations(stamp.timestamp)
+
+    @staticmethod
+    def _collect_pending_attestations(timestamp: Timestamp) -> list[str]:
+        """Collect all pending attestation URIs from a timestamp."""
+        uris: list[str] = []
+        for step in timestamp:
+            match step:
+                case AttestationStep(attestation=att):
+                    if isinstance(att, PendingAttestation):
+                        uris.append(att.url)
+                case ForkStep(steps=branches):
+                    for branch in branches:
+                        uris.extend(SDK._collect_pending_attestations(branch))
+        return uris
+
+    def retain_attestations(
+        self,
+        stamp: DetachedTimestamp,
+        should_retain: Callable[[Attestation], bool],
+    ) -> bool:
+        """Retain only attestations matching the predicate, removing all others.
+
+        This is analogous to Python's ``filter`` but operates on the attestation
+        leaves of the timestamp tree. FORK nodes left with a single branch after
+        filtering are collapsed.
+
+        Args:
+            stamp: The detached timestamp to filter.
+            should_retain: Predicate receiving each attestation; return True to keep.
+
+        Returns True if the timestamp still has attestations, False if all were removed.
+        """
+        return self._retain_attestations_in_timestamp(stamp.timestamp, should_retain)
+
+    @staticmethod
+    def _retain_attestations_in_timestamp(
+        timestamp: Timestamp,
+        should_retain: Callable[[Attestation], bool],
+    ) -> bool:
+        """Recursively retain attestations matching the predicate.
+
+        Modifies the timestamp list in place.
+        Returns True if the timestamp still has content.
+        """
+        i = len(timestamp) - 1
+        while i >= 0:
+            step = timestamp[i]
+            match step:
+                case AttestationStep(attestation=att):
+                    if not should_retain(att):
+                        del timestamp[i]
+                case ForkStep(steps=branches):
+                    j = len(branches) - 1
+                    while j >= 0:
+                        if not SDK._retain_attestations_in_timestamp(
+                            branches[j], should_retain
+                        ):
+                            del branches[j]
+                        j -= 1
+                    if len(branches) == 0:
+                        del timestamp[i]
+                    elif len(branches) == 1:
+                        # Collapse: expand the single remaining branch in place
+                        timestamp[i : i + 1] = branches[0]
+            i -= 1
+        return len(timestamp) > 0
+
+    def purge_pending(
+        self,
+        stamp: DetachedTimestamp,
+        *,
+        uris_to_purge: set[str] | None = None,
+    ) -> PurgeResult:
+        """Purge pending attestations from the given detached timestamp.
+
+        This is a convenience wrapper around :meth:`retain_attestations` that
+        removes pending attestation branches from the timestamp tree in place.
+
+        Args:
+            stamp: The detached timestamp to purge.
+            uris_to_purge: Optional set of URIs to selectively purge. If None,
+                all pending attestations are purged.
+
+        Returns a PurgeResult with purged URIs and whether any non-pending attestations
+        remain. If all attestations were pending, the timestamp will be empty.
+        """
+        all_pending = self.list_pending(stamp)
+        if not all_pending:
+            return PurgeResult(purged=[], has_remaining=True)
+
+        purged_uris = (
+            [u for u in all_pending if u in uris_to_purge]
+            if uris_to_purge is not None
+            else all_pending
+        )
+
+        if not purged_uris:
+            return PurgeResult(purged=[], has_remaining=True)
+
+        def should_retain(att: Attestation) -> bool:
+            if not isinstance(att, PendingAttestation):
+                return True
+            if uris_to_purge is None:
+                return False
+            return att.url not in uris_to_purge
+
+        has_remaining = self.retain_attestations(stamp, should_retain)
+        return PurgeResult(purged=purged_uris, has_remaining=has_remaining)
 
     async def _upgrade_timestamp(
         self,

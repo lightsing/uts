@@ -165,6 +165,145 @@ impl<A: Allocator> Timestamp<A> {
     pub fn pending_attestations_mut(&mut self) -> PendingAttestationIterMut<'_, A> {
         PendingAttestationIterMut { stack: vec![self] }
     }
+
+    /// Retains only the attestations for which the predicate returns `true`,
+    /// removing all others from this timestamp tree.
+    ///
+    /// The predicate receives each [`RawAttestation`] and should return `true`
+    /// to keep the attestation or `false` to remove it. This is analogous to
+    /// [`Vec::retain`] but operates on the attestation leaves of the timestamp
+    /// tree.
+    ///
+    /// Returns `Some(count)` where `count` is the number of attestations removed,
+    /// or `None` if the entire timestamp would be empty after filtering (all
+    /// attestations were removed).
+    ///
+    /// When a FORK node is left with only one remaining branch after filtering,
+    /// it is collapsed into that branch to maintain the invariant that FORKs
+    /// have at least two children.
+    pub fn retain_attestations<F>(&mut self, mut f: F) -> Option<usize>
+    where
+        F: FnMut(&RawAttestation<A>) -> bool,
+    {
+        self.retain_attestations_inner(&mut f)
+    }
+
+    fn retain_attestations_inner<F>(&mut self, f: &mut F) -> Option<usize>
+    where
+        F: FnMut(&RawAttestation<A>) -> bool,
+    {
+        // Phase 1: recursively filter children and compute result
+        let (removed_count, should_collapse) = match self {
+            Timestamp::Attestation(attestation) => {
+                return if f(attestation) { Some(0) } else { None };
+            }
+            Timestamp::Step(step) if step.op == OpCode::FORK => {
+                let mut removed = 0usize;
+                step.next
+                    .retain_mut(|child| match child.retain_attestations_inner(f) {
+                        None => {
+                            removed += 1;
+                            false
+                        }
+                        Some(count) => {
+                            removed += count;
+                            true
+                        }
+                    });
+
+                if step.next.is_empty() {
+                    return None;
+                }
+
+                (removed, step.next.len() == 1)
+            }
+            Timestamp::Step(step) => {
+                debug_assert!(step.next.len() == 1, "non-FORK must have exactly one child");
+                return step.next[0].retain_attestations_inner(f);
+            }
+        };
+
+        // Phase 2: collapse single-branch FORK
+        if should_collapse && let Timestamp::Step(step) = self {
+            let remaining = step.next.pop().unwrap();
+            *self = remaining;
+        }
+
+        Some(removed_count)
+    }
+
+    /// Retains only the attestations for which the predicate returns `true`,
+    /// removing all others from this timestamp tree.
+    ///
+    /// Unlike [`retain_attestations`](Self::retain_attestations), this variant
+    /// provides mutable access to each [`RawAttestation`] in the predicate,
+    /// allowing in-place modification of attestations during filtering.
+    ///
+    /// Returns `Some(count)` where `count` is the number of attestations removed,
+    /// or `None` if the entire timestamp would be empty after filtering.
+    ///
+    /// When a FORK node is left with only one remaining branch after filtering,
+    /// it is collapsed into that branch to maintain the invariant that FORKs
+    /// have at least two children.
+    pub fn retain_attestations_mut<F>(&mut self, mut f: F) -> Option<usize>
+    where
+        F: FnMut(&mut RawAttestation<A>) -> bool,
+    {
+        self.retain_attestations_mut_inner(&mut f)
+    }
+
+    fn retain_attestations_mut_inner<F>(&mut self, f: &mut F) -> Option<usize>
+    where
+        F: FnMut(&mut RawAttestation<A>) -> bool,
+    {
+        let (removed_count, should_collapse) = match self {
+            Timestamp::Attestation(attestation) => {
+                return if f(attestation) { Some(0) } else { None };
+            }
+            Timestamp::Step(step) if step.op == OpCode::FORK => {
+                let mut removed = 0usize;
+                step.next
+                    .retain_mut(|child| match child.retain_attestations_mut_inner(f) {
+                        None => {
+                            removed += 1;
+                            false
+                        }
+                        Some(count) => {
+                            removed += count;
+                            true
+                        }
+                    });
+
+                if step.next.is_empty() {
+                    return None;
+                }
+
+                (removed, step.next.len() == 1)
+            }
+            Timestamp::Step(step) => {
+                debug_assert!(step.next.len() == 1, "non-FORK must have exactly one child");
+                return step.next[0].retain_attestations_mut_inner(f);
+            }
+        };
+
+        if should_collapse && let Timestamp::Step(step) = self {
+            let remaining = step.next.pop().unwrap();
+            *self = remaining;
+        }
+
+        Some(removed_count)
+    }
+
+    /// Purges all pending attestations from this timestamp tree.
+    ///
+    /// This is a convenience wrapper around [`retain_attestations`](Self::retain_attestations)
+    /// that removes all attestations tagged as pending.
+    ///
+    /// Returns `Some(count)` where `count` is the number of pending attestations removed,
+    /// or `None` if the entire timestamp consists only of pending attestations.
+    pub fn purge_pending(&mut self) -> Option<usize> {
+        self.retain_attestations(|att| att.tag != PendingAttestation::TAG)
+    }
 }
 
 impl<A: Allocator + Clone> Timestamp<A> {
@@ -355,5 +494,143 @@ impl<'a, A: Allocator> Iterator for PendingAttestationIterMut<'a, A> {
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        alloc::vec as alloc_vec,
+        codec::v1::{BitcoinAttestation, PendingAttestation},
+    };
+    use std::borrow::Cow;
+
+    fn make_pending(uri: &str) -> Timestamp {
+        Timestamp::builder()
+            .attest(PendingAttestation {
+                uri: Cow::Borrowed(uri),
+            })
+            .unwrap()
+    }
+
+    fn make_bitcoin(height: u32) -> Timestamp {
+        Timestamp::builder()
+            .attest(BitcoinAttestation { height })
+            .unwrap()
+    }
+
+    #[test]
+    fn purge_pending_single_pending() {
+        let mut ts = make_pending("https://example.com");
+        assert!(
+            ts.purge_pending().is_none(),
+            "all-pending should return None"
+        );
+    }
+
+    #[test]
+    fn purge_pending_single_confirmed() {
+        let mut ts = make_bitcoin(100);
+        assert_eq!(ts.purge_pending(), Some(0));
+    }
+
+    #[test]
+    fn purge_pending_fork_mixed() {
+        // FORK with one pending and one confirmed branch
+        let pending = make_pending("https://example.com");
+        let confirmed = make_bitcoin(100);
+        let mut ts = Timestamp::merge(alloc_vec![pending, confirmed]);
+
+        let result = ts.purge_pending();
+        assert_eq!(result, Some(1));
+        // After purge, the FORK should be collapsed since only 1 branch remains
+        assert!(
+            !matches!(ts, Timestamp::Step(ref s) if s.op == OpCode::FORK),
+            "FORK with 1 branch should be collapsed"
+        );
+    }
+
+    #[test]
+    fn purge_pending_fork_all_pending() {
+        let p1 = make_pending("https://a.example.com");
+        let p2 = make_pending("https://b.example.com");
+        let mut ts = Timestamp::merge(alloc_vec![p1, p2]);
+
+        assert!(ts.purge_pending().is_none());
+    }
+
+    #[test]
+    fn purge_pending_fork_all_confirmed() {
+        let c1 = make_bitcoin(100);
+        let c2 = make_bitcoin(200);
+        let mut ts = Timestamp::merge(alloc_vec![c1, c2]);
+
+        assert_eq!(ts.purge_pending(), Some(0));
+        // FORK should remain since both branches are kept
+        assert!(matches!(ts, Timestamp::Step(ref s) if s.op == OpCode::FORK));
+    }
+
+    #[test]
+    fn purge_pending_nested_fork() {
+        // Outer FORK: [inner FORK: [pending, confirmed], confirmed]
+        let inner_pending = make_pending("https://inner.example.com");
+        let inner_confirmed = make_bitcoin(100);
+        let inner_fork = Timestamp::merge(alloc_vec![inner_pending, inner_confirmed]);
+        let outer_confirmed = make_bitcoin(200);
+        let mut ts = Timestamp::merge(alloc_vec![inner_fork, outer_confirmed]);
+
+        let result = ts.purge_pending();
+        assert_eq!(result, Some(1));
+        // Outer FORK remains (2 branches), inner FORK collapsed
+        assert!(matches!(ts, Timestamp::Step(ref s) if s.op == OpCode::FORK));
+    }
+
+    #[test]
+    fn retain_attestations_selective() {
+        // FORK with two different pending attestations and one confirmed
+        let p1 = make_pending("https://a.example.com");
+        let p2 = make_pending("https://b.example.com");
+        let confirmed = make_bitcoin(100);
+        let mut ts = Timestamp::merge(alloc_vec![p1, p2, confirmed]);
+
+        // Retain confirmed + second pending, removing first pending
+        let result = ts.retain_attestations(|att| {
+            if att.tag != PendingAttestation::TAG {
+                return true;
+            }
+            let p = PendingAttestation::from_raw(att).unwrap();
+            p.uri != "https://a.example.com"
+        });
+        assert_eq!(result, Some(1));
+        // FORK should remain since 2 branches are still present (p2 + confirmed)
+        assert!(matches!(ts, Timestamp::Step(ref s) if s.op == OpCode::FORK));
+    }
+
+    #[test]
+    fn retain_attestations_keep_all() {
+        let p1 = make_pending("https://a.example.com");
+        let confirmed = make_bitcoin(100);
+        let mut ts = Timestamp::merge(alloc_vec![p1, confirmed]);
+
+        // Retain everything
+        let result = ts.retain_attestations(|_| true);
+        assert_eq!(result, Some(0));
+        // FORK should remain unchanged
+        assert!(matches!(ts, Timestamp::Step(ref s) if s.op == OpCode::FORK));
+    }
+
+    #[test]
+    fn retain_attestations_remove_by_type() {
+        // Test removing confirmed attestations (not just pending)
+        let pending = make_pending("https://example.com");
+        let confirmed = make_bitcoin(100);
+        let mut ts = Timestamp::merge(alloc_vec![pending, confirmed]);
+
+        // Remove bitcoin attestations, keep pending
+        let result = ts.retain_attestations(|att| att.tag == PendingAttestation::TAG);
+        assert_eq!(result, Some(1));
+        // FORK collapsed since only 1 branch remains
+        assert!(!matches!(ts, Timestamp::Step(ref s) if s.op == OpCode::FORK));
     }
 }
