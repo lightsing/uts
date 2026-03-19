@@ -1,0 +1,11 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --primary-color: #6366f1;
+  --primary-color-hover: #4f46e5;
+  --primary-color-pressed: #4338ca;
+  --primary-color-suppl: #c7d2fe;
+}

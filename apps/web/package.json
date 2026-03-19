@@ -1,40 +1,36 @@
 {
   "name": "web",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
-    "lint": "eslint src --cache --fix",
-    "typecheck": "vue-tsc --noEmit"
+    "build-only": "vite build",
+    "type-check": "vue-tsc --build",
+    "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
-    "@lingui/core": "^5.9.2",
-    "@lingui/message-utils": "^5.9.2",
-    "@noble/hashes": "^2.0.1",
-    "@uts/sdk": "workspace:*",
-    "@vueuse/core": "^14.2.1",
-    "date-fns": "^4.1.0",
-    "jszip": "^3.10.1",
-    "lucide-vue-next": "^0.575.0",
     "pinia": "^3.0.4",
-    "viem": "^2.47.0",
-    "vue": "^3.5.24"
+    "vue": "^3.5.29",
+    "vue-i18n": "^11.3.0",
+    "vue-router": "^5.0.3"
   },
   "devDependencies": {
-    "@lingui/cli": "^5.9.2",
-    "@lingui/format-po": "^5.9.2",
-    "@lingui/vite-plugin": "^5.9.2",
-    "@tailwindcss/vite": "^4.2.1",
-    "@types/jszip": "^3.4.1",
-    "@types/node": "^24.10.1",
-    "@vitejs/plugin-vue": "^6.0.1",
+    "@tsconfig/node24": "^24.0.4",
+    "@types/node": "^24.11.0",
+    "@vitejs/plugin-vue": "^6.0.4",
     "@vue/tsconfig": "^0.8.1",
-    "tailwindcss": "^4.2.1",
+    "naive-ui": "^2.44.1",
+    "npm-run-all2": "^8.0.4",
+    "prettier": "3.8.1",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4",
-    "vue-tsc": "^3.1.4"
+    "vite": "^7.3.1",
+    "vite-plugin-vue-devtools": "^8.0.6",
+    "vue-tsc": "^3.2.5"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
   }
 }
