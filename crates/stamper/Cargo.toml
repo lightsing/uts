@@ -4,12 +4,14 @@ description = "Universal Timestamps Stamper Library for packing digest and publi
 edition.workspace = true
 homepage.workspace = true
 include = [
-  ".sqlx/**/*",
   "src/**/*",
+  ".sqlx/*.json",
+  "migrations/*.sql",
   "Cargo.toml",
+  "LICENSE",
 ]
-keywords.workspace = true
-license.workspace = true
+keywords = ["uts", "timestamping"]
+license = "AGPL-3.0-or-later"
 name = "uts-stamper"
 repository.workspace = true
 version.workspace = true

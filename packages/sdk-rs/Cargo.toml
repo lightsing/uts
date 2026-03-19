@@ -1,9 +1,10 @@
 [package]
 authors.workspace = true
+description = "Universal Timestamping SDK in Rust"
 edition.workspace = true
 homepage.workspace = true
-keywords.workspace = true
-license.workspace = true
+keywords = ["uts", "timestamping", "sdk"]
+license = "MIT OR Apache-2.0"
 name = "uts-sdk"
 repository.workspace = true
 version.workspace = true

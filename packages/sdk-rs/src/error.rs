@@ -28,6 +28,7 @@ pub enum Error {
     #[error(transparent)]
     Finalization(#[from] uts_core::codec::v1::FinalizationError),
 
+    /// Error indicating that the input provided was empty when it was expected to contain data.
     #[error("Input cannot be empty")]
     EmptyInput,
 

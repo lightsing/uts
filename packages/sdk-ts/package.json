@@ -1,6 +1,6 @@
 {
-  "name": "@uts/sdk",
-  "version": "0.1.0",
+  "name": "@universal-timestamps/sdk",
+  "version": "0.1.0-alpha.1",
   "description": "",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,6 +1,6 @@
 {
-  "name": "@uts/contracts",
-  "version": "1.0.0",
+  "name": "@universal-timestamps/contracts",
+  "version": "0.1.0-alpha.1",
   "description": "",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,14 +14,28 @@
       "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "!dist/.tsbuildinfo",
+    "!dist/test",
+    "src/**/*.ts"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "rimraf dist && tsc && rollup -c",
+    "dev": "rollup -c --watch",
+    "lint": "eslint src --cache --fix",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "(MIT OR Apache-2.0)",
   "packageManager": "pnpm@10.30.3",
   "devDependencies": {
-    "@wagmi/cli": "^2.10.0"
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@wagmi/cli": "^2.10.0",
+    "rimraf": "^6.1.3",
+    "rollup": "^4.59.0",
+    "typescript": "^5.9.3"
   }
 }

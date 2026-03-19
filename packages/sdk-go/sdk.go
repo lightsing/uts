@@ -1,3 +1,40 @@
+// MIT License
+//
+// Copyright (c) 2025 UTS Contributors
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// Apache License, Version 2.0
+//
+// Copyright (c) 2025 UTS Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package uts
 
 import (
@@ -22,7 +59,7 @@ import (
 )
 
 var DefaultCalendars = []string{
-	"https://lgm1.calendar.test.timestamps.now",
+	"https://lgm1.calendar.test.timestamps.now/",
 	// Run by Peter Todd
 	"https://a.pool.opentimestamps.org/",
 	"https://b.pool.opentimestamps.org/",
@@ -673,4 +710,135 @@ func (s *SDK) Upgrade(ctx context.Context, stamp *types.DetachedTimestamp, keepP
 	}
 	s.logger.Debug(ctx, "Upgrade: complete", "results", len(results))
 	return results, nil
+}
+
+// ListPending returns all pending attestation URIs in the given detached timestamp.
+func (s *SDK) ListPending(stamp *types.DetachedTimestamp) []string {
+	return collectPendingAttestations(stamp.Timestamp)
+}
+
+func collectPendingAttestations(ts types.Timestamp) []string {
+	var uris []string
+	for _, step := range ts {
+		switch st := step.(type) {
+		case *types.AttestationStep:
+			if pending, ok := st.Attestation.(*types.PendingAttestation); ok {
+				uris = append(uris, pending.URI)
+			}
+		case *types.ForkStep:
+			for _, branch := range st.Branches {
+				uris = append(uris, collectPendingAttestations(branch)...)
+			}
+		}
+	}
+	return uris
+}
+
+// PurgeResult contains the result of a purge operation.
+type PurgeResult struct {
+	// Purged contains the URIs of the pending attestations that were removed.
+	Purged []string
+	// HasRemaining is true if the timestamp still has non-pending attestations.
+	HasRemaining bool
+}
+
+// RetainAttestations retains only the attestations for which the predicate returns true,
+// removing all others from the timestamp tree. This is analogous to Go's slices.DeleteFunc
+// but operates on the attestation leaves of the timestamp tree.
+// FORK nodes left with a single branch after filtering are collapsed.
+// Returns true if the timestamp still has attestations, false if all were removed.
+func (s *SDK) RetainAttestations(stamp *types.DetachedTimestamp, shouldRetain func(types.Attestation) bool) bool {
+	return retainAttestations(&stamp.Timestamp, shouldRetain)
+}
+
+// PurgePending removes all pending attestations from the given detached timestamp.
+// This is a convenience wrapper around RetainAttestations.
+// It returns a PurgeResult with the purged URIs and whether any attestations remain.
+func (s *SDK) PurgePending(stamp *types.DetachedTimestamp) *PurgeResult {
+	return s.PurgePendingByURIs(stamp, nil)
+}
+
+// PurgePendingByURIs removes selected pending attestations from the given detached timestamp.
+// If urisToPurge is nil, all pending attestations are removed.
+// If urisToPurge is non-nil, only pending attestations whose URI is in the set are removed.
+// This is a convenience wrapper around RetainAttestations.
+func (s *SDK) PurgePendingByURIs(stamp *types.DetachedTimestamp, urisToPurge map[string]bool) *PurgeResult {
+	allPending := s.ListPending(stamp)
+	if len(allPending) == 0 {
+		return &PurgeResult{Purged: nil, HasRemaining: true}
+	}
+
+	var purgedURIs []string
+	if urisToPurge != nil {
+		for _, uri := range allPending {
+			if urisToPurge[uri] {
+				purgedURIs = append(purgedURIs, uri)
+			}
+		}
+	} else {
+		purgedURIs = allPending
+	}
+
+	if len(purgedURIs) == 0 {
+		return &PurgeResult{Purged: nil, HasRemaining: true}
+	}
+
+	hasRemaining := s.RetainAttestations(stamp, func(att types.Attestation) bool {
+		pending, ok := att.(*types.PendingAttestation)
+		if !ok {
+			return true // keep non-pending
+		}
+		if urisToPurge == nil {
+			return false // purge all pending
+		}
+		return !urisToPurge[pending.URI] // keep if NOT in purge set
+	})
+
+	return &PurgeResult{
+		Purged:       purgedURIs,
+		HasRemaining: hasRemaining,
+	}
+}
+
+// retainAttestations recursively retains only attestations matching the predicate.
+// It modifies the timestamp slice in place.
+// Returns true if the timestamp still has content, false if it should be removed.
+func retainAttestations(ts *types.Timestamp, shouldRetain func(types.Attestation) bool) bool {
+	i := 0
+	for i < len(*ts) {
+		step := (*ts)[i]
+		switch st := step.(type) {
+		case *types.AttestationStep:
+			if !shouldRetain(st.Attestation) {
+				*ts = append((*ts)[:i], (*ts)[i+1:]...)
+				continue
+			}
+			i++
+		case *types.ForkStep:
+			j := 0
+			for j < len(st.Branches) {
+				if !retainAttestations(&st.Branches[j], shouldRetain) {
+					st.Branches = append(st.Branches[:j], st.Branches[j+1:]...)
+				} else {
+					j++
+				}
+			}
+			if len(st.Branches) == 0 {
+				*ts = append((*ts)[:i], (*ts)[i+1:]...)
+				continue
+			} else if len(st.Branches) == 1 {
+				remaining := st.Branches[0]
+				newTs := make(types.Timestamp, 0, len(*ts)-1+len(remaining))
+				newTs = append(newTs, (*ts)[:i]...)
+				newTs = append(newTs, remaining...)
+				newTs = append(newTs, (*ts)[i+1:]...)
+				*ts = newTs
+				continue
+			}
+			i++
+		default:
+			i++
+		}
+	}
+	return len(*ts) > 0
 }

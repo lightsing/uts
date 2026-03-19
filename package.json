@@ -1,6 +1,7 @@
 {
   "name": "uts-monorepo",
   "private": true,
+  "license": "MIT OR Apache-2.0",
   "type": "module",
   "scripts": {
     "build": "pnpm -r run build",

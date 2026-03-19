@@ -1,0 +1,83 @@
+name: Rust CI
+
+on:
+  pull_request:
+    paths:
+      - crates/**
+      - packages/sdk-rs/**
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - rustfmt.toml
+      - .github/workflows/ci-rust.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.94.0"
+
+jobs:
+  fmt:
+    name: Rust Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt
+
+      - name: Install taplo
+        uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli
+
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+
+      - name: Check TOML formatting
+        run: taplo fmt --check
+
+  clippy:
+    name: Rust Clippy
+    runs-on: ubuntu-latest
+    needs: [fmt]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    needs: [clippy]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+
+      - run: cargo test --workspace
