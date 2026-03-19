@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! # UTS FFI Binding
+//!
+//! UniFFI-based foreign function interface for the [`uts-core`] library.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod error;
+pub use error::UtsError;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod codec;
+mod primitives;
+
+uniffi::setup_scaffolding!("uts");

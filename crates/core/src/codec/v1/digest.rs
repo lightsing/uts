@@ -41,10 +41,21 @@ impl fmt::Display for DigestHeader {
 impl DigestHeader {
     /// Creates a new digest header from the given digest output.
     pub fn new<D: DigestOpExt>(digest: Output<D>) -> Self {
+        Self::from_slice_unchecked(D::OPCODE, &digest)
+    }
+
+    /// Creates a new digest header from a slice without check its length
+    pub fn from_slice_unchecked(kind: DigestOp, digest: &[u8]) -> Self {
+        debug_assert_eq!(
+            kind.output_size(),
+            digest.len(),
+            "precondition violated: digest don't have proper length"
+        );
+
         let mut digest_bytes = [0u8; 32];
-        digest_bytes[..D::OutputSize::USIZE].copy_from_slice(&digest);
+        digest_bytes[..kind.output_size()].copy_from_slice(digest);
         DigestHeader {
-            kind: D::OPCODE,
+            kind,
             digest: digest_bytes,
         }
     }
