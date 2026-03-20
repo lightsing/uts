@@ -11,7 +11,7 @@ use core::fmt;
 use digest::{Output, typenum::Unsigned};
 
 /// Header describing the digest that anchors a timestamp.
-#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(
     feature = "serde",
     serde_with::serde_as,

@@ -1,7 +1,13 @@
 use clap::Args;
 use std::{collections::HashSet, path::PathBuf};
 use tracing::{error, info, warn};
-use uts_core::codec::{Decode, Encode, VersionedProof, v1::DetachedTimestamp};
+use uts_core::{
+    codec::{
+        Decode, Encode, VersionedProof,
+        v1::{Attestation, DetachedTimestamp, PendingAttestation},
+    },
+    utils::Hexed,
+};
 use uts_sdk::Sdk;
 
 #[derive(Debug, Args)]
@@ -12,6 +18,10 @@ pub struct Purge {
     /// Skip the interactive confirmation prompt and purge all pending attestations.
     #[arg(short = 'y', long = "yes", default_value_t = false)]
     yes: bool,
+    /// Purge malformed pending attestations that fail to decode. By default, these are retained
+    /// to avoid data loss, but enabling this flag will attempt to purge them as well.
+    #[arg(long = "purge-malformed", default_value_t = false)]
+    purge_malformed: bool,
 }
 
 impl Purge {
@@ -26,9 +36,24 @@ impl Purge {
 
     async fn purge_one(&self, path: &PathBuf) -> eyre::Result<()> {
         let file = tokio::fs::read(path).await?;
-        let mut proof = VersionedProof::<DetachedTimestamp>::decode(&mut &*file)?;
+        let proof = VersionedProof::<DetachedTimestamp>::decode(&mut &*file)?;
 
-        let pending = Sdk::list_pending(&proof);
+        let pending = proof
+            .attestations()
+            .filter(|att| att.tag == PendingAttestation::TAG)
+            .flat_map(|att| {
+                PendingAttestation::from_raw(att)
+                    .map(|p| p.uri)
+                    .inspect_err(|e| {
+                        warn!(
+                            "[{path}] skipped malformed PendingAttestation (value = {data}), error: {e}",
+                            path = path.display(),
+                            data = Hexed(&att.data)
+                        )
+                    })
+                    .ok()
+            })
+            .collect::<Vec<_>>();
         if pending.is_empty() {
             info!(
                 "[{}] no pending attestations found, skipping",
@@ -48,7 +73,7 @@ impl Purge {
 
         let uris_to_purge = if self.yes {
             // Purge all when --yes flag is used
-            None
+            pending.into_iter().collect()
         } else {
             // Interactive selection
             print!("Enter numbers to purge (comma-separated), 'all', or 'none' to skip: ");
@@ -64,7 +89,7 @@ impl Purge {
             }
 
             if input.eq_ignore_ascii_case("all") {
-                None
+                pending.into_iter().collect()
             } else {
                 let mut selected = HashSet::new();
                 for part in input.split(',') {
@@ -82,32 +107,31 @@ impl Purge {
                     info!("[{}] no valid selections, skipping", path.display());
                     return Ok(());
                 }
-                Some(selected)
+                selected
             }
         };
 
-        let result = Sdk::purge_pending_by_uris(&mut proof, uris_to_purge.as_ref());
+        let Some(result) = Sdk::filter_pending_by_uris(
+            &proof,
+            |uri| uris_to_purge.contains(uri),
+            self.purge_malformed,
+        ) else {
+            error!("won't purge [{}], results in empty proof", path.display());
+            return Ok(());
+        };
 
         if result.purged.is_empty() {
             info!("[{}] nothing to purge", path.display());
             return Ok(());
         }
 
-        if !result.has_remaining {
-            warn!(
-                "[{}] purging would leave no attestations in the file, skipping",
-                path.display()
-            );
-            return Ok(());
-        }
-
         let mut buf = Vec::new();
-        proof.encode(&mut buf)?;
+        VersionedProof::new(result.new_stamp).encode(&mut buf)?;
         tokio::fs::write(path, buf).await?;
         info!(
-            "[{}] purged {} pending attestation(s)",
+            "purged {} pending attestation(s) from [{}]",
+            result.purged.len(),
             path.display(),
-            result.purged.len()
         );
         Ok(())
     }

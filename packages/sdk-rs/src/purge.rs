@@ -1,114 +1,91 @@
-use std::collections::HashSet;
-use tracing::info;
+use crate::Sdk;
 use uts_core::{
-    alloc::Allocator,
+    alloc::{Allocator, vec::Vec},
     codec::v1::{Attestation, DetachedTimestamp, PendingAttestation},
 };
 
-use crate::Sdk;
-
-/// Result of a purge operation on a detached timestamp.
+/// Represents the result of filtering pending attestations from a detached timestamp.
 #[derive(Debug)]
-pub struct PurgeResult {
-    /// URIs of the pending attestations that were purged.
-    pub purged: Vec<String>,
-    /// Whether the timestamp still has any attestations remaining.
-    pub has_remaining: bool,
+pub struct PurgeResult<A: Allocator> {
+    /// URIs of the pending attestations that were excluded (purged) during the filtering process.
+    pub purged: Vec<String, A>,
+    /// A new detached timestamp instance containing only the retained attestations.
+    pub new_stamp: DetachedTimestamp<A>,
 }
 
 impl Sdk {
-    /// Lists all pending attestation URIs in the given detached timestamp.
-    pub fn list_pending<A: Allocator>(stamp: &DetachedTimestamp<A>) -> Vec<String> {
+    /// Filters out all pending attestations from the given detached timestamp.
+    ///
+    /// This method creates a new `DetachedTimestamp` excluding all entries tagged as `Pending`.
+    /// The original `stamp` remains unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `stamp` - A reference to the source `DetachedTimestamp`.
+    /// * `purge_malformed` - A boolean flag indicating whether malformed `PendingAttestation` entries
+    ///   should be purged (`true`) or retained (`false`) in the new timestamp.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some(PurgeResult)` if results in a valid timestamp, otherwise returns `None`.
+    pub fn filter_pending<A: Allocator + Clone>(
+        stamp: &DetachedTimestamp<A>,
+        purge_malformed: bool,
+    ) -> Option<PurgeResult<A>> {
+        Self::filter_pending_by_uris(stamp, |_| true, purge_malformed)
+    }
+
+    /// Filters pending attestations from the given detached timestamp based on a predicate.
+    ///
+    /// This function iterates over the attestations in `stamp`. For each attestation tagged as
+    /// `Pending`, it attempts to decode the URI and applies the `predicate`.
+    /// - If the predicate returns `true`, the attestation is excluded from the new timestamp.
+    /// - If the predicate returns `false`, or if the attestation is not pending, it is retained.
+    ///
+    /// # Arguments
+    ///
+    /// * `stamp` - A reference to the source `DetachedTimestamp`.
+    /// * `predicate` - A closure that determines whether a specific pending attestation URI
+    ///   should be excluded. Returns `true` to exclude, `false` to retain.
+    /// * `purge_malformed` - A boolean flag indicating whether malformed `PendingAttestation` entries
+    ///   should be purged (`true`) or retained (`false`) in the new timestamp.
+    ///
+    /// # Note
+    ///
+    /// - Non-pending attestations are always retained.
+    /// - Malformed `PendingAttestation` entries (those that fail to decode) are safely retained
+    ///   in the new timestamp to prevent data loss.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some(PurgeResult)` if it results in a valid timestamp, otherwise returns `None`.
+    pub fn filter_pending_by_uris<A: Allocator + Clone, F>(
+        stamp: &DetachedTimestamp<A>,
+        mut predicate: F,
+        purge_malformed: bool,
+    ) -> Option<PurgeResult<A>>
+    where
+        F: FnMut(&str) -> bool,
+    {
+        let mut purged = Vec::new_in(stamp.allocator().clone());
+
         stamp
-            .attestations()
-            .filter_map(|att| {
-                PendingAttestation::from_raw(att)
-                    .ok()
-                    .map(|p| p.uri.to_string())
-            })
-            .collect()
-    }
-
-    /// Purges all pending attestations from the given detached timestamp.
-    ///
-    /// Returns a [`PurgeResult`] containing the URIs of purged attestations
-    /// and whether the timestamp still has remaining (non-pending) attestations.
-    ///
-    /// If all attestations were pending, the timestamp becomes invalid and
-    /// `has_remaining` will be `false` — callers should handle this case
-    /// (e.g., by not writing the file).
-    pub fn purge_pending<A: Allocator>(stamp: &mut DetachedTimestamp<A>) -> PurgeResult {
-        Self::purge_pending_by_uris(stamp, None)
-    }
-
-    /// Purges selected pending attestations from the given detached timestamp.
-    ///
-    /// If `uris_to_purge` is `None`, all pending attestations are purged.
-    /// If `uris_to_purge` is `Some(set)`, only pending attestations whose URI
-    /// is in the set are purged.
-    ///
-    /// This is implemented using [`Timestamp::retain_attestations`] under the hood.
-    ///
-    /// Returns a [`PurgeResult`] containing the URIs of purged attestations
-    /// and whether the timestamp still has remaining (non-pending) attestations.
-    pub fn purge_pending_by_uris<A: Allocator>(
-        stamp: &mut DetachedTimestamp<A>,
-        uris_to_purge: Option<&HashSet<String>>,
-    ) -> PurgeResult {
-        let pending_uris = Self::list_pending(stamp);
-
-        if pending_uris.is_empty() {
-            info!("no pending attestations found");
-            return PurgeResult {
-                purged: Vec::new(),
-                has_remaining: true,
-            };
-        }
-
-        let purged_uris: Vec<String> = match &uris_to_purge {
-            Some(set) => pending_uris
-                .iter()
-                .filter(|u| set.contains(*u))
-                .cloned()
-                .collect(),
-            None => pending_uris,
-        };
-
-        if purged_uris.is_empty() {
-            info!("no matching pending attestations to purge");
-            return PurgeResult {
-                purged: Vec::new(),
-                has_remaining: true,
-            };
-        }
-
-        let result = stamp.retain_attestations(|att| {
-            if att.tag != PendingAttestation::TAG {
-                return true; // keep non-pending attestations
-            }
-            match &uris_to_purge {
-                None => false, // purge all pending
-                Some(set) => {
-                    let uri = PendingAttestation::from_raw(att)
-                        .map(|p| p.uri.to_string())
-                        .unwrap_or_default();
-                    !set.contains(&uri) // keep if NOT in the purge set
+            .filter_attestations(|att| {
+                if att.tag != PendingAttestation::TAG {
+                    return false; // keep non-pending attestations
                 }
-            }
-        });
-
-        if let Some(purged) = result {
-            info!("purged {purged} pending attestation(s)");
-            PurgeResult {
-                purged: purged_uris,
-                has_remaining: true,
-            }
-        } else {
-            info!("all attestations were pending, timestamp is now empty");
-            PurgeResult {
-                purged: purged_uris,
-                has_remaining: false,
-            }
-        }
+                let Ok(uri) = PendingAttestation::from_raw(att).map(|p| p.uri) else {
+                    return purge_malformed;
+                };
+                let result = predicate(&uri);
+                if result {
+                    purged.push(uri.to_string())
+                }
+                result
+            })
+            .map(|new_stamp| {
+                let new_stamp = DetachedTimestamp::<A>::from_parts(*stamp.header(), new_stamp);
+                PurgeResult { purged, new_stamp }
+            })
     }
 }
