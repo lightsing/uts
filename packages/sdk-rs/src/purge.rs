@@ -19,13 +19,20 @@ impl Sdk {
     /// This method creates a new `DetachedTimestamp` excluding all entries tagged as `Pending`.
     /// The original `stamp` remains unchanged.
     ///
+    /// # Arguments
+    ///
+    /// * `stamp` - A reference to the source `DetachedTimestamp`.
+    /// * `purge_malformed` - A boolean flag indicating whether malformed `PendingAttestation` entries
+    ///   should be purged (`true`) or retained (`false`) in the new timestamp.
+    ///
     /// # Returns
     ///
     /// Returns `Some(PurgeResult)` if results in a valid timestamp, otherwise returns `None`.
     pub fn filter_pending<A: Allocator + Clone>(
         stamp: &DetachedTimestamp<A>,
+        purge_malformed: bool,
     ) -> Option<PurgeResult<A>> {
-        Self::filter_pending_by_uris(stamp, |_| true)
+        Self::filter_pending_by_uris(stamp, |_| true, purge_malformed)
     }
 
     /// Filters pending attestations from the given detached timestamp based on a predicate.
@@ -40,6 +47,8 @@ impl Sdk {
     /// * `stamp` - A reference to the source `DetachedTimestamp`.
     /// * `predicate` - A closure that determines whether a specific pending attestation URI
     ///   should be excluded. Returns `true` to exclude, `false` to retain.
+    /// * `purge_malformed` - A boolean flag indicating whether malformed `PendingAttestation` entries
+    ///   should be purged (`true`) or retained (`false`) in the new timestamp.
     ///
     /// # Note
     ///
@@ -49,10 +58,11 @@ impl Sdk {
     ///
     /// # Returns
     ///
-    /// Returns `Some(PurgeResult)` if results in a valid timestamp, otherwise returns `None`.
+    /// Returns `Some(PurgeResult)` if it results in a valid timestamp, otherwise returns `None`.
     pub fn filter_pending_by_uris<A: Allocator + Clone, F>(
         stamp: &DetachedTimestamp<A>,
         mut predicate: F,
+        purge_malformed: bool,
     ) -> Option<PurgeResult<A>>
     where
         F: FnMut(&str) -> bool,
@@ -65,7 +75,7 @@ impl Sdk {
                     return false; // keep non-pending attestations
                 }
                 let Ok(uri) = PendingAttestation::from_raw(att).map(|p| p.uri) else {
-                    return false; // keep malformed pending attestations to avoid data loss
+                    return purge_malformed;
                 };
                 let result = predicate(&uri);
                 if result {

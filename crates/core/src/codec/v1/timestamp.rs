@@ -288,7 +288,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
     {
         let mut this = self.clone();
 
-        // This only be called when it's in root level
+        // This can only be called at the root level
         if let Timestamp::Attestation(attestation) = &this {
             return if f(attestation) { None } else { Some(this) };
         }

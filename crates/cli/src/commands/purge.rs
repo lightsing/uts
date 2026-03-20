@@ -18,6 +18,10 @@ pub struct Purge {
     /// Skip the interactive confirmation prompt and purge all pending attestations.
     #[arg(short = 'y', long = "yes", default_value_t = false)]
     yes: bool,
+    /// Purge malformed pending attestations that fail to decode. By default, these are retained
+    /// to avoid data loss, but enabling this flag will attempt to purge them as well.
+    #[arg(long = "purge-malformed", default_value_t = false)]
+    purge_malformed: bool,
 }
 
 impl Purge {
@@ -107,8 +111,11 @@ impl Purge {
             }
         };
 
-        let Some(result) = Sdk::filter_pending_by_uris(&proof, |uri| uris_to_purge.contains(uri))
-        else {
+        let Some(result) = Sdk::filter_pending_by_uris(
+            &proof,
+            |uri| uris_to_purge.contains(uri),
+            self.purge_malformed,
+        ) else {
             error!("won't purge [{}], results in empty proof", path.display());
             return Ok(());
         };
