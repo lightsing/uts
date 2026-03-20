@@ -1,9 +1,12 @@
 use clap::Args;
 use std::{collections::HashSet, path::PathBuf};
 use tracing::{error, info, warn};
-use uts_core::codec::{
-    Decode, Encode, VersionedProof,
-    v1::{Attestation, DetachedTimestamp, PendingAttestation},
+use uts_core::{
+    codec::{
+        Decode, Encode, VersionedProof,
+        v1::{Attestation, DetachedTimestamp, PendingAttestation},
+    },
+    utils::Hexed,
 };
 use uts_sdk::Sdk;
 
@@ -34,8 +37,19 @@ impl Purge {
         let pending = proof
             .attestations()
             .filter(|att| att.tag == PendingAttestation::TAG)
-            .map(|att| PendingAttestation::from_raw(att).map(|p| p.uri))
-            .collect::<Result<Vec<_>, _>>()?;
+            .flat_map(|att| {
+                PendingAttestation::from_raw(att)
+                    .map(|p| p.uri)
+                    .inspect_err(|e| {
+                        warn!(
+                            "[{path}] skipped malformed PendingAttestation (value = {data}), error: {e}",
+                            path = path.display(),
+                            data = Hexed(&att.data)
+                        )
+                    })
+                    .ok()
+            })
+            .collect::<Vec<_>>();
         if pending.is_empty() {
             info!(
                 "[{}] no pending attestations found, skipping",
@@ -108,7 +122,7 @@ impl Purge {
         VersionedProof::new(result.new_stamp).encode(&mut buf)?;
         tokio::fs::write(path, buf).await?;
         info!(
-            "purged {} pending attestation(s) from [{}] ",
+            "purged {} pending attestation(s) from [{}]",
             result.purged.len(),
             path.display(),
         );

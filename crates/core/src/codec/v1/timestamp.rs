@@ -276,9 +276,6 @@ impl<A: Allocator + Clone> Timestamp<A> {
     /// Make a copy of the timestamp, by filtering the attestations for which the predicate
     /// returns `true`.
     ///
-    /// The predicate receives each [`RawAttestation`] and should return `false` to filter the
-    /// attestation or `true` to keep it.
-    ///
     /// Returns `Some(timestamp)` where `timestamp` is the modified copy of the original one,
     /// or `None` if the entire timestamp would be empty after filtering.
     ///
@@ -293,7 +290,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
 
         // This only be called when it's in root level
         if let Timestamp::Attestation(attestation) = &this {
-            return if f(attestation) { Some(this) } else { None };
+            return if f(attestation) { None } else { Some(this) };
         }
 
         this.filter_attestations_inner(&mut f).not().then_some(this)
@@ -330,11 +327,12 @@ impl<A: Allocator + Clone> Timestamp<A> {
 
     /// Purges all pending attestations from this timestamp tree.
     ///
-    /// This is a convenience wrapper around [`retain_attestations`](Self::filter_attestations)
+    /// This is a convenience wrapper around [`filter_attestations`](Self::filter_attestations)
     /// that removes all attestations tagged as pending.
     ///
-    /// Returns `Some(count)` where `count` is the number of pending attestations removed,
-    /// or `None` if the entire timestamp consists only of pending attestations.
+    /// Returns `Some(filtered)` where `filtered` is a copy of this timestamp tree with all
+    /// pending attestations removed, or `None` if removing pending attestations would leave
+    /// the timestamp tree empty.
     pub fn purge_pending(&self) -> Option<Timestamp<A>> {
         self.filter_attestations(|att| att.tag == PendingAttestation::TAG)
     }

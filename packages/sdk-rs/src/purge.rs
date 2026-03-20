@@ -65,7 +65,7 @@ impl Sdk {
                     return false; // keep non-pending attestations
                 }
                 let Ok(uri) = PendingAttestation::from_raw(att).map(|p| p.uri) else {
-                    return true;
+                    return false; // keep malformed pending attestations to avoid data loss
                 };
                 let result = predicate(&uri);
                 if result {
