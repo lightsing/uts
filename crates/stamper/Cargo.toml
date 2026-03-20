@@ -1,28 +1,40 @@
 [package]
 authors.workspace = true
+description = "Universal Timestamps Stamper Library for packing digest and publish root on chain."
 edition.workspace = true
 homepage.workspace = true
-keywords.workspace = true
-license.workspace = true
+include = [
+  "src/**/*",
+  ".sqlx/*.json",
+  "migrations/*.sql",
+  "Cargo.toml",
+  "LICENSE",
+]
+keywords = ["uts", "timestamping"]
+license = "AGPL-3.0-or-later"
 name = "uts-stamper"
 repository.workspace = true
 version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-provider = { workspace = true }
-bitcode = { workspace = true, features = ["serde"] }
-bytemuck = { workspace = true }
 digest = { workspace = true }
+eyre = { workspace = true }
 rocksdb = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "migrate"] }
+strum = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["time", "macros"] }
+tokio-util = { workspace = true }
 tracing = { workspace = true }
 uts-bmt = { workspace = true }
 uts-contracts = { workspace = true }
 uts-core = { workspace = true }
 uts-journal = { workspace = true }
+uts-sql = { workspace = true }
 
-[lints]
-workspace = true
+[features]

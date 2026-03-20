@@ -1,9 +1,17 @@
 [package]
 authors.workspace = true
+categories = ["command-line-utilities"]
+description = "Universal Timestamps Command Line Interface."
 edition.workspace = true
 homepage.workspace = true
-keywords.workspace = true
-license.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "LICENSE-*",
+  "README.md",
+]
+keywords = ["cli", "command-line", "uts", "timestamping"]
+license = "MIT OR Apache-2.0"
 name = "uts-cli"
 repository.workspace = true
 version.workspace = true
@@ -16,31 +24,26 @@ name = "uts"
 path = "src/main.rs"
 
 [dependencies]
-alloy-provider = { workspace = true }
-bytemuck = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 color-eyre = { workspace = true }
 digest = { workspace = true }
 eyre = { workspace = true }
 futures = { workspace = true }
-jiff = { workspace = true }
-rand = { workspace = true }
-reqwest = { workspace = true, default-features = false, features = ["http2"] }
 ripemd = { workspace = true }
 sha1 = { workspace = true }
 sha2 = { workspace = true }
 sha3 = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 url = { workspace = true }
-uts-bmt = { workspace = true }
-uts-core = { workspace = true, features = ["std", "ethereum-uts-verifier", "io-utils"] }
+uts-core = { workspace = true }
+uts-sdk = { workspace = true, features = ["full"] }
 
 [features]
-default = ["reqwest-default-tls"]
-reqwest-default-tls = ["reqwest/default-tls"]
-reqwest-native-tls = ["reqwest/native-tls"]
-reqwest-native-tls-no-alpn = ["reqwest/native-tls-no-alpn"]
-reqwest-native-tls-vendored = ["reqwest/native-tls-vendored"]
-reqwest-native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn"]
-reqwest-rustls = ["reqwest/rustls"]
+default = ["reqwest-rustls"]
+performance = ["tracing/max_level_info"]
+
+reqwest-default-tls = ["uts-sdk/reqwest-default-tls"]
+reqwest-native-tls = ["uts-sdk/reqwest-native-tls"]
+reqwest-rustls = ["uts-sdk/reqwest-rustls"]

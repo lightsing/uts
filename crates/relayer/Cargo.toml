@@ -1,0 +1,57 @@
+[package]
+authors.workspace = true
+description = "UTS L2->L1->L2 Relayer Server"
+edition.workspace = true
+homepage.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "migrations/*.sql",
+  ".sqlx/*.json",
+  "LICENSE",
+]
+keywords = ["uts", "ethereum"]
+license = "AGPL-3.0-or-later"
+name = "uts-relayer"
+repository.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+alloy-contract = { workspace = true, features = ["pubsub"] }
+alloy-primitives = { workspace = true, features = ["serde"] }
+alloy-provider = { workspace = true, default-features = false, features = ["ws", "reqwest"] }
+alloy-rpc-client = { workspace = true }
+alloy-rpc-types-eth = { workspace = true }
+alloy-signer-local = { workspace = true, features = ["mnemonic"] }
+alloy-sol-types = { workspace = true }
+axum = { workspace = true, default-features = false, features = [
+  "macros",
+  "http2",
+  "tokio",
+  "json",
+] }
+config = { workspace = true }
+eyre = { workspace = true }
+futures = { workspace = true }
+jiff = { workspace = true, features = ["serde"] }
+rustls = { workspace = true, optional = true }
+serde = { workspace = true }
+sha3 = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "migrate"] }
+strum = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["full"] }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uts-bmt = { workspace = true }
+uts-contracts = { workspace = true, features = ["provider-helper-serde"] }
+uts-sql = { workspace = true }
+
+[features]
+default = ["reqwest-rustls-tls"]
+
+performance = ["tracing/release_max_level_info"]
+reqwest-rustls-tls = ["rustls", "alloy-provider/reqwest-rustls-tls"]

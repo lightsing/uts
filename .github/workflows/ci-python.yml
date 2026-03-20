@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   check:
-    name: Lint, Format & Test
+    name: Python Lint, Format & Test
     runs-on: ubuntu-latest
     defaults:
       run:

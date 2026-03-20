@@ -1,0 +1,558 @@
+<!--
+Copyright (C) 2026 UTS Contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{NODE_NAME}} - UTS L1 Relayer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Retro-Futuristic Font */
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+    body {
+      font-family: 'Share Tech Mono', monospace;
+      background-color: #050505;
+      color: #22d3ee; /* Cyan 400 */
+    }
+
+    /* CRT Scanline Effect */
+    .crt-overlay {
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+      linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+      z-index: 50;
+      background-size: 100% 2px, 3px 100%;
+      pointer-events: none;
+    }
+
+    /* Subtle Vignette */
+    .vignette {
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.8) 100%);
+      z-index: 49;
+      pointer-events: none;
+    }
+
+    /* Neon Borders & Glow (Cyan Theme) */
+    .retro-card {
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid #164e63; /* Cyan 900 */
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      transition: all 0.3s ease;
+    }
+    .retro-card:hover {
+      border-color: #22d3ee;
+      box-shadow: 0 0 15px rgba(34, 211, 238, 0.2), inset 0 0 10px rgba(34, 211, 238, 0.1);
+    }
+
+    .neon-text-cyan { text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
+    .neon-text-fuchsia { text-shadow: 0 0 8px rgba(232, 121, 249, 0.6); }
+    .neon-text-amber { text-shadow: 0 0 8px rgba(251, 191, 36, 0.6); }
+    .neon-text-rose { text-shadow: 0 0 8px rgba(244, 63, 94, 0.6); }
+    .neon-text-emerald { text-shadow: 0 0 8px rgba(52, 211, 153, 0.6); }
+
+    /* Blinking Cursor */
+    .cursor-blink { animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #164e63; }
+    ::-webkit-scrollbar-thumb { background: #164e63; }
+    ::-webkit-scrollbar-thumb:hover { background: #22d3ee; }
+
+    /* Pipeline Step Active Glow */
+    .step-active {
+      background-color: rgba(34, 211, 238, 0.1);
+      border-color: #22d3ee;
+      box-shadow: inset 0 0 10px rgba(34, 211, 238, 0.2), 0 0 10px rgba(34, 211, 238, 0.4);
+      color: #67e8f9; /* Cyan 300 */
+    }
+    .step-inactive {
+      border-color: #164e63;
+      color: #164e63; /* Cyan 900 */
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-cyan-500 selection:text-black relative">
+
+<!-- Screen Effects -->
+<div class="crt-overlay"></div>
+<div class="vignette"></div>
+
+<!-- Header -->
+<header class="border-b border-cyan-900 bg-black/90 sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[4rem] py-3 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+      <div class="border border-cyan-500 p-1.5 sm:p-2 text-cyan-400 bg-cyan-950/30 shadow-[0_0_10px_rgba(34,211,238,0.3)] shrink-0">
+        <i data-lucide="arrow-left-right" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 sm:gap-3">
+          <h1 class="font-bold text-sm sm:text-lg md:text-xl text-cyan-400 tracking-widest neon-text-cyan uppercase truncate">SYS.RELAYER [ {{NODE_NAME}} ]</h1>
+          <!-- SERVICE BADGE -->
+          <span class="bg-fuchsia-600 text-black px-2 py-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide hidden lg:inline-block shrink-0 shadow-[0_0_8px_rgba(217,70,239,0.5)]">
+                        L1 Premium Anchoring
+                    </span>
+        </div>
+        <p class="text-[10px] sm:text-xs text-cyan-600 tracking-wider sm:tracking-widest truncate">Universal.Timestamps.Relayer.v{{VERSION}}</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-4 shrink-0">
+      <div class="flex items-center gap-2 px-2 sm:px-3 py-1 border border-cyan-900 bg-black text-sm">
+                <span class="relative flex h-2 w-2 sm:h-3 sm:w-3">
+                    <span id="status-ping" class="animate-ping absolute inline-flex h-full w-full bg-cyan-400 opacity-75 hidden"></span>
+                    <span id="status-dot" class="relative inline-flex h-2 w-2 sm:h-3 sm:w-3 bg-cyan-900"></span>
+                </span>
+        <span id="status-text" class="text-xs sm:text-sm text-cyan-700 hidden md:inline-block">SYS.CONNECTING...</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6 z-10">
+
+  <!-- Welcome Hero / System Info -->
+  <div class="border-l-4 border-cyan-500 pl-4 py-2 mb-8">
+    <h2 class="text-2xl font-bold text-cyan-400 uppercase tracking-wider neon-text-cyan">
+      > UTS Interchain Relayer Engine <span class="cursor-blink">_</span>
+    </h2>
+    <div class="mt-3 space-y-4">
+      <p class="text-cyan-600 max-w-4xl leading-relaxed">
+        This daemon is responsible for packing L2 user attestations into batches and submitting them to the Ethereum L1 gateway.
+      </p>
+
+      <!-- TESTNET WARNING -->
+      <div class="bg-amber-950/30 border border-amber-500/50 p-3 sm:p-4 flex items-start gap-3 shadow-[inset_0_0_10px_rgba(245,158,11,0.05)]">
+        <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-500 shrink-0 mt-0.5"></i>
+        <div>
+          <span class="text-amber-500 text-xs font-bold uppercase tracking-widest block mb-1">SYSTEM_WARNING: TESTNET_ENVIRONMENT</span>
+          <span class="text-amber-400/80 text-xs sm:text-sm leading-relaxed block">This node is connected to the experimental testnet. Proofs generated here are for testing purposes only. Do not rely on this network for production data.</span>
+        </div>
+      </div>
+
+      <!-- Node Address Identity Badge -->
+      <div class="inline-flex items-start sm:items-center gap-3 bg-black border border-cyan-900/80 px-3 sm:px-4 py-2 sm:py-3 shadow-[inset_0_0_10px_rgba(34,211,238,0.05)] w-full sm:w-auto">
+        <i data-lucide="cpu" class="w-5 h-5 text-cyan-500/70 shrink-0 mt-0.5 sm:mt-0"></i>
+        <div class="flex flex-col sm:flex-row sm:items-baseline sm:gap-2 min-w-0">
+          <span class="text-[10px] sm:text-xs text-cyan-700 uppercase tracking-widest shrink-0">RELAYER_OPERATOR:</span>
+          <span class="text-xs sm:text-sm text-cyan-400 font-mono tracking-wider break-all">{{NODE_ADDRESS}}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Metrics Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Batches Processed -->
+    <div class="retro-card p-5 relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <i data-lucide="layers" class="w-16 h-16 text-cyan-400"></i>
+      </div>
+      <h3 class="text-cyan-600 text-xs font-bold tracking-widest uppercase mb-1">Total_L1_Batches</h3>
+      <div class="text-3xl font-bold text-cyan-400 tracking-widest neon-text-cyan flex items-baseline gap-2 mt-2">
+        <span id="metric-total-batches">N/A</span>
+      </div>
+      <div class="w-full h-1 bg-cyan-900/50 mt-4"><div class="h-full bg-cyan-500/50 w-full"></div></div>
+    </div>
+
+    <!-- Pending Queue -->
+    <div class="retro-card p-5 relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <i data-lucide="list-ordered" class="w-16 h-16 text-amber-400"></i>
+      </div>
+      <h3 class="text-cyan-600 text-xs font-bold tracking-widest uppercase mb-1">Mempool_Queue</h3>
+      <div class="text-3xl font-bold text-amber-400 tracking-widest neon-text-amber flex items-baseline gap-2 mt-2">
+        <span id="metric-queued-requests">N/A</span>
+      </div>
+      <p class="text-[10px] text-cyan-700 uppercase mt-1">Pending L2 Attestations</p>
+    </div>
+
+    <!-- Gas Consumed -->
+    <div class="retro-card p-5 relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity z-0">
+        <i data-lucide="fuel" class="w-16 h-16 text-fuchsia-400"></i>
+      </div>
+      <h3 class="text-cyan-600 text-xs font-bold tracking-widest uppercase mb-1">Network_Gas_Fees</h3>
+      <div class="mt-2 space-y-1 relative z-10">
+        <div class="flex items-baseline justify-between overflow-hidden">
+          <span class="text-[10px] text-cyan-600 uppercase tracking-widest shrink-0 mr-2">L1</span>
+          <span id="metric-l1-gas" class="text-base sm:text-lg font-bold text-fuchsia-400 tracking-widest neon-text-fuchsia truncate">N/A</span>
+        </div>
+        <div class="flex items-baseline justify-between border-t border-cyan-900/50 pt-1 overflow-hidden">
+          <span class="text-[10px] text-cyan-600 uppercase tracking-widest shrink-0 mr-2">L2</span>
+          <span id="metric-l2-gas" class="text-base sm:text-lg font-bold text-fuchsia-400 tracking-widest neon-text-fuchsia truncate">N/A</span>
+        </div>
+      </div>
+      <p class="text-[10px] text-cyan-700 uppercase mt-2">Cumulative Gas Fees</p>
+    </div>
+
+    <!-- Cross-chain Fees Spent -->
+    <div class="retro-card p-5 relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <i data-lucide="coins" class="w-16 h-16 text-cyan-400"></i>
+      </div>
+      <h3 class="text-cyan-600 text-xs font-bold tracking-widest uppercase mb-1">Cross_Chain_Fees</h3>
+      <div class="text-lg sm:text-xl font-bold text-cyan-400 tracking-widest neon-text-cyan flex items-baseline gap-2 mt-3 truncate">
+        <span id="metric-l1-fees">N/A</span>
+      </div>
+      <p class="text-[10px] text-cyan-700 uppercase mt-2">Cumulative Msg Value</p>
+    </div>
+  </div>
+
+  <!-- Aggregate Unit Economics Bar -->
+  <div class="retro-card p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-l-4 border-l-emerald-500">
+    <div class="flex items-start md:items-center gap-4">
+      <i data-lucide="calculator" class="w-8 h-8 text-emerald-400 shrink-0"></i>
+      <div>
+        <h3 class="text-emerald-400 text-sm font-bold tracking-widest uppercase">System_Unit_Economics</h3>
+        <p class="text-xs text-cyan-600 uppercase mt-1">Sum of (L1 + L2 + Cross-Chain) / <span class="text-fuchsia-400 font-bold mx-1" id="ui-denominator-text">0</span> Total Packed Entries</p>
+      </div>
+    </div>
+    <div class="bg-black border border-emerald-900 px-4 py-2 flex flex-col items-end shrink-0">
+      <span class="text-[10px] text-emerald-600 uppercase tracking-widest mb-1">Total_Avg_Cost_Per_Entry</span>
+      <span id="metric-avg-fee-total" class="text-xl font-bold text-emerald-400 tracking-widest neon-text-emerald">N/A</span>
+    </div>
+  </div>
+
+  <!-- Live Pipeline Visualization -->
+  <div class="retro-card p-6 border-l-4 border-l-cyan-500 mt-2">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div class="flex items-center gap-3">
+        <h2 class="text-lg font-bold text-cyan-400 flex items-center gap-3 uppercase tracking-widest">
+          <i data-lucide="git-merge" class="w-5 h-5 text-cyan-400"></i>
+          Active_Batch_Pipeline
+        </h2>
+        <!-- Dynamic Engine Pulse -->
+        <span class="relative flex h-3 w-3">
+                    <span id="engine-pulse" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                </span>
+      </div>
+      <span class="text-xs text-cyan-600 bg-black border border-cyan-900 px-2 py-1 flex items-center justify-between sm:justify-start gap-2">
+                <span>BATCH_ID:</span>
+                <span id="ui-batch-id" class="text-cyan-400 font-bold">N/A</span>
+            </span>
+    </div>
+
+    <!-- State Machine Progress Bar -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4 mb-8">
+      <div id="step-collected" class="border p-2 sm:p-3 text-center transition-all duration-300 step-inactive">
+        <i data-lucide="package" class="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 sm:mb-2"></i>
+        <div class="text-[9px] sm:text-[10px] font-bold tracking-widest">1. COLLECTED</div>
+      </div>
+      <div id="step-l1-sent" class="border p-2 sm:p-3 text-center transition-all duration-300 step-inactive">
+        <i data-lucide="send" class="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 sm:mb-2"></i>
+        <div class="text-[9px] sm:text-[10px] font-bold tracking-widest">2. L1_SENT</div>
+      </div>
+      <div id="step-l1-mined" class="border p-2 sm:p-3 text-center transition-all duration-300 step-inactive">
+        <i data-lucide="pickaxe" class="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 sm:mb-2"></i>
+        <div class="text-[9px] sm:text-[10px] font-bold tracking-widest">3. L1_MINED</div>
+      </div>
+      <div id="step-l2-received" class="border p-2 sm:p-3 text-center transition-all duration-300 step-inactive">
+        <i data-lucide="inbox" class="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 sm:mb-2"></i>
+        <div class="text-[9px] sm:text-[10px] font-bold tracking-widest">4. L2_RECEIVED</div>
+      </div>
+      <div id="step-l2-finalized" class="col-span-2 md:col-span-1 border p-2 sm:p-3 text-center transition-all duration-300 step-inactive">
+        <i data-lucide="check-square" class="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 sm:mb-2"></i>
+        <div class="text-[9px] sm:text-[10px] font-bold tracking-widest">5. FINALIZED</div>
+      </div>
+    </div>
+
+    <!-- Batch Transaction Details -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- L1 Anchor Hash -->
+      <div class="flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-cyan-600 text-[10px] sm:text-sm uppercase tracking-widest">> L1_Anchoring_TX_Hash (Ethereum)</span>
+        </div>
+        <a id="ui-l1-tx" class="flex-1 block w-full bg-black p-4 border border-cyan-900 text-cyan-700 transition-all duration-300 break-all leading-relaxed relative group overflow-hidden" title="Awaiting TX">
+          <div class="absolute top-0 left-0 w-full h-1 bg-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.5)] -translate-y-full group-hover:animate-[scan_2s_linear_infinite]"></div>
+          PENDING_L1_SUBMISSION...
+        </a>
+      </div>
+
+      <!-- L2 Finalize Hash -->
+      <div class="flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-cyan-600 text-[10px] sm:text-sm uppercase tracking-widest">> L2_Finalization_TX_Hash (Scroll)</span>
+        </div>
+        <a id="ui-l2-tx" class="flex-1 block w-full bg-black p-4 border border-cyan-900 text-cyan-700 transition-all duration-300 break-all leading-relaxed relative group overflow-hidden" title="Awaiting TX">
+          <div class="absolute top-0 left-0 w-full h-1 bg-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.5)] -translate-y-full group-hover:animate-[scan_2s_linear_infinite]"></div>
+          PENDING_L2_FINALIZATION...
+        </a>
+      </div>
+    </div>
+
+    <!-- Batch Stats Footer -->
+    <div class="mt-6 flex flex-wrap gap-4 text-xs">
+      <div class="bg-black border border-cyan-900 px-3 py-1 text-cyan-600">
+        Merkle_Root: <span id="ui-batch-root" class="text-cyan-400 font-mono">N/A</span>
+      </div>
+      <div class="bg-black border border-cyan-900 px-3 py-1 text-cyan-600">
+        Pack_Size: <span id="ui-batch-count" class="text-fuchsia-400 font-bold">0</span> items
+      </div>
+      <div class="bg-black border border-cyan-900 px-3 py-1 text-cyan-600 ml-auto">
+        Status: <span id="ui-batch-status" class="text-amber-400 font-bold uppercase">IDLE</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="border-t border-cyan-900 py-6 text-center text-cyan-700 text-sm mt-auto z-10 bg-black/80">
+  <p>END OF TRANSMISSION // UTS RELAYER DAEMON</p>
+</footer>
+
+<!-- Scripts -->
+<script>
+  // Initialize Icons
+  lucide.createIcons();
+
+  let pollInterval;
+
+  // Custom animation for scanning line
+  const style = document.createElement('style');
+  style.textContent = `
+            @keyframes scan {
+                0% { transform: translateY(-100%); }
+                100% { transform: translateY(10000%); }
+            }
+        `;
+  document.head.appendChild(style);
+
+  // Formatter functions
+  const formatNumber = (num) => new Intl.NumberFormat('en-US').format(num);
+
+  // Core function to safely parse Wei values (hex/string/number) into ETH float
+  const getEthValue = (weiVal) => {
+    if (weiVal === undefined || weiVal === null || weiVal === "0" || weiVal === "0x0" || weiVal === 0) return 0;
+    try {
+      const weiStr = String(weiVal);
+      if (weiStr.includes('e') || weiStr.includes('E')) {
+        return Number(weiVal) / 1e18;
+      } else {
+        // Ignore possible injected decimals if casted to f64 accidentally by backend JSON
+        const wei = weiStr.startsWith('0x') ? BigInt(weiStr) : BigInt(weiStr.split('.')[0]);
+        return Number(wei) / 1e18;
+      }
+    } catch (e) {
+      console.error("Parse error for", weiVal, e);
+      return 0;
+    }
+  };
+
+  // Formats ETH float. 自动将太小的 ETH 数值转为 Gwei 以节省 UI 空间
+  const formatEthValue = (eth) => {
+    if (eth === 0) return "0 ETH";
+
+    if (eth >= 0.001) {
+      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 2 }).format(eth) + ' ETH';
+    } else {
+      // 当数值小于 0.001 ETH 时，转换为 Gwei
+      const gwei = eth * 1e9;
+      if (gwei >= 1000) {
+        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(gwei) + ' Gwei';
+      } else if (gwei >= 1) {
+        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(gwei) + ' Gwei';
+      } else {
+        // 如果极其微小，保留 4 位小数的 Gwei
+        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(gwei) + ' Gwei';
+      }
+    }
+  };
+
+  // Utility to map chainId to explorer URL
+  function getExplorerUrl(chainId, txHash) {
+    if (!txHash) return '#';
+    const explorers = {
+      1: 'https://etherscan.io',
+      11155111: 'https://sepolia.etherscan.io',
+      10: 'https://optimistic.etherscan.io',
+      8453: 'https://basescan.org',
+      42161: 'https://arbiscan.io',
+      534352: 'https://scrollscan.com',
+      534351: 'https://sepolia.scrollscan.com'
+    };
+    const baseUrl = explorers[chainId] || 'https://blockscan.com';
+    return `${baseUrl}/tx/${txHash}`;
+  }
+
+  function setStatus(status) {
+    const dot = document.getElementById('status-dot');
+    const ping = document.getElementById('status-ping');
+    const text = document.getElementById('status-text');
+
+    if (status === 'online') {
+      dot.classList.replace('bg-cyan-900', 'bg-cyan-400');
+      dot.classList.add('shadow-[0_0_8px_rgba(34,211,238,1)]');
+      ping.classList.remove('hidden');
+      text.innerText = 'SYS.ONLINE';
+      text.className = 'text-cyan-400 font-bold neon-text-cyan hidden sm:inline-block';
+    } else {
+      dot.classList.replace('bg-cyan-400', 'bg-rose-500');
+      dot.classList.replace('bg-cyan-900', 'bg-rose-500');
+      dot.classList.remove('shadow-[0_0_8px_rgba(34,211,238,1)]');
+      dot.classList.add('shadow-[0_0_8px_rgba(244,63,94,1)]');
+      ping.classList.add('hidden');
+      text.innerText = 'SYS.OFFLINE';
+      text.className = 'text-rose-500 font-bold neon-text-rose animate-pulse hidden sm:inline-block';
+      document.getElementById('engine-pulse').classList.add('hidden');
+      document.getElementById('ui-batch-status').innerText = 'OFFLINE';
+      document.getElementById('ui-batch-status').className = 'text-rose-500 font-bold uppercase';
+    }
+  }
+
+  function updatePipelineUI(status) {
+    const uiSteps = [
+      document.getElementById('step-collected'),
+      document.getElementById('step-l1-sent'),
+      document.getElementById('step-l1-mined'),
+      document.getElementById('step-l2-received'),
+      document.getElementById('step-l2-finalized')
+    ];
+
+    // Reset all
+    uiSteps.forEach(el => {
+      el.classList.remove('step-active');
+      el.classList.add('step-inactive');
+    });
+
+    // Determine active step index matching L1BatchStatus enum
+    let activeIdx = -1;
+    if (status === 'Collected') activeIdx = 0;
+    if (status === 'L1Sent') activeIdx = 1;
+    if (status === 'L1Mined') activeIdx = 2;
+    if (status === 'L2Received' || status === 'L2FinalizeTxSent') activeIdx = 3;
+    if (status === 'L2Finalized') activeIdx = 4;
+
+    // Apply active style to current and all previous steps
+    for (let i = 0; i <= activeIdx; i++) {
+      if(uiSteps[i]) {
+        uiSteps[i].classList.remove('step-inactive');
+        uiSteps[i].classList.add('step-active');
+      }
+    }
+  }
+
+  function styleTxLink(element, hash, chainId) {
+    if (!hash) {
+      element.innerText = "PENDING_NETWORK_SUBMISSION...";
+      element.href = "#";
+      element.removeAttribute('target');
+      element.classList.remove('text-cyan-400', 'hover:bg-cyan-950/50', 'hover:border-cyan-400', 'neon-text-cyan', 'shadow-[0_0_20px_rgba(34,211,238,0.2)]');
+      element.classList.add('text-cyan-700');
+      return;
+    }
+
+    element.innerText = hash;
+    // Default to Ethereum mainnet blockscan if chainId is missing for L1
+    element.href = getExplorerUrl(chainId || 1, hash);
+    element.target = "_blank";
+    element.rel = "noopener noreferrer";
+
+    element.classList.remove('text-cyan-700');
+    element.classList.add('text-cyan-400', 'hover:bg-cyan-950/50', 'hover:border-cyan-400', 'neon-text-cyan', 'hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]');
+  }
+
+  function updateDOM(data) {
+    document.getElementById('metric-total-batches').innerText = formatNumber(data.total || 0);
+    document.getElementById('metric-queued-requests').innerText = formatNumber(data.pending || 0);
+
+    const l1GasEth = getEthValue(data.costs?.l1_gas_fee);
+    const l2GasEth = getEthValue(data.costs?.l2_gas_fee);
+    const crossChainEth = getEthValue(data.costs?.cross_chain_fee);
+
+    document.getElementById('metric-l1-gas').innerText = formatEthValue(l1GasEth);
+    document.getElementById('metric-l2-gas').innerText = formatEthValue(l2GasEth);
+    document.getElementById('metric-l1-fees').innerText = formatEthValue(crossChainEth);
+
+    let totalPackedEntries = 0;
+    if (data.latest_batch) {
+      // start_index 是从 1 开始的，例如 start 100, 长度 5，说明截止到了第 104 个请求
+      totalPackedEntries = data.latest_batch.start_index + data.latest_batch.count - 1;
+    }
+    document.getElementById('ui-denominator-text').innerText = formatNumber(totalPackedEntries);
+
+    const totalCostEth = l1GasEth + l2GasEth + crossChainEth;
+    if (totalPackedEntries > 0) {
+      const avgEth = totalCostEth / totalPackedEntries;
+      document.getElementById('metric-avg-fee-total').innerText = formatEthValue(avgEth);
+    } else {
+      document.getElementById('metric-avg-fee-total').innerText = "0 ETH";
+    }
+
+    document.getElementById('engine-pulse').classList.remove('hidden');
+
+    if (data.latest_batch) {
+      const batch = data.latest_batch;
+      document.getElementById('ui-batch-status').innerText = batch.status;
+      document.getElementById('ui-batch-status').className = 'text-cyan-400 font-bold uppercase neon-text-cyan';
+
+      document.getElementById('ui-batch-id').innerText = batch.id;
+
+      // Format root to be shorter for UI
+      const rootStr = batch.root || "N/A";
+      document.getElementById('ui-batch-root').innerText = rootStr.length > 20 ? rootStr.substring(0, 10) + '...' + rootStr.substring(rootStr.length - 8) : rootStr;
+      document.getElementById('ui-batch-count').innerText = formatNumber(batch.count || 0);
+
+      // Update Pipeline UI matching the L1BatchStatus Enum
+      updatePipelineUI(batch.status);
+
+      // Update TX Links (L1 falls back to 1 for chain_id if undefined, L2 takes real l2_chain_id)
+      styleTxLink(document.getElementById('ui-l1-tx'), batch.l1_tx_hash, 11155111);
+      styleTxLink(document.getElementById('ui-l2-tx'), batch.l2_tx_hash, batch.l2_chain_id);
+
+    } else {
+      document.getElementById('ui-batch-status').innerText = 'IDLE';
+      document.getElementById('ui-batch-status').className = 'text-amber-400 font-bold uppercase';
+      updatePipelineUI('None');
+    }
+  }
+
+  async function fetchMetrics() {
+    try {
+      const res = await fetch(`/metrics`, {
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+      const data = await res.json();
+      setStatus('online');
+      updateDOM(data);
+
+    } catch (error) {
+      console.warn("Failed to fetch API metrics.", error);
+      setStatus('offline');
+    }
+  }
+
+  // Initial fetch and start polling
+  fetchMetrics();
+  pollInterval = setInterval(fetchMetrics, 5000);
+
+</script>
+</body>
+</html>

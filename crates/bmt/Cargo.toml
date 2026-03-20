@@ -1,29 +1,31 @@
 [package]
 authors.workspace = true
+categories = [
+  "data-structures",
+  "cryptography",
+]
 description = "Binary Merkle Tree implementation for Universal Timestamps in Rust"
 edition.workspace = true
 homepage.workspace = true
-keywords.workspace = true
-license.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "LICENSE-*",
+]
+keywords = ["bmt", "merkle", "trie", "uts"]
+license = "MIT OR Apache-2.0"
 name = "uts-bmt"
 repository.workspace = true
-version.workspace = true
+version = "0.1.2"
 
 [dependencies]
-bytemuck = { workspace = true }
 digest.workspace = true
-hybrid-array = { workspace = true, features = ["bytemuck"] }
 
 [dev-dependencies]
-commonware-cryptography = "0.0.63" # for benchmarks
-commonware-storage = "0.0.63" # for benchmarks
-criterion.workspace = true
+alloy-primitives.workspace = true
+alloy-sol-types.workspace = true
 sha2.workspace = true
 sha3.workspace = true
-
-[[bench]]
-harness = false
-name = "tree_construction"
 
 [lints]
 workspace = true

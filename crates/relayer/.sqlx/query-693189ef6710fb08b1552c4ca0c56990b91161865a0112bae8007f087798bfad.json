@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO l1_batch_finalized (l1_batch_id, internal_log_id, l2_block_number, l2_timestamp_finalized)\n        VALUES (?1, ?2, ?3, ?4)\n        ON CONFLICT DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "693189ef6710fb08b1552c4ca0c56990b91161865a0112bae8007f087798bfad"
+}

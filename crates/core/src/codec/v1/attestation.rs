@@ -4,33 +4,43 @@
 //! comes from some server or from a blockchain.
 
 use crate::{
+    alloc::{Allocator, Global, vec::Vec},
     codec::{Decode, DecodeIn, Decoder, Encode, Encoder, v1::MayHaveInput},
     error::{DecodeError, EncodeError},
-    utils::{Hexed, OnceLock},
-};
-use alloc::{
-    alloc::{Allocator, Global},
-    borrow::Cow,
-    vec::Vec,
+    utils::Hexed,
 };
 use alloy_chains::Chain;
-use alloy_primitives::{Address, BlockNumber, ChainId, TxHash};
+use alloy_primitives::{B256, FixedBytes, fixed_bytes as tag};
 use core::fmt;
+use std::{borrow::Cow, sync::OnceLock};
 
 /// Size in bytes of the tag identifying the attestation type.
 const TAG_SIZE: usize = 8;
 
-/// Tag indicating a Bitcoin attestation.
-const BITCOIN_TAG: &[u8; 8] = b"\x05\x88\x96\x0d\x73\xd7\x19\x01";
-/// Tag indicating a pending attestation.
-const PENDING_TAG: &[u8; 8] = b"\x83\xdf\xe3\x0d\x2e\xf9\x0c\x8e";
-/// Tag indicating an Ethereum UTS contract attestation.
-///
-/// TAG = keccak256("EthereumUTSAttestation")[:8]
-const ETHEREUM_UTS_TAG: &[u8; 8] = b"\xea\xf2\xbc\x69\x3c\x93\x25\x1c";
-
 /// Tag identifying the attestation kind.
-pub type AttestationTag = [u8; TAG_SIZE];
+pub type AttestationTag = FixedBytes<TAG_SIZE>;
+
+/// Tag indicating a Bitcoin attestation.
+static BITCOIN_TAG: AttestationTag = tag!("0x0588960d73d71901");
+
+/// Tag indicating a pending attestation.
+static PENDING_TAG: AttestationTag = tag!("0x83dfe30d2ef90c8e");
+
+/// Tag indicating an EAS attestation.
+///
+/// The attestation emits an event with signature `Attested(address,address,bytes32,bytes32)`, and
+/// `selector = 0x8bf46bf4cfd674fa735a3d63ec1c9ad4153f033c290341f3a588b75685141b35`.
+///
+/// `TAG = selector[..8]`
+static EAS_ATTEST_TAG: AttestationTag = tag!("0x8bf46bf4cfd674fa");
+
+/// Tag indicating an EAS Timestamp Log attestation.
+///
+/// The attestation emits an event with signature `Timestamped(bytes32,uint64)`, and
+/// `selector = 0x5aafceeb1c7ad58e4a84898bdee37c02c0fc46e7d24e6b60e8209449f183459f`.
+///
+/// `TAG = selector[..8]`
+static EAS_TIMESTAMP_TAG: AttestationTag = tag!("0x5aafceeb1c7ad58e");
 
 /// Raw Proof that some data existed at a given time.
 #[derive(Clone)]
@@ -52,8 +62,7 @@ impl<A: Allocator> fmt::Debug for RawAttestation<A> {
 
 impl<A: Allocator> DecodeIn<A> for RawAttestation<A> {
     fn decode_in(decoder: &mut impl Decoder, alloc: A) -> Result<Self, DecodeError> {
-        let mut tag = [0u8; TAG_SIZE];
-        decoder.read_exact(&mut tag)?;
+        let tag = decoder.decode()?;
 
         let len = decoder.decode()?;
         let mut data = Vec::with_capacity_in(len, alloc);
@@ -137,7 +146,7 @@ impl fmt::Display for BitcoinAttestation {
 }
 
 impl Attestation<'_> for BitcoinAttestation {
-    const TAG: AttestationTag = *BITCOIN_TAG;
+    const TAG: AttestationTag = BITCOIN_TAG;
 
     fn from_raw_data(data: &[u8]) -> Result<Self, DecodeError> {
         let height = u32::decode(&mut &*data)?;
@@ -151,138 +160,67 @@ impl Attestation<'_> for BitcoinAttestation {
     }
 }
 
-/// Attestation by an Ethereum UTS contract.
+/// Attestation by `EAS::attest` using schema `0x5c5b8b295ff43c8e442be11d569e94a4cd5476f5e23df0f71bdd408df6b9649c`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EthereumUTSAttestation {
+pub struct EASAttestation {
     pub chain: Chain,
-    pub height: BlockNumber,
-    /// Optional extra metadata about the attestation, such as the contract address and transaction hash.
-    pub metadata: EthereumUTSAttestationExtraMetadata,
+    pub uid: B256,
 }
 
-/// Extra metadata for an Ethereum UTS attestation.
-///
-/// The tx field is only present if the contract field is present,
-/// and should be ignored if the contract field is None.
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct EthereumUTSAttestationExtraMetadata {
-    contract: Option<Address>,
-    tx: Option<TxHash>,
-}
-
-impl EthereumUTSAttestation {
-    /// Creates a new Ethereum UTS attestation with the given chain id, block number, and extra metadata.
-    pub fn new(
-        chain_id: ChainId,
-        height: BlockNumber,
-        metadata: EthereumUTSAttestationExtraMetadata,
-    ) -> Self {
-        Self {
-            chain: Chain::from_id(chain_id),
-            height,
-            metadata,
-        }
-    }
-}
-
-impl fmt::Display for EthereumUTSAttestation {
+impl fmt::Display for EASAttestation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "UTS on chain {} at block #{}({})",
-            self.chain, self.height, self.metadata
-        )
+        write!(f, "EAS attestation {} on {}", self.uid, self.chain)
     }
 }
 
-impl Attestation<'_> for EthereumUTSAttestation {
-    const TAG: AttestationTag = *ETHEREUM_UTS_TAG;
+impl<'a> Attestation<'a> for EASAttestation {
+    const TAG: AttestationTag = EAS_ATTEST_TAG;
 
-    fn from_raw_data(data: &[u8]) -> Result<Self, DecodeError> {
+    fn from_raw_data(data: &'a [u8]) -> Result<Self, DecodeError> {
         let data = &mut &data[..];
-        let chain = Chain::decode(data)?;
-        let height = BlockNumber::decode(data)?;
-        let metadata = EthereumUTSAttestationExtraMetadata::decode(data)?;
-        Ok(EthereumUTSAttestation {
-            chain,
-            height,
-            metadata,
+        let chain_id = u64::decode(data)?;
+        let uid = B256::decode(data)?;
+        Ok(EASAttestation {
+            chain: Chain::from_id(chain_id),
+            uid,
         })
     }
 
     fn to_raw_data_in<A: Allocator>(&self, alloc: A) -> Result<Vec<u8, A>, EncodeError> {
-        // chain id + block number + optional address + optional tx hash
-        const SIZE: usize = size_of::<ChainId>() + size_of::<BlockNumber>() + 20 + 32;
-        let mut buffer = Vec::with_capacity_in(SIZE, alloc);
-        buffer.encode(self.chain)?;
-        buffer.encode(self.height)?;
-        buffer.encode(&self.metadata)?;
+        let mut buffer =
+            Vec::with_capacity_in(u64::BITS.div_ceil(7) as usize + size_of::<B256>(), alloc);
+        buffer.encode(self.chain.id())?;
+        buffer.encode(self.uid)?;
         Ok(buffer)
     }
 }
 
-impl Encode for EthereumUTSAttestationExtraMetadata {
-    fn encode(&self, encoder: &mut impl Encoder) -> Result<(), EncodeError> {
-        if let Some(contract) = self.contract {
-            encoder.encode(&contract)?;
-            if let Some(tx) = self.tx {
-                encoder.encode(&tx)?;
-            }
-        }
-        Ok(())
-    }
+/// Attestation by `EAS::timestamp`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EASTimestamped {
+    pub chain: Chain,
 }
 
-impl Decode for EthereumUTSAttestationExtraMetadata {
-    fn decode(decoder: &mut impl Decoder) -> Result<Self, DecodeError> {
-        let contract = Address::decode_trailing(decoder)?;
-        let tx = if contract.is_some() {
-            TxHash::decode_trailing(decoder)?
-        } else {
-            None
-        };
-        Ok(Self { contract, tx })
-    }
-}
-
-impl fmt::Display for EthereumUTSAttestationExtraMetadata {
+impl fmt::Display for EASTimestamped {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match (self.contract, self.tx) {
-            (Some(contract), Some(tx)) => write!(f, "{contract} by tx: {tx}"),
-            (Some(contract), None) => write!(f, "{contract}"),
-            (None, Some(_)) => unreachable!("Tx should not be present without contract"),
-            (None, None) => write!(f, "no extra metadata"),
-        }
+        write!(f, "EAS timestamped on {}", self.chain)
     }
 }
 
-impl EthereumUTSAttestationExtraMetadata {
-    /// Creates new extra metadata with the given contract address and no transaction hash.
-    pub fn new(contract: Address) -> Self {
-        Self {
-            contract: Some(contract),
-            tx: None,
-        }
+impl<'a> Attestation<'a> for EASTimestamped {
+    const TAG: AttestationTag = EAS_TIMESTAMP_TAG;
+
+    fn from_raw_data(data: &'a [u8]) -> Result<Self, DecodeError> {
+        let chain_id = u64::decode(&mut &data[..])?;
+        Ok(EASTimestamped {
+            chain: Chain::from_id(chain_id),
+        })
     }
 
-    /// Creates new extra metadata with the given contract address and transaction hash.
-    pub fn new_with_tx(contract: Address, tx: TxHash) -> Self {
-        Self {
-            contract: Some(contract),
-            tx: Some(tx),
-        }
-    }
-
-    /// Returns the contract address if present, or None if not.
-    #[inline]
-    pub fn contract(&self) -> Option<Address> {
-        self.contract
-    }
-
-    /// Returns the transaction hash if present, or None if not.
-    #[inline]
-    pub fn tx(&self) -> Option<TxHash> {
-        self.tx
+    fn to_raw_data_in<A: Allocator>(&self, alloc: A) -> Result<Vec<u8, A>, EncodeError> {
+        let mut buffer = Vec::with_capacity_in(u64::BITS.div_ceil(7) as usize, alloc);
+        buffer.encode(self.chain.id())?;
+        Ok(buffer)
     }
 }
 
@@ -309,7 +247,7 @@ impl fmt::Display for PendingAttestation<'_> {
 }
 
 impl<'a> Attestation<'a> for PendingAttestation<'a> {
-    const TAG: AttestationTag = *PENDING_TAG;
+    const TAG: AttestationTag = PENDING_TAG;
 
     fn from_raw_data(data: &'a [u8]) -> Result<Self, DecodeError> {
         let data = &mut &data[..];
@@ -354,9 +292,12 @@ impl<A: Allocator> fmt::Display for RawAttestation<A> {
                 let att = BitcoinAttestation::from_raw(self).expect("Valid Bitcoin attestation");
                 write!(f, "{}", att)
             }
-            tag if *tag == *ETHEREUM_UTS_TAG => {
-                let att =
-                    EthereumUTSAttestation::from_raw(self).expect("Valid Ethereum UTS attestation");
+            tag if *tag == *EAS_ATTEST_TAG => {
+                let att = EASAttestation::from_raw(self).expect("Valid EAS attestation");
+                write!(f, "{}", att)
+            }
+            tag if *tag == *EAS_TIMESTAMP_TAG => {
+                let att = EASTimestamped::from_raw(self).expect("Valid EAS Timestamp attestation");
                 write!(f, "{}", att)
             }
             _ => write!(f, "Unknown Attestation with tag {}", Hexed(&self.tag)),
@@ -368,20 +309,5 @@ impl<A: Allocator> MayHaveInput for RawAttestation<A> {
     #[inline]
     fn input(&self) -> Option<&[u8]> {
         self.value.get().map(|v| v.as_slice())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_ethereum_uts_tag() {
-        use sha3::{Digest, Keccak256};
-
-        let mut hasher = Keccak256::new();
-        hasher.update(b"EthereumUTSAttestation");
-        let result = hasher.finalize().to_vec();
-        assert_eq!(&result[..8], ETHEREUM_UTS_TAG);
     }
 }

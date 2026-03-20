@@ -7,8 +7,8 @@ pub mod opcode;
 mod timestamp;
 
 pub use attestation::{
-    Attestation, AttestationTag, BitcoinAttestation, EthereumUTSAttestation, PendingAttestation,
-    RawAttestation,
+    Attestation, AttestationTag, BitcoinAttestation, EASAttestation, EASTimestamped,
+    PendingAttestation, RawAttestation,
 };
 pub use detached_timestamp::DetachedTimestamp;
 pub use digest::DigestHeader;
@@ -24,7 +24,6 @@ impl core::fmt::Display for FinalizationError {
     }
 }
 
-#[cfg(feature = "std")]
 impl std::error::Error for FinalizationError {}
 
 /// Trait for objects that may have input data.
@@ -61,7 +60,7 @@ pub trait ConsistentWith<T: ToInput + ?Sized>: MayHaveInput {
     fn is_consistent_with(&self, other: &T) -> bool {
         self.input()
             .zip(other.to_input())
-            .map_or(true, |(a, b)| a == b)
+            .is_none_or(|(a, b)| a == b)
     }
 
     /// Checks if self is consistent with the given input.

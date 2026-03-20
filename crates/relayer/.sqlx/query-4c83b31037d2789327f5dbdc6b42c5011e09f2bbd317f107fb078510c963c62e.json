@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO eth_transaction (internal_block_id, transaction_index, transaction_hash)\n        VALUES (?1, ?2, ?3)\n        ON CONFLICT DO UPDATE SET transaction_hash = excluded.transaction_hash\n        RETURNING id as \"id!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4c83b31037d2789327f5dbdc6b42c5011e09f2bbd317f107fb078510c963c62e"
+}

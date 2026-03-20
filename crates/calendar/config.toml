@@ -1,0 +1,35 @@
+# This is an example configuration file for the calendar server.
+[server]
+bind-address = "0.0.0.0:3000"
+node-name = "LGM-1 // PSR_B1919+21"
+uri = "http://localhost:3000"
+
+[blockchain.rpc]
+url = "https://sepolia-rpc.scroll.io"
+
+[blockchain.rpc.retry]
+compute-units-per-second = 20
+initial-backoff = 100
+max-rate-limit-retries = 10
+
+[blockchain.rpc.throttle]
+requests-per-second = 25
+
+[blockchain.wallet]
+#mnemonic = "<REDACTED>" # You can also load it from env var.
+index = 0
+
+[db.journal]
+capacity = 1048576
+db-path = "./.db/journal"
+
+[db.kv]
+path = "./.db/tries"
+
+[db.sql]
+filename = "./.db/calendar.sqlite"
+
+[stamper]
+max-entries-per-timestamp = 1024
+max-interval-seconds = 10
+min-leaves = 16

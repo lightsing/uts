@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(*) as \"count!\"\n            FROM attest_attempts\n            WHERE attestation_id = ?1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2e7fbf51720dc5f655ea7e45fc6e7b236b75030807a8fdb6a4f5e32eae008241"
+}

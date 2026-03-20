@@ -1,29 +1,49 @@
-#![feature(generic_const_exprs)]
-#![allow(incomplete_features)]
-
 //! Timestamping
+
+// Copyright (C) 2026 UTS Contributors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #[macro_use]
 extern crate tracing;
 
-use alloy_primitives::{B256, BlockNumber, ChainId, TxHash};
+use alloy_primitives::B256;
 use alloy_provider::Provider;
-use bytemuck::{NoUninit, Pod};
 use digest::{Digest, FixedOutputReset, Output, typenum::Unsigned};
+use eyre::{Context, bail};
 use rocksdb::{DB, WriteBatch};
-use serde::{Deserialize, Serialize};
-use std::{
-    borrow::Cow,
-    collections::{HashMap, VecDeque},
-    fmt,
-    sync::Arc,
-    time::Duration,
+use sqlx::SqlitePool;
+use std::{fmt, marker::PhantomData, sync::Arc, time::Duration};
+use tokio::{
+    select,
+    time::{Interval, MissedTickBehavior},
 };
-use tokio::time::{Interval, MissedTickBehavior};
-use uts_bmt::UnorderedMerkleTree;
-use uts_contracts::uts::UniversalTimestamps;
+use tokio_util::sync::CancellationToken;
+use uts_bmt::MerkleTree;
+use uts_contracts::eas::EAS;
 use uts_core::utils::Hexed;
 use uts_journal::reader::JournalReader;
+
+/// kv storage for leaf->root mappings, and root->full_tree mappings (for power-of-two sized trees)
+pub mod kv;
+/// sql storage for pending attestation metadata, and finalized timestamp metadata
+pub mod sql;
+
+mod tx_sender;
+
+/// Maximum number of retries for transient errors in transaction sending.
+pub const MAX_RETRIES: i64 = 3;
 
 /// Stamper for timestamping
 ///
@@ -36,19 +56,20 @@ use uts_journal::reader::JournalReader;
 /// - if available entries size is not power of two, it will take:
 ///  - the largest power of two less than available entries, if that is >= `min_leaves`
 ///  - else, it will take all available entries
-pub struct Stamper<D: Digest, P, const ENTRY_SIZE: usize> {
+pub struct Stamper<D: Digest, P: Provider> {
     /// Journal reader to read entries from
-    reader: JournalReader<ENTRY_SIZE>,
+    reader: JournalReader,
     /// Storage for merkle trees and leaf->root mappings
-    storage: Arc<DB>,
-    /// FIFO cache of recent merkle trees
-    cache: VecDeque<UnorderedMerkleTree<D>>,
-    /// FIFO cache index of recent merkle trees
-    cache_index: HashMap<B256, usize>,
+    kv_storage: Arc<DB>,
+    /// Sql db for storing timestamp metadata
+    sql_storage: SqlitePool,
+
     /// The contract
-    contract: UniversalTimestamps<P>,
+    contract: EAS<P>,
     /// Stamper configuration
     config: StamperConfig,
+
+    _marker: PhantomData<D>,
 }
 
 /// Configuration for the Stamper
@@ -62,146 +83,162 @@ pub struct StamperConfig {
     /// The minimum size of the Merkle tree leaves.
     /// It should be a power of two.
     pub min_leaves: usize,
-    /// The maximum number of recent Merkle trees to keep in cache.
-    pub max_cache_size: usize,
 }
 
-/// Merkle entry stored in the database
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MerkleEntry<'a> {
-    /// Chain ID of the timestamp transaction
-    pub chain_id: ChainId,
-    /// Transaction hash of the timestamp transaction
-    pub tx_hash: TxHash,
-    /// Block number of the timestamp transaction
-    pub height: BlockNumber,
-
-    trie: Cow<'a, [u8]>,
-}
-
-impl MerkleEntry<'_> {
-    /// Get the Merkle tree from the entry
-    pub fn trie<D>(&self) -> UnorderedMerkleTree<D>
-    where
-        D: Digest + FixedOutputReset,
-        Output<D>: Pod + Copy,
-    {
-        // SAFETY: We trust that the data in the database is valid, and that the trie was serialized correctly.
-        unsafe { UnorderedMerkleTree::from_raw_bytes(&self.trie) }
-    }
-}
-
-/// Errors that can occur during storage operations
-#[derive(Debug, thiserror::Error)]
-pub enum StorageError {
-    /// Errors from RocksDB
-    #[error(transparent)]
-    Rocks(#[from] rocksdb::Error),
-    /// Errors from bitcode serialization/deserialization
-    #[error(transparent)]
-    Bitcode(#[from] bitcode::Error),
-}
-
-/// Extension trait for DB to load Merkle entries and leaf->root mappings
-pub trait DbExt {
-    /// Load a Merkle entry from the database by root hash
-    fn load_entry(&self, root: B256) -> Result<Option<MerkleEntry<'static>>, StorageError>;
-
-    /// Get the root hash for a given leaf hash, if it exists
-    fn get_root_for_leaf(&self, leaf: B256) -> Result<Option<B256>, StorageError>;
-}
-
-impl DbExt for DB {
-    fn load_entry(&self, root: B256) -> Result<Option<MerkleEntry<'static>>, StorageError> {
-        let Some(data) = self.get(root)? else {
-            return Ok(None);
-        };
-        let entry: MerkleEntry<'static> = bitcode::deserialize(&data)?;
-        Ok(Some(entry))
-    }
-
-    fn get_root_for_leaf(&self, leaf: B256) -> Result<Option<B256>, StorageError> {
-        let Some(root) = self.get(leaf)? else {
-            return Ok(None);
-        };
-        if root.len() != 32 {
-            let _entry: MerkleEntry<'static> = bitcode::deserialize(&root)?;
-            return Ok(Some(leaf)); // it's a single-leaf tree
-        }
-        let hash: [u8; 32] = root.as_slice().try_into().expect("infallible");
-        Ok(Some(B256::new(hash)))
-    }
-}
-
-impl<D: Digest, P, const ENTRY_SIZE: usize> fmt::Debug for Stamper<D, P, ENTRY_SIZE> {
+impl<D: Digest, P: Provider> fmt::Debug for Stamper<D, P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Stamper")
-            .field("cache_size", &self.cache.len())
             .field("config", &self.config)
+            .field("contract", &self.contract)
             .finish()
     }
 }
 
-impl<D, P, const ENTRY_SIZE: usize> Stamper<D, P, ENTRY_SIZE>
+impl<D, P> Stamper<D, P>
 where
     D: Digest + FixedOutputReset + 'static,
-    P: Provider,
-    Output<D>: Pod + Copy,
-    [u8; ENTRY_SIZE]: NoUninit,
+    P: Provider + Clone + 'static,
+    Output<D>: Copy,
 {
-    const _SIZE_MATCHES: () = assert!(D::OutputSize::USIZE == ENTRY_SIZE);
-
     /// Create a new Stamper
     pub fn new(
-        reader: JournalReader<ENTRY_SIZE>,
-        storage: Arc<DB>,
-        contract: UniversalTimestamps<P>,
+        reader: JournalReader,
+        kv_storage: Arc<DB>,
+        sql_storage: SqlitePool,
+        contract: EAS<P>,
         config: StamperConfig,
     ) -> Self {
         Self {
             reader,
-            storage,
-            cache: VecDeque::with_capacity(config.max_cache_size),
-            cache_index: HashMap::with_capacity(config.max_cache_size),
+            kv_storage,
+            sql_storage,
             contract,
             config,
+            _marker: PhantomData,
         }
     }
 
     /// Work loop
-    pub async fn run(&mut self) {
-        let chain_id = self
-            .contract
-            .provider()
-            .get_chain_id()
-            .await
-            .expect("Failed to get chain ID");
+    pub async fn run(&mut self, token: CancellationToken) -> eyre::Result<()> {
         let mut ticker =
             tokio::time::interval(Duration::from_secs(self.config.max_interval_seconds));
         ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut leaves_buffer = Vec::with_capacity(self.config.max_entries_per_timestamp);
+        let (waker_tx, waker_rx) = tokio::sync::mpsc::channel::<()>(1);
+
+        let tx_sender = tx_sender::TxSender {
+            eas: self.contract.clone(),
+            sql_storage: self.sql_storage.clone(),
+            waker: waker_rx,
+            token: token.clone(),
+        };
+        tokio::spawn(async move {
+            tx_sender.run_until_cancelled().await;
+        });
+
         loop {
-            self.pack(chain_id, &mut ticker, &mut leaves_buffer).await;
+            select! {
+                _ = token.cancelled() => {
+                    info!("Cancellation received, stopping stamper...");
+                    break;
+                }
+                res = self.pack(&mut ticker, &mut leaves_buffer) => {
+                    match res {
+                        Err(e) => {
+                            error!(error = ?e, "Error in packing batch, stopping stamper...");
+                            break;
+                        }
+                        Ok(0) => continue,
+                        // notify the tx sender to wake up
+                        Ok(e) => {
+                            info!(entries = e, "Batch packed successfully, waking up TxSender...");
+                            waker_tx.try_send(()).ok()
+                        },
+                    };
+                }
+            }
         }
+        Ok(())
     }
 
+    /// Try to pack a batch of entries into a Merkle tree and push the pending attestation to SQL db.
+    ///
+    /// # Errors
+    ///
+    /// All errors here are considered **FATAL**, meaning the stamper cannot continue to run correctly,
+    /// and should be restarted after the error is resolved.
+    ///
+    /// The errors likely indicate an issue with the underlying storage (either journal or db),
+    /// and should be resolved by fixing the storage issue (e.g. clearing corrupted data,
+    /// increasing disk space, etc.)
     async fn pack(
         &mut self,
-        chain_id: ChainId,
         ticker: &mut Interval,
-        buffer: &mut Vec<[u8; ENTRY_SIZE]>,
-    ) {
+        buffer: &mut Vec<Output<D>>,
+    ) -> eyre::Result<usize> {
+        let target_size = self.wait_for_next_batch(ticker).await?;
+        // no entries to process, skip this round
+        if target_size == 0 {
+            return Ok(0);
+        };
+        trace!(target_size);
+
+        // Read entries, could need two reads if wrapping around
+        buffer.clear();
+        for entry in self.reader.read(target_size)? {
+            let mut node = Output::<D>::default();
+            debug_assert_eq!(entry.len(), D::OutputSize::USIZE);
+            node.copy_from_slice(entry);
+            buffer.push(node);
+        }
+        debug_assert_eq!(buffer.len(), target_size);
+
+        let merkle_tree = MerkleTree::<D>::new_unhashed(buffer);
+
+        let merkle_tree = tokio::task::spawn_blocking(move || {
+            let merkle_tree = merkle_tree.finalize(); // CPU intensive
+            let root = merkle_tree.root();
+            info!(root = ?Hexed(root));
+            merkle_tree
+        })
+        .await
+        .context("failed to create Merkle tree")?;
+
+        let root = B256::from_slice(merkle_tree.root());
+
+        let mut batch = WriteBatch::default();
+        // store leaf->root mappings for quick lookup
+        for leaf in merkle_tree.leaves() {
+            batch.put(leaf, root);
+        }
+        // if it's a single-leaf tree, the root == the leaf, so we write mapping first.
+        batch.put(root, merkle_tree.to_raw_bytes());
+        self.kv_storage
+            .write(batch)
+            .context("failed to write to kv db")?;
+
+        sql::new_pending_attestation(&self.sql_storage, root)
+            .await
+            .context("failed to create pending attestation in sql db")?;
+
+        self.reader
+            .commit()
+            .context("failed to commit journal reader")?;
+        Ok(target_size)
+    }
+
+    async fn wait_for_next_batch(&mut self, ticker: &mut Interval) -> eyre::Result<usize> {
         let entries = self
             .reader
             .wait_at_least(self.config.max_entries_per_timestamp);
 
-        let target_size = tokio::select! {
+        let target_size = select! {
             _ = ticker.tick() => {
                 // Timeout reached, create timestamp with available entries
                 let current_available = self.reader.available();
                 if current_available == 0 {
                     debug!("No available entries, skipping this round...");
-                    return;
+                    return Ok(0);
                 }
 
                 debug!(current_available, "Timeout reached, creating timestamp");
@@ -212,6 +249,9 @@ where
                     trace!("Current available is power of two, taking all");
                     current_available
                 } else if next_power_of_two / 2 >= self.config.min_leaves {
+                    // This is for avoiding creating small Merkle trees with too few leaves.
+                    // e.g. if current_available = 3, min_leaves = 4 then next_power_of_two / 2 = 2,
+                    // we will take 3 entries instead of 2 to create a Merkle tree with 4 leaves instead of 1 leaf.
                     let target = next_power_of_two / 2;
                     trace!(target, "Taking largest power of two less than available");
                     target
@@ -220,85 +260,15 @@ where
                     current_available
                 }
             }
-            _ = entries => {
+            result = entries => {
+                if result.is_err() {
+                    bail!("fatal error in journal while waiting for entries");
+                }
                 // Max entries reached, create timestamp
                 debug!("Max entries reached, creating timestamp");
                 self.config.max_entries_per_timestamp
             }
         };
-        trace!(target_size);
-
-        // Read entries, could need two reads if wrapping around
-        buffer.clear();
-        buffer.extend_from_slice(self.reader.read(target_size));
-        let remaining = target_size - buffer.len();
-        if remaining > 0 {
-            buffer.extend_from_slice(self.reader.read(remaining));
-        }
-        debug_assert_eq!(buffer.len(), target_size);
-
-        let merkle_tree = UnorderedMerkleTree::<D>::new_unhashed(bytemuck::cast_slice(&buffer));
-        let storage = self.storage.clone();
-
-        let merkle_tree = tokio::task::spawn_blocking(move || {
-            let merkle_tree = merkle_tree.finalize(); // CPU intensive
-            let root = merkle_tree.root();
-            info!(root = ?Hexed(root));
-            merkle_tree
-        })
-        .await
-        .expect("Failed to create Merkle tree"); // FIXME: handle error properly
-
-        let root = B256::new(bytemuck::cast(*merkle_tree.root()));
-
-        // commit to blockchain
-        let receipt = self
-            .contract
-            .attest(root)
-            .send()
-            .await
-            .expect("failed to build transaction")
-            .get_receipt()
-            .await
-            .expect("failed to send transaction"); // FIXME: handle error properly
-        let block_number = receipt.block_number.expect("Transaction not yet mined");
-        info!(%block_number, %receipt.transaction_hash, %root,"Timestamp attested on-chain");
-
-        // write to storage
-        let mut batch = WriteBatch::default();
-        // store leaf->root mappings for quick lookup
-        for leaf in merkle_tree.leaves() {
-            batch.put(leaf, root);
-        }
-        // store the Merkle tree
-        let entry = MerkleEntry {
-            chain_id,
-            tx_hash: receipt.transaction_hash,
-            height: block_number,
-            trie: Cow::Borrowed(merkle_tree.as_raw_bytes()),
-        };
-        let serialized_entry =
-            bitcode::serialize(&entry).expect("Failed to serialize Merkle entry");
-        bitcode::deserialize::<MerkleEntry>(&serialized_entry)
-            .expect("Failed to deserialize Merkle entry"); // sanity check
-        // if it's a single-leaf tree, the root == the leaf, so we write mapping first.
-        batch.put(root, serialized_entry);
-        storage.write(batch).expect("Failed to write to storage"); // FIXME: handle error properly
-
-        if self.cache.len() >= self.config.max_cache_size {
-            let evicted = self
-                .cache
-                .pop_front()
-                .expect("infallible due to check above");
-
-            let root = evicted.root();
-            let removed = self.cache_index.remove(&B256::new(bytemuck::cast(*root)));
-            debug_assert_eq!(removed, Some(0));
-
-            self.cache_index.iter_mut().for_each(|(_, idx)| *idx -= 1);
-        }
-        self.cache.push_back(merkle_tree);
-        self.cache_index.insert(root, self.cache.len() - 1);
-        self.reader.commit().expect("Failed to commit read entries"); // FIXME: handle error properly
+        Ok(target_size)
     }
 }

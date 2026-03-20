@@ -6,3 +6,7 @@ pnpm-lock.yaml
 crates/*
 lib/*
 target/*
+
+**/.sqlx/*.json
+
+apps/docs/content/**/*.md

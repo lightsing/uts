@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            SUM(CASE WHEN result = 'pending' THEN 1 ELSE 0 END) as \"pending!\",\n            SUM(CASE WHEN result = 'success' THEN 1 ELSE 0 END) as \"success!\",\n            SUM(CASE WHEN result <> 'pending' AND result <> 'success' THEN 1 ELSE 0 END) as \"failed!\"\n        FROM pending_attestations\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "pending!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "success!",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "failed!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "5fe8d835ece42f34ee0cf551cb9bd7e38819dd31587817edaeb5b339a5c7e6b6"
+}

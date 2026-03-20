@@ -1,0 +1,37 @@
+[server]
+bind-address = "0.0.0.0:3000"
+node-name = "Lich // PSR B1257+12"
+
+[blockchain]
+gateway-address = "0x39Ea3C70A5e26C8dB4a1A5E9A7Fc7Bab04684C08"
+manager-address = "0x7249802D50CB719547F7685d090d4b84e7183C32"
+
+[blockchain.rpc]
+l1 = "https://eth-sepolia.g.alchemy.com/v2/uymDlBa_asemsxbDEdpTU"
+l2-ws = "wss://scroll-sepolia.g.alchemy.com/v2/uymDlBa_asemsxbDEdpTU"
+
+[blockchain.rpc.retry]
+compute-units-per-second = 20
+initial-backoff = 100
+max-rate-limit-retries = 10
+
+[blockchain.rpc.throttle]
+requests-per-second = 25
+
+[blockchain.wallet]
+index = 0
+mnemonic = "tag text lens coyote rescue reason drive tag cousin rice just tongue hotel effort focus grape venue pool hard coffee busy tomorrow comic under"
+
+[indexer.l2]
+batch-size = 10
+start-block = 17049361
+
+[relayer]
+batch-max-size = 512
+batch-max-wait-seconds = 60
+l1-batch-submission-fee = "0x38d7ea4c68000" # 0.001 ETH
+l1-batch-submission-gas-limit = 200_000
+tick-interval-seconds = 10
+
+[db.sql]
+filename = "./.db/relayer.sqlite"

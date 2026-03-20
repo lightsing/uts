@@ -1,26 +1,33 @@
 [package]
 authors.workspace = true
+categories = ["api-bindings"]
+description = "Ethereum Smart Contracts Interfaces for Universal Timestamps Project"
 edition.workspace = true
 homepage.workspace = true
-keywords.workspace = true
-license.workspace = true
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "LICENSE-*",
+]
+keywords = ["contracts", "solidity", "uts", "ethereum"]
+license = "MIT OR Apache-2.0"
 name = "uts-contracts"
 repository.workspace = true
 version.workspace = true
 
-[dependencies]
-alloy-contract = { workspace = true }
-alloy-primitives = { workspace = true }
-alloy-sol-types = { workspace = true, features = ["json"] }
-
-[dev-dependencies]
-alloy = { workspace = true, features = ["full", "node-bindings", "signer-mnemonic"] }
-eyre = { workspace = true }
-futures = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-
 [lints]
 workspace = true
 
+[dependencies]
+alloy-contract = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
+alloy-transport = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+phf = { workspace = true, features = ["std", "macros"] }
+serde = { workspace = true, optional = true }
+
 [features]
-erc1967 = []
+provider-helper = ["dep:alloy-transport", "alloy-transport/throttle"]
+provider-helper-clap = ["provider-helper", "dep:clap", "clap/derive"]
+provider-helper-serde = ["provider-helper", "dep:serde", "serde/derive"]

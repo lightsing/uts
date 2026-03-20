@@ -1,0 +1,23 @@
+[blockchain]
+eas-address = "0xaEF4103A04090071165F78D45D83A0C0782c2B2a"
+fee-oracle-address = "0x79bd2bb088b4E75AB26869cbEc1571019aBa06C0"
+manager-address = "0x7249802D50CB719547F7685d090d4b84e7183C32"
+
+[blockchain.rpc]
+l2 = "https://scroll-sepolia.g.alchemy.com/v2/<REDACTED>"
+
+[blockchain.rpc.retry]
+compute-units-per-second = 20
+initial-backoff = 100
+max-rate-limit-retries = 10
+
+[blockchain.rpc.throttle]
+requests-per-second = 25
+
+[blockchain.wallet]
+index = 0
+mnemonic = "<REDACTED>"
+
+[injector]
+calendar-url = "https://lgm1.calendar.test.timestamps.now"
+drand-base-url = "https://api.drand.sh"

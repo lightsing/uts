@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO l1_anchoring_queued (internal_log_id, attestation_id, root, queue_index, fee, block_number, timestamp)\n        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)\n        ON CONFLICT DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "51354b3d377266583cf45e7afaf72f87ff3efb1fd5a274150d9fd8fce66a4cd5"
+}

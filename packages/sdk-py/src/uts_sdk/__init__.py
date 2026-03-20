@@ -1,0 +1,135 @@
+# packages/sdk-py/src/uts_sdk/__init__.py
+
+# MIT License
+#
+# Copyright (c) 2025 UTS Contributors
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# Apache License, Version 2.0
+#
+# Copyright (c) 2025 UTS Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Universal Timestamps Python SDK."""
+
+from __future__ import annotations
+
+from uts_sdk._codec import Decoder, Encoder
+from uts_sdk._crypto import (
+    MerkleProof,
+    SiblingNode,
+    UnorderedMerkleTree,
+    keccak256,
+    sha256,
+)
+from uts_sdk._types import (
+    AppendStep,
+    Attestation,
+    AttestationStatus,
+    AttestationStatusKind,
+    AttestationStep,
+    BitcoinAttestation,
+    DetachedTimestamp,
+    DigestHeader,
+    DigestOp,
+    EASAttestation,
+    EASTimestamped,
+    ForkStep,
+    HexlifyStep,
+    Keccak256Step,
+    NodePosition,
+    OpCode,
+    PendingAttestation,
+    PrependStep,
+    PurgeResult,
+    ReverseStep,
+    RIPEMD160Step,
+    SHA1Step,
+    SHA256Step,
+    StampPhase,
+    Step,
+    Timestamp,
+    UnknownAttestation,
+    UpgradeResult,
+    UpgradeStatus,
+    VerifyStatus,
+)
+from uts_sdk.errors import DecodeError, EncodeError, RemoteError, UTSError, VerifyError
+from uts_sdk.sdk import SDK, VerificationResult
+
+__version__ = "0.1.0"
+
+__all__ = [
+    "SDK",
+    "VerificationResult",
+    "OpCode",
+    "Attestation",
+    "PendingAttestation",
+    "BitcoinAttestation",
+    "EASAttestation",
+    "EASTimestamped",
+    "UnknownAttestation",
+    "Timestamp",
+    "Step",
+    "DetachedTimestamp",
+    "DigestHeader",
+    "DigestOp",
+    "VerifyStatus",
+    "AttestationStatus",
+    "AttestationStatusKind",
+    "UpgradeStatus",
+    "UpgradeResult",
+    "PurgeResult",
+    "StampPhase",
+    "NodePosition",
+    "AttestationStep",
+    "AppendStep",
+    "PrependStep",
+    "SHA256Step",
+    "SHA1Step",
+    "RIPEMD160Step",
+    "Keccak256Step",
+    "ReverseStep",
+    "HexlifyStep",
+    "ForkStep",
+    "Encoder",
+    "Decoder",
+    "UnorderedMerkleTree",
+    "MerkleProof",
+    "SiblingNode",
+    "sha256",
+    "keccak256",
+    "UTSError",
+    "EncodeError",
+    "DecodeError",
+    "RemoteError",
+    "VerifyError",
+]

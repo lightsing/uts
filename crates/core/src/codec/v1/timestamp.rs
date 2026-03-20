@@ -1,14 +1,16 @@
 //! ** The implementation here is subject to change as this is a read-only version. **
 
 use crate::{
+    alloc::{Allocator, Global, vec, vec::Vec},
     codec::v1::{
         Attestation, FinalizationError, MayHaveInput, PendingAttestation,
         attestation::RawAttestation, opcode::OpCode,
     },
-    utils::{Hexed, OnceLock},
+    utils::Hexed,
 };
-use alloc::{alloc::Global, vec::Vec};
-use core::{alloc::Allocator, fmt::Debug};
+use allocator_api2::SliceExt;
+use core::fmt::Debug;
+use std::{ops::Not, sync::OnceLock};
 
 pub(crate) mod builder;
 mod decode;
@@ -154,14 +156,23 @@ impl<A: Allocator> Timestamp<A> {
         AttestationIter { stack: vec![self] }
     }
 
-    /// Iterates over all pending attestation steps in this timestamp.
+    /// Iterates over all attestation steps in this timestamp.
     ///
     /// # Note
     ///
-    /// This iterator will yield `Timestamp` instead of `RawAttestation`.
+    /// This iterator will yield `Timestamp` instead of `RawAttestation`
     #[inline]
-    pub fn pending_attestations_mut(&mut self) -> PendingAttestationIterMut<'_, A> {
-        PendingAttestationIterMut { stack: vec![self] }
+    pub fn attestations_mut(&mut self) -> AttestationIterMut<'_, A> {
+        AttestationIterMut { stack: vec![self] }
+    }
+
+    /// Iterates over all pending attestation steps in this timestamp.
+    ///
+    /// This is a shorthand by calling `attestations_mut`
+    #[inline]
+    pub fn pending_attestations_mut(&mut self) -> impl Iterator<Item = &mut Timestamp<A>> + '_ {
+        self.attestations_mut()
+            .filter(|ts| ts.as_attestation().expect("infallible").tag == PendingAttestation::TAG)
     }
 }
 
@@ -186,11 +197,11 @@ impl<A: Allocator + Clone> Timestamp<A> {
     ///
     /// Returns an error if the timestamp is already finalized with different input data.
     pub fn try_finalize(&self, input: &[u8]) -> Result<(), FinalizationError> {
-        let init_fn = || input.to_vec_in(self.allocator().clone());
+        let init_fn = || SliceExt::to_vec_in(input, self.allocator().clone());
         match self {
             Self::Attestation(attestation) => {
                 if let Some(already) = attestation.value.get() {
-                    return if &input != already {
+                    return if input != already {
                         Err(FinalizationError)
                     } else {
                         Ok(())
@@ -200,7 +211,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
             }
             Self::Step(step) => {
                 if let Some(already) = step.input.get() {
-                    return if &input != already {
+                    return if input != already {
                         Err(FinalizationError)
                     } else {
                         Ok(())
@@ -248,7 +259,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
         // if any timestamp is finalized, ensure they are with the same input,
         // finalize unfinalized timestamps with that input
         let finalized_input = timestamps.iter().find_map(|ts| ts.input());
-        if let Some(ref input) = finalized_input {
+        if let Some(input) = finalized_input {
             for ts in timestamps.iter().filter(|ts| !ts.is_finalized()) {
                 ts.try_finalize(input)?;
             }
@@ -260,6 +271,70 @@ impl<A: Allocator + Clone> Timestamp<A> {
             input: OnceLock::new(),
             next: timestamps,
         }))
+    }
+
+    /// Make a copy of the timestamp, by filtering the attestations for which the predicate
+    /// returns `true`.
+    ///
+    /// Returns `Some(timestamp)` where `timestamp` is the modified copy of the original one,
+    /// or `None` if the entire timestamp would be empty after filtering.
+    ///
+    /// When a FORK node is left with only one remaining branch after filtering,
+    /// it is collapsed into that branch to maintain the invariant that FORKs
+    /// have at least two children.
+    pub fn filter_attestations<F>(&self, mut f: F) -> Option<Timestamp<A>>
+    where
+        F: FnMut(&RawAttestation<A>) -> bool,
+    {
+        let mut this = self.clone();
+
+        // This can only be called at the root level
+        if let Timestamp::Attestation(attestation) = &this {
+            return if f(attestation) { None } else { Some(this) };
+        }
+
+        this.filter_attestations_inner(&mut f).not().then_some(this)
+    }
+
+    /// Returns `true` if this branch should be filtered
+    fn filter_attestations_inner<F>(&mut self, f: &mut F) -> bool
+    where
+        F: FnMut(&RawAttestation<A>) -> bool,
+    {
+        match self {
+            Timestamp::Step(step) if step.op == OpCode::FORK => {
+                step.next
+                    .retain_mut(|child| !child.filter_attestations_inner(f));
+                if step.next.is_empty() {
+                    return true;
+                }
+
+                // collapse
+                if step.next.len() == 1 {
+                    let remaining = step.next.pop().unwrap();
+                    *self = remaining;
+                }
+                false
+            }
+            Timestamp::Step(step) => {
+                debug_assert!(step.next.len() == 1, "non-FORK must have exactly one child");
+                step.next[0].filter_attestations_inner(f)
+            }
+
+            Timestamp::Attestation(attestation) => f(attestation),
+        }
+    }
+
+    /// Purges all pending attestations from this timestamp tree.
+    ///
+    /// This is a convenience wrapper around [`filter_attestations`](Self::filter_attestations)
+    /// that removes all attestations tagged as pending.
+    ///
+    /// Returns `Some(filtered)` where `filtered` is a copy of this timestamp tree with all
+    /// pending attestations removed, or `None` if removing pending attestations would leave
+    /// the timestamp tree empty.
+    pub fn purge_pending(&self) -> Option<Timestamp<A>> {
+        self.filter_attestations(|att| att.tag == PendingAttestation::TAG)
     }
 }
 
@@ -330,11 +405,11 @@ impl<'a, A: Allocator> Iterator for AttestationIter<'a, A> {
     }
 }
 
-pub struct PendingAttestationIterMut<'a, A: Allocator> {
+pub struct AttestationIterMut<'a, A: Allocator> {
     stack: Vec<&'a mut Timestamp<A>>,
 }
 
-impl<'a, A: Allocator> Iterator for PendingAttestationIterMut<'a, A> {
+impl<'a, A: Allocator> Iterator for AttestationIterMut<'a, A> {
     type Item = &'a mut Timestamp<A>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -345,13 +420,155 @@ impl<'a, A: Allocator> Iterator for PendingAttestationIterMut<'a, A> {
                         self.stack.push(next);
                     }
                 }
-                Timestamp::Attestation(attestation) => {
-                    if attestation.tag == PendingAttestation::TAG {
-                        return Some(ts);
-                    }
-                }
+                Timestamp::Attestation(_) => return Some(ts),
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        alloc::vec as alloc_vec,
+        codec::v1::{BitcoinAttestation, PendingAttestation},
+    };
+    use std::borrow::Cow;
+
+    fn make_pending(uri: &str) -> Timestamp {
+        Timestamp::builder()
+            .attest(PendingAttestation {
+                uri: Cow::Borrowed(uri),
+            })
+            .unwrap()
+    }
+
+    fn make_bitcoin(height: u32) -> Timestamp {
+        Timestamp::builder()
+            .attest(BitcoinAttestation { height })
+            .unwrap()
+    }
+
+    #[test]
+    fn purge_pending_single_pending() {
+        let ts = make_pending("https://example.com");
+        assert!(
+            ts.purge_pending().is_none(),
+            "all-pending should return None"
+        );
+    }
+
+    #[test]
+    fn purge_pending_single_confirmed() {
+        let ts = make_bitcoin(100);
+        assert_eq!(ts, ts.purge_pending().unwrap());
+    }
+
+    #[test]
+    fn purge_pending_fork_mixed() {
+        // FORK with one pending and one confirmed branch
+        let pending = make_pending("https://example.com");
+        let confirmed = make_bitcoin(100);
+        let ts = Timestamp::merge(alloc_vec![pending, confirmed]);
+
+        let result = ts.purge_pending().unwrap();
+        // After purge, the FORK should be collapsed since only 1 branch remains
+        assert!(
+            !matches!(result, Timestamp::Step(ref s) if s.op == OpCode::FORK),
+            "FORK with 1 branch should be collapsed"
+        );
+    }
+
+    #[test]
+    fn purge_pending_fork_all_pending() {
+        let p1 = make_pending("https://a.example.com");
+        let p2 = make_pending("https://b.example.com");
+        let ts = Timestamp::merge(alloc_vec![p1, p2]);
+
+        assert!(ts.purge_pending().is_none());
+    }
+
+    #[test]
+    fn purge_pending_fork_all_confirmed() {
+        let c1 = make_bitcoin(100);
+        let c2 = make_bitcoin(200);
+        let ts = Timestamp::merge(alloc_vec![c1, c2]);
+        assert_eq!(ts, ts.purge_pending().unwrap());
+    }
+
+    #[test]
+    fn purge_pending_nested_fork() {
+        // Outer FORK: [inner FORK: [pending, confirmed], confirmed]
+        let inner_pending = make_pending("https://inner.example.com");
+        let inner_confirmed = make_bitcoin(100);
+        let inner_fork = Timestamp::merge(alloc_vec![inner_pending, inner_confirmed]);
+        let outer_confirmed = make_bitcoin(200);
+        let ts = Timestamp::merge(alloc_vec![inner_fork, outer_confirmed]);
+
+        let result = ts.purge_pending().unwrap();
+        // Outer FORK remains (2 branches), inner FORK collapsed
+        assert!(matches!(result, Timestamp::Step(ref s) if s.op == OpCode::FORK));
+    }
+
+    #[test]
+    fn purge_attestations_complex() {
+        let pending1 = make_pending("https://example1.com");
+        let pending2 = make_pending("https://example2.com");
+        let mut ts = Timestamp::builder();
+        ts.keccak256();
+        let ts = ts.concat(Timestamp::merge(alloc_vec![pending1, pending2]));
+        let confirmed = make_bitcoin(100);
+        let ts = Timestamp::merge(alloc_vec![ts, confirmed]);
+
+        let result = ts.purge_pending().unwrap();
+        assert!(matches!(result, Timestamp::Attestation(a) if a.tag == BitcoinAttestation::TAG))
+    }
+
+    #[test]
+    fn retain_attestations_selective() {
+        // FORK with two different pending attestations and one confirmed
+        let p1 = make_pending("https://a.example.com");
+        let p2 = make_pending("https://b.example.com");
+        let confirmed = make_bitcoin(100);
+        let ts = Timestamp::merge(alloc_vec![p1, p2, confirmed]);
+
+        // Retain confirmed + second pending, removing first pending
+        let result = ts
+            .filter_attestations(|att| {
+                if att.tag != PendingAttestation::TAG {
+                    return false;
+                }
+                let p = PendingAttestation::from_raw(att).unwrap();
+                p.uri == "https://a.example.com"
+            })
+            .unwrap();
+        // FORK should remain since 2 branches are still present (p2 + confirmed)
+        assert!(matches!(result, Timestamp::Step(ref s) if s.op == OpCode::FORK));
+    }
+
+    #[test]
+    fn retain_attestations_keep_all() {
+        let p1 = make_pending("https://a.example.com");
+        let confirmed = make_bitcoin(100);
+        let ts = Timestamp::merge(alloc_vec![p1, confirmed]);
+
+        // Retain everything
+        assert_eq!(ts, ts.filter_attestations(|_| false).unwrap());
+    }
+
+    #[test]
+    fn retain_attestations_remove_by_type() {
+        // Test removing confirmed attestations (not just pending)
+        let pending = make_pending("https://example.com");
+        let confirmed = make_bitcoin(100);
+        let ts = Timestamp::merge(alloc_vec![pending, confirmed]);
+
+        // Remove bitcoin attestations, keep pending
+        let result = ts
+            .filter_attestations(|att| att.tag != PendingAttestation::TAG)
+            .unwrap();
+        // FORK collapsed since only 1 branch remains
+        assert!(!matches!(result, Timestamp::Step(ref s) if s.op == OpCode::FORK));
     }
 }

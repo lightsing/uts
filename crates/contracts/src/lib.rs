@@ -1,107 +1,57 @@
 //! Solidity contracts for UTS
 
-/// UniversalTimestamps contract
-pub mod uts {
-    use alloy_primitives::{Address, address};
+// MIT License
+//
+// Copyright (c) 2025 UTS Contributors
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// Apache License, Version 2.0
+//
+// Copyright (c) 2025 UTS Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-    #[doc(hidden)]
-    pub mod binding {
-        use alloy_sol_types::sol;
+/// EAS contract
+pub mod eas;
 
-        sol!(
-            #[sol(rpc, all_derives)]
-            IUniversalTimestamps,
-            "abi/IUniversalTimestamps.json"
-        );
-        sol!(
-            #[sol(rpc)]
-            UniversalTimestamps,
-            "abi/UniversalTimestamps.json"
-        );
-    }
+/// Incomplete Solidity interfaces for the L1 Gateway contract. This is not a complete interface,
+/// but only includes the events and functions that are relevant to the server/backend.
+pub mod gateway;
 
-    pub use binding::IUniversalTimestamps::{
-        Attested, IUniversalTimestampsInstance as UniversalTimestamps,
-    };
+/// Incomplete Solidity interfaces for the L2 Anchoring Manager. This is not a complete interface,
+/// but only includes the events and functions that are relevant to the server/backend.
+pub mod manager;
 
-    pub use binding::UniversalTimestamps::{BYTECODE, DEPLOYED_BYTECODE, deploy, deploy_builder};
+/// Solidity interfaces for the Fee Oracle.
+pub mod fee_oracle;
 
-    /// Default address for the UniversalTimestamps contract.
-    pub const DEFAULT_ADDRESS: Address = address!("0xceB7a9E77bd00D0391349B9bC989167cAB5e35e7");
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        use crate::erc1967::ERC1967ProxyInstance;
-        use alloy::{
-            network::EthereumWallet,
-            primitives::{B256, Bytes, U256, b256},
-            providers::ProviderBuilder,
-            signers::local::MnemonicBuilder,
-        };
-        use futures::StreamExt;
-        use std::env;
-
-        const ROOT: B256 =
-            b256!("5cd5c6763b9f2b3fb1cd66a15fe92b7ac913eec295d9927886e175f144ce3308");
-
-        #[tokio::test]
-        async fn test() -> eyre::Result<()> {
-            let provider = ProviderBuilder::new().connect_anvil_with_wallet();
-            let imp = deploy(&provider).await?;
-            let proxy =
-                ERC1967ProxyInstance::deploy(&provider, *imp.address(), Bytes::new()).await?;
-            let uts = UniversalTimestamps::new(*proxy.address(), &provider);
-
-            let attested_log = uts.Attested_filter().watch().await?;
-
-            let _ = uts.attest(ROOT).send().await?.watch().await?;
-
-            let timestamp = uts.timestamp(ROOT).call().await?;
-            assert_ne!(timestamp, U256::ZERO);
-
-            let (attested, _log) = attested_log.into_stream().next().await.unwrap()?;
-            assert_eq!(attested.root, ROOT);
-
-            Ok(())
-        }
-
-        #[tokio::test]
-        #[ignore]
-        async fn deploy_to_sepolia() -> eyre::Result<()> {
-            let signer = MnemonicBuilder::from_phrase(env::var("MNEMONIC")?.as_str())
-                .index(0u32)?
-                .build()?;
-
-            let provider = ProviderBuilder::new()
-                .wallet(EthereumWallet::new(signer))
-                .connect("https://0xrpc.io/sep")
-                .await?;
-
-            let imp = deploy(&provider).await?;
-            println!("Implementation deployed at: {:?}", imp.address());
-
-            let proxy =
-                ERC1967ProxyInstance::deploy(&provider, *imp.address(), Bytes::new()).await?;
-            println!("Proxy deployed at: {:?}", proxy.address());
-
-            Ok(())
-        }
-    }
-}
-
-/// ERC-1967 Proxy contract
-#[cfg(any(test, feature = "erc1967"))]
-pub mod erc1967 {
-    mod binding {
-        use alloy_sol_types::sol;
-
-        sol!(
-            #[sol(rpc)]
-            ERC1967Proxy,
-            "abi/ERC1967Proxy.json"
-        );
-    }
-
-    pub use binding::ERC1967Proxy::*;
-}
+/// Helper for construct retry and throttle provider layers.
+#[cfg(feature = "provider-helper")]
+pub mod provider_helper;

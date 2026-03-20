@@ -1,0 +1,17 @@
+[book]
+authors = ["UTS Contributors"]
+language = "en"
+src = "src"
+title = "UTS: Universal Timestamps"
+
+[build]
+build-dir = "build"
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[output.html]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+git-repository-icon = "fab-github"
+git-repository-url = "https://github.com/lightsing/uts"
+mathjax-support = true

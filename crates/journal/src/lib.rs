@@ -1,156 +1,160 @@
-//! Journal implementation for UTS
+//! RocksDB-backed journal implementation for UTS
+//!
+//! This crate provides the same functionality as `uts-journal` but uses RocksDB
+//! for persistence instead of a custom WAL, providing better reliability and
+//! crash recovery guarantees.
+
+// Copyright (C) 2026 UTS Contributors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 #[macro_use]
 extern crate tracing;
 
-use crate::{
-    checkpoint::{Checkpoint, CheckpointConfig},
-    error::JournalUnavailable,
-    reader::JournalReader,
-    wal::Wal,
-};
+use crate::{helper::FatalErrorExt, reader::JournalReader};
+use rocksdb::{ColumnFamily, DB, Options, WriteBatch};
 use std::{
-    cell::UnsafeCell,
-    fmt, io,
-    ops::Deref,
+    fmt,
     path::PathBuf,
-    pin::Pin,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
-    task::{Poll, Waker},
+    task::Waker,
 };
 
-/// Checkpointing
-pub mod checkpoint;
-/// Error types.
-pub mod error;
 /// Journal reader.
 pub mod reader;
-/// Write-Ahead Log backend.
-pub mod wal;
+
+mod helper;
+/// Error indicating that the journal buffer is not available now.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    /// The journal is in a fatal state, caller should stop using it and drop it as soon as possible.
+    #[error("fatal error happened")]
+    Fatal,
+    /// The journal buffer is full, new entries cannot be accepted until some entries are consumed
+    /// and the buffer has space.
+    #[error("journal buffer is full")]
+    Full,
+}
+
+const CF_ENTRIES: &str = "entries";
+const CF_META: &str = "meta";
 
 /// Configuration for the journal.
 #[derive(Debug, Clone)]
 pub struct JournalConfig {
-    /// Configuration for the consumer checkpoint, which tracks the `consumed_index` of the journal.
-    pub consumer_checkpoint: CheckpointConfig,
-    /// Directory for the write-ahead log (WAL) backend, which persists committed entries to disk
-    /// for durability and crash recovery, allowing the journal to recover from crashes without data
-    /// loss.
-    pub wal_dir: PathBuf,
+    /// Directory for the RocksDB database that stores journal entries and metadata.
+    pub db_path: PathBuf,
 }
 
 impl Default for JournalConfig {
     fn default() -> Self {
         Self {
-            consumer_checkpoint: CheckpointConfig::default(),
-            wal_dir: PathBuf::from("wal"),
+            db_path: PathBuf::from("journal_db"),
         }
     }
 }
 
-/// An `At-Least-Once` journal for storing fixed-size entries in a ring buffer.
+/// An `At-Least-Once` journal for storing fixed-size entries, with
+/// RocksDB-backed persistence.
 ///
-/// All index here are monotonic u64, wrapping around on overflow.
+/// All indices here are monotonic u64, wrapping around on overflow.
 ///
-/// Following invariants are maintained:
-/// `consumed_index` <= `persisted_index` <= `filled_index` <= `write_index`.
+/// Invariant: `consumed_index` <= `write_index`.
+///
+/// Writes go directly to RocksDB (synchronous and durable), so there is no
+/// separate "persisted" boundary — `write_index` **is** the persisted boundary.
 #[derive(Clone)]
-pub struct Journal<const ENTRY_SIZE: usize> {
-    inner: Arc<JournalInner<{ ENTRY_SIZE }>>,
-    /// Wal backend for recovery.
-    wal: Wal<{ ENTRY_SIZE }>,
+pub struct Journal {
+    inner: Arc<JournalInner>,
 }
 
-pub(crate) struct JournalInner<const ENTRY_SIZE: usize> {
-    /// The ring buffer storing the entries.
-    /// The capacity of the ring buffer, **MUST** be power of two.
-    buffer: Box<[UnsafeCell<[u8; ENTRY_SIZE]>]>,
-    /// The co-ring buffer storing the wakers.
-    /// The capacity of the ring buffer, **MUST** be power of two.
-    waker_buffer: Box<[WakerEntry]>,
-    /// Mask for indexing into the ring buffer.
-    index_mask: u64,
-    /// Next Write Position, aka:
-    /// - Total entries reserved count.
-    /// - Position to write the next entry to.
+pub(crate) struct JournalInner {
+    /// The RocksDB instance storing entries and metadata.
+    db: DB,
+    /// Maximum number of in-flight (written but not yet consumed) entries.
+    capacity: u64,
+    /// Next write position – also the durable frontier because every commit
+    /// is a synchronous RocksDB write.
     write_index: AtomicU64,
-    /// Filled Boundary, aka:
-    /// - Total entries that have been fully written to the ring buffer.
-    /// - Advanced in order after each writer finishes copying data into its reserved slot.
-    /// - The WAL worker uses this (not `write_index`) to determine how far it can safely read.
-    filled_index: AtomicU64,
-    /// WAL Committed Boundary, aka.:
-    /// - Total committed entries count.
-    /// - Position has not yet been persisted to durable storage.
-    persisted_index: AtomicU64,
-    /// Free Boundary, aka.:
-    /// - Total consumed entries count.
-    /// - Position that has not yet been consumed by readers.
-    consumed_checkpoint: Checkpoint,
-    /// Whether a reader has taken ownership of this journal.
+    /// Last consumed index, updated by the reader's `commit()`.
+    consumed_index: AtomicU64,
+    /// Serializes the write path so entries are numbered consecutively.
+    write_lock: Mutex<()>,
+    /// Whether a reader has been acquired.
     reader_taken: AtomicBool,
-    /// Waker for the consumer to notify new persisted entries.
+    /// Waker for the consumer waiting for new entries.
     consumer_wait: Mutex<Option<ConsumerWait>>,
-    /// Shutdown flag
-    shutdown: AtomicBool,
+    /// Whether the journal is in a fatal error state. If true, all operations will fail and the
+    /// journal should be dropped.
+    fatal_error: AtomicBool,
 }
 
-unsafe impl<const ENTRY_SIZE: usize> Sync for JournalInner<ENTRY_SIZE> {}
-unsafe impl<const ENTRY_SIZE: usize> Send for JournalInner<ENTRY_SIZE> {}
-
-impl<const ENTRY_SIZE: usize> fmt::Debug for Journal<ENTRY_SIZE> {
+impl fmt::Debug for Journal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Journal").finish()
     }
 }
 
-impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
-    /// Create a new journal with the specified capacity.
-    ///
-    /// The capacity will be rounded up to the next power of two.
-    pub fn with_capacity(capacity: usize) -> io::Result<Self> {
+impl Journal {
+    /// Create a new journal with the specified capacity and default configuration.
+    pub fn with_capacity(capacity: usize) -> Result<Self, Error> {
         Self::with_capacity_and_config(capacity, JournalConfig::default())
     }
 
-    /// Create a new journal with the specified capacity.
-    ///
-    /// The capacity will be rounded up to the next power of two.
-    pub fn with_capacity_and_config(capacity: usize, config: JournalConfig) -> io::Result<Self> {
-        let capacity = capacity.next_power_of_two();
-        let index_mask = capacity as u64 - 1;
+    /// Create a new journal with the specified capacity and configuration.
+    pub fn with_capacity_and_config(capacity: usize, config: JournalConfig) -> Result<Self, Error> {
+        let capacity = capacity as u64;
 
-        let mut buffer = Vec::with_capacity(capacity);
-        buffer.resize_with(capacity, || UnsafeCell::new([0u8; ENTRY_SIZE]));
-        let buffer = buffer.into_boxed_slice();
+        let mut global_options = Options::default();
+        global_options.create_if_missing(true);
+        global_options.create_missing_column_families(true);
 
-        let mut waker_buffer = Vec::with_capacity(capacity);
-        waker_buffer.resize_with(capacity, Default::default);
-        let waker_buffer = waker_buffer.into_boxed_slice();
+        let db = match DB::open_cf(&global_options, &config.db_path, [CF_ENTRIES, CF_META]) {
+            Ok(db) => db,
+            Err(e) => {
+                error!("Failed to open RocksDB at {:?}: {e}", config.db_path);
+                return Err(Error::Fatal);
+            }
+        };
 
         let inner = Arc::new(JournalInner {
-            buffer,
-            waker_buffer,
-            index_mask,
+            db,
+            capacity,
             write_index: AtomicU64::new(0),
-            filled_index: AtomicU64::new(0),
-            persisted_index: AtomicU64::new(0),
-            consumed_checkpoint: Checkpoint::new(config.consumer_checkpoint)?,
+            consumed_index: AtomicU64::new(0),
+            write_lock: Mutex::new(()),
             reader_taken: AtomicBool::new(false),
             consumer_wait: Mutex::new(None),
-            shutdown: AtomicBool::new(false),
+            fatal_error: AtomicBool::new(false),
         });
 
-        let wal = Wal::new(config.wal_dir, inner.clone())?;
+        // Recover state
+        let write_index = inner.read_write_index_from_db()?;
+        let consumed_index = inner.read_consumed_index_from_db()?;
+        if consumed_index > write_index {
+            error!("Consumed index {consumed_index} is greater than write index {write_index}");
+            return Err(Error::Fatal);
+        }
+        info!("Journal recovered: write_index={write_index}, consumed_index={consumed_index}");
 
-        Ok(Self { inner, wal })
-    }
+        inner.set_write_index(write_index);
+        inner.set_consumed_index(consumed_index);
 
-    /// Get the capacity of the journal.
-    #[inline]
-    fn capacity(&self) -> usize {
-        self.inner.capacity()
+        Ok(Self { inner })
     }
 
     /// Acquires a reader for this journal.
@@ -158,216 +162,178 @@ impl<const ENTRY_SIZE: usize> Journal<ENTRY_SIZE> {
     /// # Panics
     ///
     /// Panics if a reader is already taken.
-    pub fn reader(&self) -> JournalReader<ENTRY_SIZE> {
+    pub fn reader(&self) -> JournalReader {
         self.try_reader().expect("Journal reader already taken")
     }
 
     /// Try acquires a reader for this journal.
     ///
     /// If a reader is already taken, returns None.
-    pub fn try_reader(&self) -> Option<JournalReader<ENTRY_SIZE>> {
+    pub fn try_reader(&self) -> Option<JournalReader> {
         if self.inner.reader_taken.swap(true, Ordering::AcqRel) {
             return None;
         }
-
         Some(JournalReader::new(self.inner.clone()))
     }
 
     /// Commit a new entry to the journal.
     ///
+    /// The entry is written to RocksDB synchronously.
+    ///
     /// # Panics
     ///
-    /// Panics if:
-    /// - the journal is full.
-    /// - the journal is shut down.
-    pub fn commit(&self, data: &[u8; ENTRY_SIZE]) -> CommitFuture<'_, ENTRY_SIZE> {
-        self.try_commit(data).expect("Journal buffer is full")
+    /// Panics if the journal is full or has encountered a fatal error.
+    pub fn commit(&self, data: &[u8]) {
+        self.try_commit(data).expect("Journal is unavailable")
     }
 
     /// Try commit a new entry to the journal.
     ///
-    /// Returns a future that resolves when the entry has been safely persisted.
-    /// Returns `BufferFull` error if the journal is full.
-    pub fn try_commit(
-        &self,
-        data: &[u8; ENTRY_SIZE],
-    ) -> Result<CommitFuture<'_, ENTRY_SIZE>, JournalUnavailable> {
-        if self.inner.shutdown.load(Ordering::Acquire) {
-            return Err(JournalUnavailable::Shutdown);
+    /// The entry is written to RocksDB synchronously.
+    pub fn try_commit(&self, data: &[u8]) -> Result<(), Error> {
+        if self.inner.fatal_error.load(Ordering::Acquire) {
+            return Err(Error::Fatal);
         }
 
-        let mut current_written = self.inner.write_index.load(Ordering::Relaxed);
-        loop {
-            // 1. Check if there is space in the buffer.
-            let consumed = self.inner.consumed_checkpoint.current_index();
-            if current_written.wrapping_sub(consumed) >= self.capacity() as u64 {
-                return Err(JournalUnavailable::Full);
-            }
+        // Serialize writes so indices are strictly consecutive.
+        let _guard = self.inner.write_lock.lock().unwrap();
 
-            // 2. Try to reserve a slot.
-            match self.inner.write_index.compare_exchange_weak(
-                current_written,
-                current_written.wrapping_add(1),
-                Ordering::AcqRel,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => break,
-                Err(actual) => current_written = actual,
-            }
+        let write_idx = self.inner.write_index();
+        let consumed = self.inner.consumed_index();
+
+        if write_idx.wrapping_sub(consumed) >= self.inner.capacity {
+            return Err(Error::Full);
         }
 
-        // 3. Write the data to the slot.
-        let slot = unsafe { &mut *self.data_slot_ptr(current_written) };
-        slot.copy_from_slice(data);
+        let cf_entries = self.inner.cf_entries();
+        // Write entry + updated write_index atomically via WriteBatch.
+        let new_write_idx = write_idx.wrapping_add(1);
+        let mut batch = WriteBatch::default();
+        batch.put_cf(cf_entries, write_idx.to_be_bytes(), data);
+        self.inner
+            .write_write_index_batched(&mut batch, new_write_idx);
+        self.inner.db.write(batch).stop_if_error(&self.inner)?;
 
-        // 4. Publish the filled slot.
-        //    Spin-wait until all prior slots are filled, then advance `filled_index`.
-        //    The Release ordering ensures the slot write above is visible to the WAL worker
-        //    before it reads `filled_index`.
-        while self
-            .inner
-            .filled_index
-            .compare_exchange_weak(
-                current_written,
-                current_written.wrapping_add(1),
-                Ordering::Release,
-                Ordering::Relaxed,
-            )
-            .is_err()
-        {
-            std::hint::spin_loop();
-        }
+        self.inner.set_write_index(new_write_idx);
 
-        // 5. Notify WAL worker if needed.
-        let committed = self.inner.persisted_index.load(Ordering::Relaxed);
-        // Explain: If there is no pending committed entry before ours,
-        // the WAL worker may be sleeping, so we need to wake it up.
-        if current_written == committed {
-            // Notify the WAL worker thread to persist new entries.
-            self.wal.unpark();
-        }
+        // drop write_lock before notifying consumer
+        drop(_guard);
 
-        Ok(CommitFuture {
-            journal: self,
-            slot: current_written,
-            active_waker: None,
-        })
-    }
+        // Notify consumer if it is waiting for entries.
+        self.inner.notify_consumer();
 
-    /// Shut down the journal, flushing all checkpoints and shutting down the WAL.
-    pub fn shutdown(&self) -> io::Result<()> {
-        self.inner.shutdown.store(true, Ordering::SeqCst);
-
-        self.inner.consumed_checkpoint.flush()?;
-        self.wal.shutdown();
         Ok(())
     }
 
-    /// Get a mut ptr to the slot at the given index.
+    /// Get the current consumed index.
     #[inline]
-    fn data_slot_ptr(&self, index: u64) -> *mut [u8; ENTRY_SIZE] {
-        self.inner.data_slot_ptr(index)
+    pub fn consumed_index(&self) -> u64 {
+        self.inner.consumed_index()
     }
 
-    /// Get a ref to the waker entry at the given index.
+    /// Get the current write index.
     #[inline]
-    fn waker_slot(&self, index: u64) -> &WakerEntry {
-        self.inner.waker_slot(index)
-    }
-}
-
-impl<const ENTRY_SIZE: usize> JournalInner<ENTRY_SIZE> {
-    /// Get the capacity of the journal.
-    #[inline]
-    fn capacity(&self) -> usize {
-        self.buffer.len()
-    }
-
-    /// Get a mut ptr to the slot at the given index.
-    #[inline]
-    const fn data_slot_ptr(&self, index: u64) -> *mut [u8; ENTRY_SIZE] {
-        let slot_idx = index & self.index_mask;
-        self.buffer[slot_idx as usize].get()
-    }
-
-    /// Get a ref to the waker entry at the given index.
-    #[inline]
-    const fn waker_slot(&self, index: u64) -> &WakerEntry {
-        let slot_idx = index & self.index_mask;
-        &self.waker_buffer[slot_idx as usize]
+    pub fn write_index(&self) -> u64 {
+        self.inner.write_index()
     }
 }
 
-/// Future returned by `Journal::commit` representing the commit operation.
-/// The future resolves when the entry has been safely persisted.
-#[derive(Debug)]
-pub struct CommitFuture<'a, const ENTRY_SIZE: usize> {
-    journal: &'a Journal<ENTRY_SIZE>,
-    slot: u64,
-    /// Whether the waker has been registered.
-    active_waker: Option<Waker>,
-}
+impl JournalInner {
+    const META_WRITE_INDEX_KEY: &[u8] = &[0x00];
+    const META_CONSUMED_INDEX_KEY: &[u8] = &[0x01];
 
-impl<const ENTRY_SIZE: usize> Future for CommitFuture<'_, ENTRY_SIZE> {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if self.journal.inner.persisted_index.load(Ordering::Acquire) > self.slot {
-            return Poll::Ready(());
+    /// Wake the consumer waker if the write index has reached its target.
+    fn notify_consumer(&self) {
+        let mut guard = self.consumer_wait.lock().unwrap();
+        if let Some(wait) = guard.as_ref()
+            && (self.write_index() >= wait.target_index || self.fatal_error.load(Ordering::Acquire))
+        {
+            guard.take().unwrap().waker.wake();
         }
+    }
 
-        let should_register = match &self.active_waker {
-            None => true,
-            // waker changed, need to update, rare case
-            Some(w) => !w.will_wake(cx.waker()),
+    #[inline]
+    pub(crate) fn consumed_index(&self) -> u64 {
+        self.consumed_index.load(Ordering::Acquire)
+    }
+
+    #[inline]
+    pub(crate) fn set_consumed_index(&self, idx: u64) {
+        self.consumed_index.store(idx, Ordering::Release);
+    }
+
+    #[inline]
+    pub(crate) fn write_index(&self) -> u64 {
+        self.write_index.load(Ordering::Acquire)
+    }
+
+    #[inline]
+    pub(crate) fn set_write_index(&self, idx: u64) {
+        self.write_index.store(idx, Ordering::Release);
+    }
+
+    #[inline]
+    pub(crate) fn cf_entries(&self) -> &ColumnFamily {
+        self.db.cf_handle(CF_ENTRIES).expect("missing entries CF")
+    }
+
+    #[inline]
+    pub(crate) fn cf_meta(&self) -> &ColumnFamily {
+        self.db.cf_handle(CF_META).expect("missing meta CF")
+    }
+
+    #[inline]
+    pub(crate) fn read_consumed_index_from_db(&self) -> Result<u64, Error> {
+        self.read_meta(Self::META_CONSUMED_INDEX_KEY)
+    }
+
+    #[inline]
+    pub(crate) fn read_write_index_from_db(&self) -> Result<u64, Error> {
+        self.read_meta(Self::META_WRITE_INDEX_KEY)
+    }
+
+    #[inline]
+    fn read_meta(&self, key: &[u8]) -> Result<u64, Error> {
+        let cf = self.cf_meta();
+        let Some(value) = self.db.get_cf(cf, key).stop_if_error(self)? else {
+            // If the key is missing, assume index 0 (fresh journal).
+            return Ok(0);
         };
-
-        if should_register {
-            let entry = self.journal.waker_slot(self.slot);
-            let mut guard = entry.lock().expect("Mutex poisoned");
-
-            if self.journal.inner.persisted_index.load(Ordering::Acquire) > self.slot {
-                return Poll::Ready(());
-            }
-
-            *guard = Some(cx.waker().clone());
-            self.active_waker = Some(cx.waker().clone());
+        if value.len() != 8 {
+            error!(
+                "Invalid meta value for key {:?}: expected 8 bytes, got {}",
+                key,
+                value.len()
+            );
+            return Err(Error::Fatal);
         }
+        Ok(u64::from_le_bytes(value.as_slice().try_into().unwrap()))
+    }
 
-        if self.journal.inner.persisted_index.load(Ordering::Acquire) > self.slot {
-            return Poll::Ready(());
-        }
+    #[inline]
+    pub(crate) fn write_consumed_index_batched(&self, batch: &mut WriteBatch, new: u64) {
+        self.write_meta_batched(Self::META_CONSUMED_INDEX_KEY, batch, new)
+    }
 
-        Poll::Pending
+    #[inline]
+    pub(crate) fn write_write_index_batched(&self, batch: &mut WriteBatch, new: u64) {
+        self.write_meta_batched(Self::META_WRITE_INDEX_KEY, batch, new)
+    }
+
+    #[inline]
+    fn write_meta_batched(&self, key: &[u8], batch: &mut WriteBatch, new: u64) {
+        batch.put_cf(self.cf_meta(), key, new.to_le_bytes())
     }
 }
 
 /// A consumer wait entry.
-struct ConsumerWait {
-    waker: Waker,
-    target_index: u64,
-}
-
-/// A waker entry in the co-ring buffer.
-///
-/// Aligned to cache line size to prevent false sharing.
-#[derive(Default)]
-#[repr(C, align(64))]
-struct WakerEntry(Mutex<Option<Waker>>);
-
-impl Deref for WakerEntry {
-    type Target = Mutex<Option<Waker>>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub(crate) struct ConsumerWait {
+    pub(crate) waker: Waker,
+    pub(crate) target_index: u64,
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::checkpoint::CheckpointConfig;
-
     pub const ENTRY_SIZE: usize = 8;
     pub const TEST_DATA: &[[u8; ENTRY_SIZE]] = &[
         [0u8; ENTRY_SIZE],
@@ -381,18 +347,14 @@ pub(crate) mod tests {
         [8u8; ENTRY_SIZE],
         [9u8; ENTRY_SIZE],
     ];
-    pub type Journal = crate::Journal<ENTRY_SIZE>;
+    pub type Journal = crate::Journal;
 
-    /// Create a journal with an isolated temporary directory for WAL and checkpoint files.
+    /// Create a journal with an isolated temporary directory for the RocksDB database.
     /// Returns the journal and the temp dir guard (must be kept alive for the test duration).
     pub fn test_journal(capacity: usize) -> (Journal, tempfile::TempDir) {
         let tmp = tempfile::tempdir().expect("failed to create temp dir");
         let config = crate::JournalConfig {
-            consumer_checkpoint: CheckpointConfig {
-                path: tmp.path().join("checkpoint.meta"),
-                ..Default::default()
-            },
-            wal_dir: tmp.path().join("wal"),
+            db_path: tmp.path().join("journal_db"),
         };
         let journal =
             Journal::with_capacity_and_config(capacity, config).expect("failed to create journal");
@@ -416,7 +378,6 @@ pub(crate) mod tests {
             "reader acquisition should succeed after drop"
         );
 
-        journal.shutdown()?;
         Ok(())
     }
 
@@ -425,19 +386,18 @@ pub(crate) mod tests {
         let (journal, _tmp) = test_journal(4);
         let mut reader = journal.reader();
 
-        journal.commit(&TEST_DATA[0]).await;
-        journal.commit(&TEST_DATA[1]).await;
+        journal.commit(&TEST_DATA[0]);
+        journal.commit(&TEST_DATA[1]);
 
         {
-            let entries = reader.read(2);
+            let entries = reader.read(2)?;
             assert_eq!(entries.len(), 2);
-            assert_eq!(entries[0], TEST_DATA[0]);
-            assert_eq!(entries[1], TEST_DATA[1]);
+            assert_eq!(*entries[0], TEST_DATA[0]);
+            assert_eq!(*entries[1], TEST_DATA[1]);
         }
 
         reader.commit()?;
         assert_eq!(reader.available(), 0);
-        journal.shutdown()?;
         Ok(())
     }
 
@@ -445,58 +405,51 @@ pub(crate) mod tests {
     async fn commit_returns_error_when_full() -> eyre::Result<()> {
         let (journal, _tmp) = test_journal(2);
 
-        journal.commit(&TEST_DATA[1]).await;
-        journal.commit(&TEST_DATA[2]).await;
+        journal.commit(&TEST_DATA[1]);
+        journal.commit(&TEST_DATA[2]);
 
         let err = journal
             .try_commit(&TEST_DATA[3])
             .expect_err("buffer should report full on third commit");
         assert!(
-            matches!(err, crate::error::JournalUnavailable::Full),
+            matches!(err, crate::Error::Full),
             "expected Full, got {err:?}"
         );
-        journal.shutdown()?;
         Ok(())
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn reader_handles_wrap_around_reads() -> eyre::Result<()> {
+    async fn reader_handles_sequential_reads() -> eyre::Result<()> {
         let (journal, _tmp) = test_journal(4);
         let mut reader = journal.reader();
 
         for entry in TEST_DATA.iter().take(4) {
-            journal.commit(entry).await;
+            journal.commit(entry);
         }
 
         {
-            let entries = reader.read(2);
+            let entries = reader.read(2)?;
             assert_eq!(entries.len(), 2);
-            assert_eq!(entries[0], TEST_DATA[0]);
-            assert_eq!(entries[1], TEST_DATA[1]);
+            assert_eq!(*entries[0], TEST_DATA[0]);
+            assert_eq!(*entries[1], TEST_DATA[1]);
         }
         reader.commit()?;
 
         for entry in TEST_DATA.iter().skip(4).take(2) {
-            journal.commit(entry).await;
+            journal.commit(entry);
         }
 
         {
-            let entries = reader.read(4);
-            assert_eq!(entries.len(), 2);
-            assert_eq!(entries[0], TEST_DATA[2]);
-            assert_eq!(entries[1], TEST_DATA[3]);
-        }
-
-        {
-            let entries = reader.read(4);
-            assert_eq!(entries.len(), 2);
-            assert_eq!(entries[0], TEST_DATA[4]);
-            assert_eq!(entries[1], TEST_DATA[5]);
+            let entries = reader.read(4)?;
+            assert_eq!(entries.len(), 4);
+            assert_eq!(*entries[0], TEST_DATA[2]);
+            assert_eq!(*entries[1], TEST_DATA[3]);
+            assert_eq!(*entries[2], TEST_DATA[4]);
+            assert_eq!(*entries[3], TEST_DATA[5]);
         }
 
         reader.commit()?;
         assert_eq!(reader.available(), 0);
-        journal.shutdown()?;
         Ok(())
     }
 }

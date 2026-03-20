@@ -1,0 +1,4 @@
+{
+  "include": [".vitepress/**/*.ts", "config.ts"],
+  "extends": "../../tsconfig.json"
+}

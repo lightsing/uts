@@ -1,5 +1,7 @@
 {
   "solidity.packageDefaultDependenciesContractsDirectory": "contracts",
   "solidity.packageDefaultDependenciesDirectory": "lib",
-  "solidity.exclude": ["lib/**"]
+  "solidity.exclude": ["lib/**"],
+  "python-envs.defaultEnvManager": "ms-python.python:poetry",
+  "python-envs.defaultPackageManager": "ms-python.python:poetry"
 }

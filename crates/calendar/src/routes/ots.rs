@@ -1,64 +1,55 @@
-use crate::{AppState, time::current_time_sec};
+use crate::{
+    AppState,
+    routes::{headers::*, responses::*},
+    time::current_time_sec,
+};
+use alloy_chains::Chain;
 use alloy_primitives::B256;
 use alloy_signer::SignerSync;
 use axum::{
     body::Bytes,
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, header},
     response::{IntoResponse, Response},
 };
 use bump_scope::Bump;
 use bytes::BytesMut;
-use digest::Digest;
+use digest::{Digest, Output};
 use sha3::Keccak256;
 use std::{cell::RefCell, sync::Arc};
-use uts_bmt::UnorderedMerkleTree;
 use uts_core::{
+    alloc::SliceExt,
     codec::{
         Encode,
-        v1::{EthereumUTSAttestation, PendingAttestation, Timestamp},
+        v1::{EASTimestamped, PendingAttestation, Timestamp},
     },
-    utils::Hexed,
 };
-use uts_stamper::DbExt;
+use uts_journal::Error;
+use uts_stamper::{kv::DbExt, sql, sql::AttestationResult};
 
 /// Maximum digest size accepted by the endpoint.
 pub const MAX_DIGEST_SIZE: usize = 64; // e.g., SHA3-512
 
-// Test this with official ots client:
-// ots stamp -c "http://localhost:3000/" -m 1 <input_file>
-// cargo run --bin uts-info -- <input_file>.ots
-// Sample:
-// ```
-// OTS Detached Timestamp found:
-// Version 1 Proof digest of SHA256 877c470874fa92e5609a1396b1188ffa3e539d83ec2748a7cb6fb2d4430d45a2
-// execute APPEND ec04517482d3be52b6123ca37f683285
-// result 877c470874fa92e5609a1396b1188ffa3e539d83ec2748a7cb6fb2d4430d45a2ec04517482d3be52b6123ca37f683285
-// execute SHA256
-// result 2edc60a195a879bd446c5473921c46db14c4b1974516682ecae2b406121a5732
-// execute PREPEND 5137456900000000
-// result 51374569000000002edc60a195a879bd446c5473921c46db14c4b1974516682ecae2b406121a5732
-// execute APPEND 9f947a5cf576ba4f68593ac5e350204cc8b38bf0fd5f6f2d4436820d3164dfeaf7405188dfc4bad66e8f42e6fd0a6ffdcceebda548d01224113baab1a568a2b8
-// result 51374569000000002edc60a195a879bd446c5473921c46db14c4b1974516682ecae2b406121a57329f947a5cf576ba4f68593ac5e350204cc8b38bf0fd5f6f2d4436820d3164dfeaf7405188dfc4bad66e8f42e6fd0a6ffdcceebda548d01224113baab1a568a2b8
-// execute KECCAK256
-// result c15b4e8b93e9aaee5b8c736f5b73e5f313062e389925a0b1fc6495053f99d352
-// result attested by Pending: update URI https://localhost:3000
-// ```
 /// Submit digest to calendar server and get pending timestamp in response.
 pub async fn submit_digest(State(state): State<Arc<AppState>>, digest: Bytes) -> Response {
-    let (output, commitment) = submit_digest_inner(digest, &state.signer);
+    let (output, commitment) = submit_digest_inner(digest, &state.signer, &state.config.server.uri);
     match state.journal.try_commit(&commitment) {
-        Err(_) => {
-            return (StatusCode::SERVICE_UNAVAILABLE, r#"{"err":"server busy"}"#).into_response();
-        } // journal is full
-        Ok(fut) => fut.await,
+        // journal is full
+        Err(Error::Full) => return service_unavailable(),
+        // journal is in fatal error status
+        Err(Error::Fatal) => return internal_server_error(),
+        Ok(()) => {}
     }
     output.into_response()
 }
 
 // TODO: We need to benchmark this.
 /// inner function to submit digest, returns (encoded timestamp, commitment)
-pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u8; 32]) {
+pub fn submit_digest_inner(
+    digest: Bytes,
+    signer: impl SignerSync,
+    pending_uri: &str,
+) -> (Bytes, [u8; 32]) {
     const PRE_ALLOCATION_SIZE_HINT: usize = 4096;
     thread_local! {
         // We don't have `.await` in this function, so it's safe to borrow thread local.
@@ -92,15 +83,16 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
             hasher.finalize_reset()
         });
 
-        let undeniable_sig = signer.sign_hash_sync(&hash.0.into()).unwrap();
+        let hash = B256::from_slice(&hash);
+        let undeniable_sig = signer.sign_hash_sync(&hash).unwrap();
         undeniable_sig.as_erc2098()
     };
 
     #[cfg(any(debug_assertions, not(feature = "performance")))]
     trace!(
-        recv_timestamp = ?Hexed(&recv_timestamp),
-        digest = ?Hexed(&digest),
-        undeniable_sig = ?Hexed(&undeniable_sig),
+        recv_timestamp = ?uts_core::utils::Hexed(&recv_timestamp),
+        digest = ?uts_core::utils::Hexed(&digest),
+        undeniable_sig = ?uts_core::utils::Hexed(&undeniable_sig),
     );
 
     BUMP.with(|bump| {
@@ -109,8 +101,8 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
 
         let mut builder = Timestamp::builder_in(&*bump);
         builder
-            .prepend(recv_timestamp.to_vec_in(&bump))
-            .append(undeniable_sig.to_vec_in(&bump))
+            .prepend(SliceExt::to_vec_in(recv_timestamp.as_slice(), &bump))
+            .append(SliceExt::to_vec_in(undeniable_sig.as_slice(), &bump))
             .keccak256();
 
         let mut commitment = [0u8; 32];
@@ -118,13 +110,11 @@ pub fn submit_digest_inner(digest: Bytes, signer: impl SignerSync) -> (Bytes, [u
 
         let timestamp = builder
             .attest(PendingAttestation {
-                uri: "http://localhost:3000".into(),
+                uri: pending_uri.into(),
             })
             .unwrap();
 
         // copy data out of bump
-        // TODO: eliminate this allocation by reusing from a pool
-        // TODO: wrap the buffer with a drop trait to return to pool
         let mut buf = BytesMut::with_capacity(128);
         timestamp.encode(&mut buf).unwrap();
 
@@ -140,51 +130,54 @@ pub async fn get_timestamp(
     State(state): State<Arc<AppState>>,
     Path(commitment): Path<B256>,
 ) -> Response {
-    const PRE_ALLOCATION_SIZE_HINT: usize = 4096;
-    thread_local! {
-        // We don't have `.await` in this function, so it's safe to borrow thread local.
-        static BUMP: RefCell<Bump> = RefCell::new(Bump::with_size(PRE_ALLOCATION_SIZE_HINT));
-    }
-
-    let Some(root) = state.db.get_root_for_leaf(commitment).expect("DB error") else {
-        return (StatusCode::NOT_FOUND, r#"{"err":"timestamp not found"}"#).into_response();
+    let Some(root) =
+        DbExt::<Keccak256>::get_root_for_leaf(&*state.kv_db, commitment).expect("DB error")
+    else {
+        return not_found();
     };
-    let entry = state
-        .db
-        .load_entry(root)
+
+    let id = match sql::get_attestation_result(&state.sql_pool, root).await {
+        Ok((_, AttestationResult::Pending)) => return not_found(),
+        Ok((_, AttestationResult::MaxAttemptsExceeded)) => return internal_server_error(),
+        Ok((id, AttestationResult::Success)) => id,
+        Err(e) => {
+            error!("SQL error: {e}");
+            return internal_server_error();
+        }
+    };
+
+    let Ok(Some(attestation)) = sql::get_last_successful_attest_attempt(&state.sql_pool, id).await
+    else {
+        error!("get_last_successful_attest_attempt failed for attestation_id {id} unexpectedly");
+        return internal_server_error();
+    };
+
+    let trie = DbExt::<Keccak256>::load_trie(&*state.kv_db, root)
         .expect("DB error")
         .expect("bug: entry not found");
-    let trie: UnorderedMerkleTree<Keccak256> = entry.trie();
 
+    let commitment = Output::<Keccak256>::from_slice(commitment.as_slice());
     let proof = trie
-        .get_proof_iter(bytemuck::cast_ref(&*commitment))
+        .get_proof_iter(commitment)
         .expect("bug: proof not found");
-    let output = BUMP.with(|bump| {
-        let mut bump = bump.borrow_mut();
-        bump.reset();
 
-        let mut builder = Timestamp::builder_in(&*bump);
-        builder.merkle_proof(proof);
+    let mut builder = Timestamp::builder();
+    builder.merkle_proof(proof);
 
-        let timestamp = builder
-            .attest(EthereumUTSAttestation::new(
-                entry.chain_id,
-                entry.height,
-                Default::default(),
-            ))
-            .unwrap();
+    let timestamp = builder
+        .attest(EASTimestamped {
+            chain: Chain::from_id(attestation.chain_id),
+        })
+        .unwrap();
 
-        // copy data out of bump
-        // TODO: eliminate this allocation by reusing from a pool
-        // TODO: wrap the buffer with a drop trait to return to pool
-        let mut buf = BytesMut::with_capacity(128);
-        timestamp.encode(&mut buf).unwrap();
+    let mut buf = BytesMut::with_capacity(128);
+    timestamp.encode(&mut buf).unwrap();
 
-        #[cfg(any(debug_assertions, not(feature = "performance")))]
-        trace!(encoded_length = buf.len(), timestamp = ?timestamp);
+    #[cfg(any(debug_assertions, not(feature = "performance")))]
+    trace!(encoded_length = buf.len(), timestamp = ?timestamp);
 
-        buf.freeze()
-    });
-
-    output.into_response()
+    let mut headers = HeaderMap::with_capacity(2);
+    headers.insert(header::CACHE_CONTROL, PUBLIC_IMMUTABLE.clone());
+    headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_OCTET_STREAM.clone());
+    buf.freeze().into_response()
 }

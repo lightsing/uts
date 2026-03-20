@@ -61,7 +61,7 @@ impl<A: Allocator + Clone> Timestamp<A> {
                 }
 
                 let result = if let Some(value) = step.next.first().and_then(|next| next.input()) {
-                    Some(value.to_vec_in(step.allocator().clone()))
+                    Some(SliceExt::to_vec_in(value, step.allocator().clone()))
                 } else if let Some(input) = input {
                     let result = op.execute_in(input, &step.data, step.allocator().clone());
                     indent(f, depth, false)?;
